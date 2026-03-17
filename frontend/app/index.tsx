@@ -700,8 +700,8 @@ export default function BrowserScreen() {
                 androidHardwareAccelerationDisabled={false}
                 // Android: Force hardware acceleration for better performance
                 androidLayerType="hardware"
-                // iOS: Native smooth scrolling deceleration
-                decelerationRate="normal"
+                // iOS: Native smooth scrolling deceleration (Platform-specific)
+                decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.998}
                 // iOS: Bounces at scroll edges for native feel
                 bounces={true}
                 // Optimize rendering performance

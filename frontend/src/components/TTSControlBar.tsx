@@ -38,9 +38,11 @@ export const TTSControlBar: React.FC<TTSControlBarProps> = ({
   const insets = useSafeAreaInsets();
   const { ttsRate, cycleTTSRate } = useBrowserStore();
   
+  // Ensure ttsRate is a valid number
+  const safeRate = typeof ttsRate === 'number' && !isNaN(ttsRate) ? ttsRate : 1.0;
+  
   // Animation values
   const slideAnim = useRef(new Animated.Value(100)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const waveAnim1 = useRef(new Animated.Value(0.3)).current;
   const waveAnim2 = useRef(new Animated.Value(0.5)).current;
   const waveAnim3 = useRef(new Animated.Value(0.4)).current;
@@ -162,7 +164,7 @@ export const TTSControlBar: React.FC<TTSControlBarProps> = ({
           activeOpacity={0.7}
         >
           <Text style={[styles.speedText, { color: colors.accent }]}>
-            {ttsRate.toFixed(ttsRate % 1 === 0 ? 1 : 2)}x
+            {safeRate.toFixed(safeRate % 1 === 0 ? 1 : 2)}x
           </Text>
         </TouchableOpacity>
 
