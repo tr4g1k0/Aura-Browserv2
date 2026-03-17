@@ -327,6 +327,19 @@ export default function SettingsScreen() {
           isHeavyToggle
         />
 
+        {/* PRIVACY GUARD: Semantic Time-Machine AI History Toggle */}
+        {/* All AI History processing happens 100% locally on-device */}
+        {/* No page content or semantic labels ever leave this device */}
+        <SettingsRow
+          icon="sparkles"
+          iconColor="#00FFFF"
+          title="AI-Powered History"
+          subtitle="100% local semantic page memory"
+          value={settings.aiHistoryEnabled}
+          onToggle={(v) => updateSetting('aiHistoryEnabled', v)}
+          isHeavyToggle
+        />
+
         <SettingsRow
           icon="mic-outline"
           iconColor="#00FF88"

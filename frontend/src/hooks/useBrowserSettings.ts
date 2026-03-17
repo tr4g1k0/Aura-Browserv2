@@ -52,6 +52,7 @@ export interface ToolbarShortcuts {
 export interface BrowserSettings {
   // AI & Accessibility
   strictLocalAI: boolean;
+  aiHistoryEnabled: boolean;      // Semantic Time-Machine: AI-powered history
   captioningLanguage: CaptioningLanguage;
   liveCaptioningEnabled: boolean;
   ambientAwarenessEnabled: boolean;
@@ -85,6 +86,7 @@ export const DEFAULT_TOOLBAR_SHORTCUTS: ToolbarShortcuts = {
 export const DEFAULT_BROWSER_SETTINGS: BrowserSettings = {
   // AI & Accessibility
   strictLocalAI: false,
+  aiHistoryEnabled: true,         // Semantic Time-Machine enabled by default
   captioningLanguage: 'english',
   liveCaptioningEnabled: false,
   ambientAwarenessEnabled: false,

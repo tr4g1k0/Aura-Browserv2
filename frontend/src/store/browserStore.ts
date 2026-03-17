@@ -70,6 +70,12 @@ export interface HistoryEntry {
   title: string;
   timestamp: number;
   favicon?: string;
+  // Semantic Time-Machine fields (AI-powered history)
+  // PRIVACY GUARD: All AI processing happens 100% locally on-device
+  // No page content or semantic labels ever leave this device
+  semanticLabel?: string;      // AI-generated 10-15 word intent description
+  metaDescription?: string;    // Page meta description
+  thumbnailUri?: string;       // Page thumbnail (future feature)
 }
 
 export interface Bookmark {
@@ -132,9 +138,10 @@ interface BrowserState {
   addLiveCaption: (caption: string) => void;
   clearLiveCaptions: () => void;
   // History actions
-  addToHistory: (url: string, title: string, favicon?: string) => void;
+  addToHistory: (url: string, title: string, favicon?: string, semanticLabel?: string, metaDescription?: string) => void;
   clearHistory: () => void;
   removeFromHistory: (timestamp: number) => void;
+  updateHistoryEntry: (timestamp: number, updates: Partial<HistoryEntry>) => void;
   // Bookmark actions
   addBookmark: (url: string, title: string, favicon?: string) => void;
   removeBookmark: (url: string) => void;
@@ -431,7 +438,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
   clearLiveCaptions: () => set({ liveCaptions: [] }),
 
   // History actions
-  addToHistory: (url: string, title: string, favicon?: string) => {
+  addToHistory: (url: string, title: string, favicon?: string, semanticLabel?: string, metaDescription?: string) => {
     // DATA BLACKOUT: Skip history logging in Ghost Mode
     if (get().isGhostMode) {
       console.log('[Ghost Mode] History logging bypassed');
@@ -458,6 +465,9 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
         title: title || url,
         timestamp: now,
         favicon,
+        // Semantic Time-Machine fields
+        semanticLabel,
+        metaDescription,
       };
       
       // Keep only the 500 most recent entries
@@ -475,6 +485,19 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
   removeFromHistory: (timestamp: number) => {
     set((state) => ({
       history: state.history.filter((h) => h.timestamp !== timestamp),
+    }));
+    get().persistState();
+  },
+
+  /**
+   * Update a history entry with new data (e.g., semantic label)
+   * PRIVACY GUARD: Semantic labels are generated 100% locally
+   */
+  updateHistoryEntry: (timestamp: number, updates: Partial<HistoryEntry>) => {
+    set((state) => ({
+      history: state.history.map((h) =>
+        h.timestamp === timestamp ? { ...h, ...updates } : h
+      ),
     }));
     get().persistState();
   },

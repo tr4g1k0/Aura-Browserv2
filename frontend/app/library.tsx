@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useBrowserStore, HistoryEntry, Bookmark } from '../src/store/browserStore';
+import { semanticHistoryService } from '../src/services/SemanticHistoryService';
 
 interface LibraryScreenProps {
   visible: boolean;
@@ -30,9 +31,15 @@ type TabType = 'bookmarks' | 'history';
  * 
  * Features:
  * - Two-tab interface (Bookmarks / History)
- * - Search through history
+ * - Semantic Time-Machine: AI-powered fuzzy search through history
+ * - Displays AI-generated semantic labels for each history entry
+ * - Search through both title AND semanticLabel for intelligent matching
  * - Swipe to delete bookmarks/history entries
  * - Navigate back to past pages
+ * 
+ * PRIVACY GUARD:
+ * All AI History processing happens 100% locally on-device.
+ * No page content or semantic labels ever leave this device.
  */
 export const LibraryScreen: React.FC<LibraryScreenProps> = ({
   visible,
@@ -51,17 +58,18 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('bookmarks');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Filter history based on search query
+  /**
+   * Semantic Time-Machine: Fuzzy Search Engine
+   * Searches against both title AND semanticLabel for intelligent matching
+   * Uses the SemanticHistoryService for advanced fuzzy matching
+   */
   const filteredHistory = useMemo(() => {
     if (!searchQuery.trim()) {
       return history;
     }
-    const query = searchQuery.toLowerCase();
-    return history.filter(
-      (entry) =>
-        entry.title.toLowerCase().includes(query) ||
-        entry.url.toLowerCase().includes(query)
-    );
+    
+    // Use the semantic history service's fuzzy search
+    return semanticHistoryService.fuzzySearch(searchQuery, history);
   }, [history, searchQuery]);
 
   // Filter bookmarks based on search query
@@ -152,6 +160,11 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
     }
   };
 
+  /**
+   * Render History Item with Semantic Label
+   * Displays the AI-generated semantic label in Electric Cyan (#00FFFF)
+   * This proves to the user that the AI 'remembered' the page content
+   */
   const renderHistoryItem = useCallback(({ item }: { item: HistoryEntry }) => (
     <Animated.View 
       entering={FadeIn.duration(200)}
@@ -164,7 +177,12 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
         activeOpacity={0.7}
       >
         <View style={styles.itemIcon}>
-          <Ionicons name="time-outline" size={20} color="#888" />
+          {item.semanticLabel ? (
+            // AI-enhanced history entry
+            <Ionicons name="sparkles" size={18} color="#00FFFF" />
+          ) : (
+            <Ionicons name="time-outline" size={20} color="#888" />
+          )}
         </View>
         <View style={styles.itemContent}>
           <Text style={styles.itemTitle} numberOfLines={1}>
@@ -173,15 +191,23 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
           <Text style={styles.itemUrl} numberOfLines={1}>
             {getHostname(item.url)}
           </Text>
+          {/* Semantic Time-Machine: Display AI-generated label */}
+          {item.semanticLabel && (
+            <Text style={styles.semanticLabel} numberOfLines={2}>
+              {item.semanticLabel}
+            </Text>
+          )}
         </View>
-        <Text style={styles.itemTime}>{formatTime(item.timestamp)}</Text>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleRemoveHistoryItem(item.timestamp)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="close" size={16} color="#666" />
-        </TouchableOpacity>
+        <View style={styles.itemActions}>
+          <Text style={styles.itemTime}>{formatTime(item.timestamp)}</Text>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleRemoveHistoryItem(item.timestamp)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={16} color="#666" />
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   ), []);
@@ -236,10 +262,20 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
           ? 'No results found for your search'
           : 'Your browsing history will appear here'}
       </Text>
+      {type === 'history' && !searchQuery && (
+        <Text style={styles.privacyNote}>
+          AI-powered semantic search enabled
+        </Text>
+      )}
     </View>
   );
 
   const isWeb = Platform.OS === 'web';
+
+  // Count entries with semantic labels
+  const semanticEntriesCount = useMemo(() => 
+    history.filter(h => h.semanticLabel).length,
+  [history]);
 
   return (
     <Modal
@@ -312,7 +348,20 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Search Bar */}
+        {/* Semantic AI Status Badge (for History tab) */}
+        {activeTab === 'history' && history.length > 0 && (
+          <View style={styles.semanticStatusContainer}>
+            <View style={styles.semanticStatusBadge}>
+              <Ionicons name="sparkles" size={14} color="#00FFFF" />
+              <Text style={styles.semanticStatusText}>
+                {semanticEntriesCount} AI-enhanced {semanticEntriesCount === 1 ? 'entry' : 'entries'}
+              </Text>
+              <Text style={styles.semanticPrivacyText}>• 100% Local</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Search Bar with Semantic Search Hint */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <Ionicons name="search" size={18} color="#666" style={styles.searchIcon} />
@@ -320,7 +369,11 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
               style={styles.searchInput}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder={`Search ${activeTab}...`}
+              placeholder={
+                activeTab === 'history' 
+                  ? "Search your memory..." 
+                  : "Search bookmarks..."
+              }
               placeholderTextColor="#555"
               autoCapitalize="none"
               autoCorrect={false}
@@ -335,6 +388,11 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
               </TouchableOpacity>
             )}
           </View>
+          {activeTab === 'history' && searchQuery.length > 0 && (
+            <Text style={styles.searchHint}>
+              Searching titles and AI-generated context...
+            </Text>
+          )}
         </View>
 
         {/* Content */}
@@ -457,6 +515,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
   },
+  // Semantic AI Status Badge
+  semanticStatusContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  semanticStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 255, 255, 0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  semanticStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#00FFFF',
+  },
+  semanticPrivacyText: {
+    fontSize: 10,
+    color: '#00FF88',
+    fontWeight: '500',
+  },
   searchContainer: {
     paddingHorizontal: 16,
     paddingBottom: 12,
@@ -486,6 +569,13 @@ const styles = StyleSheet.create({
   clearSearchButton: {
     padding: 4,
   },
+  searchHint: {
+    fontSize: 11,
+    color: '#00FFFF',
+    marginTop: 6,
+    marginLeft: 4,
+    fontStyle: 'italic',
+  },
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
@@ -495,7 +585,7 @@ const styles = StyleSheet.create({
   },
   listItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: 14,
     paddingHorizontal: 12,
     marginBottom: 8,
@@ -530,10 +620,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
+  // Semantic Time-Machine: Electric Cyan label
+  semanticLabel: {
+    fontSize: 12,
+    color: '#00FFFF',        // Electric Cyan
+    fontStyle: 'italic',
+    marginTop: 6,
+    lineHeight: 16,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  itemActions: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
   itemTime: {
     fontSize: 11,
     color: '#555',
-    marginRight: 8,
   },
   deleteButton: {
     width: 28,
@@ -561,6 +667,12 @@ const styles = StyleSheet.create({
     color: '#444',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  privacyNote: {
+    fontSize: 11,
+    color: '#00FFFF',
+    marginTop: 16,
+    fontStyle: 'italic',
   },
 });
 

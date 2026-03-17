@@ -42,6 +42,11 @@ import {
   linkExtractionScript,
   CachedPage 
 } from '../src/services/PredictiveCacheService';
+import { 
+  pageContextExtractionScript,
+  semanticHistoryService,
+  PageContext 
+} from '../src/services/SemanticHistoryService';
 import * as Haptics from 'expo-haptics';
 
 // Conditionally import WebView only on native platforms
@@ -71,6 +76,7 @@ export default function BrowserScreen() {
     loadPersistedState,
     addCachedPage,
     addToHistory,
+    updateHistoryEntry,
     saveTabScrollPosition,
     ttsRate,
     toggleDesktopMode,
@@ -464,7 +470,24 @@ export default function BrowserScreen() {
       // Extract prominent links for predictive prefetching
       webViewRef.current?.injectJavaScript(linkExtractionScript);
     }
-  }, [userSettings.aggressiveAdBlocking, settings.predictiveCachingEnabled, visionAISelectors, cachedPageSource, activeTab?.scrollY]);
+
+    /**
+     * SEMANTIC TIME-MACHINE: capturePageContext
+     * Wait 3 seconds (to ensure the user is staying on the page),
+     * then inject JS to grab the page context for AI summarization.
+     * 
+     * PRIVACY GUARD: All AI History processing happens 100% locally.
+     * No page content ever leaves this device.
+     */
+    if (!isGhostMode && userSettings.aiHistoryEnabled !== false) {
+      // Wait 3 seconds before capturing page context
+      // This ensures the user is actually staying on the page
+      setTimeout(() => {
+        console.log('[Semantic History] Capturing page context after 3s delay...');
+        webViewRef.current?.injectJavaScript(pageContextExtractionScript);
+      }, 3000);
+    }
+  }, [userSettings.aggressiveAdBlocking, userSettings.aiHistoryEnabled, settings.predictiveCachingEnabled, visionAISelectors, cachedPageSource, activeTab?.scrollY, isGhostMode]);
 
   const handleMessage = useCallback((event: any) => {
     try {
@@ -494,6 +517,55 @@ export default function BrowserScreen() {
         predictiveCacheService.prefetchMultiple(data.links);
       }
       
+      /**
+       * SEMANTIC TIME-MACHINE: Handle Page Context Extraction
+       * PRIVACY GUARD: All processing happens 100% locally on-device
+       * No page content or semantic labels ever leave this device
+       */
+      if (data.type === 'PAGE_CONTEXT') {
+        console.log('[Semantic History] Received page context for:', data.url);
+        
+        // Skip in Ghost Mode - no history tracking
+        if (!isGhostMode) {
+          const pageContext: PageContext = {
+            url: data.url,
+            title: data.title,
+            metaDescription: data.metaDescription,
+            bodyText: data.bodyText,
+            timestamp: data.timestamp,
+          };
+          
+          // Process in background - don't block UI
+          (async () => {
+            try {
+              // Generate semantic label using local AI
+              const semanticEntry = await semanticHistoryService.processPageContext(pageContext);
+              
+              console.log('[Semantic History] Generated label:', semanticEntry.semanticLabel);
+              
+              // Find and update the history entry with this timestamp
+              const historyEntries = useBrowserStore.getState().history;
+              const matchingEntry = historyEntries.find(
+                (h) => h.url === data.url && Math.abs(h.timestamp - data.timestamp) < 10000
+              );
+              
+              if (matchingEntry) {
+                updateHistoryEntry(matchingEntry.timestamp, {
+                  semanticLabel: semanticEntry.semanticLabel,
+                  metaDescription: semanticEntry.metaDescription,
+                });
+              }
+            } catch (error) {
+              console.error('[Semantic History] Processing error:', error);
+            }
+          })();
+        }
+      }
+      
+      if (data.type === 'PAGE_CONTEXT_ERROR') {
+        console.error('[Semantic History] Extraction error:', data.error);
+      }
+      
       // Handle TTS content extraction response
       if (data.type === 'TTS_CONTENT' && data.content) {
         console.log(`[TTS] Received content from ${data.source}: ${data.length} chars`);
@@ -508,7 +580,7 @@ export default function BrowserScreen() {
     } catch (e) {
       // Ignore non-JSON messages
     }
-  }, [addCachedPage]);
+  }, [addCachedPage, isGhostMode, updateHistoryEntry]);
 
   /**
    * Handle TTS content - speak the extracted text
