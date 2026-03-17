@@ -631,6 +631,94 @@ export const gpuLayerSquashingScript = `
     }, 2000);
     console.log('[Intersection Fix] YouTube Shorts detected - periodic recalc enabled');
   }
+  
+  /* ================================================================== */
+  /* VIEWPORT SANITIZATION v1.0                                         */
+  /* Fixes: Multiple video layers stacking, performance lag             */
+  /* Solution: Z-Index flattening + Single-Active playback enforcement  */
+  /* ================================================================== */
+  
+  // Z-INDEX FLATTENING: Force strict stacking context
+  // Hide inactive videos completely (zero height, invisible, no pointer events)
+  var stackFix = document.createElement('style');
+  stackFix.id = 'viewport-sanitization';
+  stackFix.innerHTML = [
+    /* Force column layout for Shorts container */
+    'ytd-shorts {',
+    '  display: flex !important;',
+    '  flex-direction: column !important;',
+    '}',
+    
+    /* CRITICAL: Make inactive reels invisible AND zero-height */
+    /* This stops GPU from trying to draw hidden videos */
+    'ytd-reel-video-renderer:not([is-active]) {',
+    '  visibility: hidden !important;',
+    '  opacity: 0 !important;',
+    '  pointer-events: none !important;',
+    '  height: 0 !important;',
+    '  overflow: hidden !important;',
+    '  position: absolute !important;',
+    '  z-index: -1 !important;',
+    '}',
+    
+    /* Only the active reel gets full visibility */
+    'ytd-reel-video-renderer[is-active] {',
+    '  visibility: visible !important;',
+    '  opacity: 1 !important;',
+    '  pointer-events: auto !important;',
+    '  height: auto !important;',
+    '  position: relative !important;',
+    '  z-index: 1 !important;',
+    '}',
+    
+    /* Disable "Infinite" DOM - limit YouTube pre-rendering */
+    'ytd-item-section-renderer {',
+    '  contain: content !important;',
+    '}',
+    
+    /* Additional feed containers - limit pre-render */
+    'ytd-section-list-renderer, ytd-rich-grid-renderer {',
+    '  contain: content !important;',
+    '}',
+    
+    /* Shorts-specific: Only render what's visible */
+    '#shorts-inner-container > *:not(:first-child):not(:nth-child(2)) {',
+    '  content-visibility: auto;',
+    '  contain-intrinsic-size: 1px 100vh;',
+    '}'
+  ].join('\\n');
+  
+  if (document.head) {
+    document.head.appendChild(stackFix);
+  } else {
+    document.documentElement.appendChild(stackFix);
+  }
+  
+  console.log('[Viewport Sanitization] Z-Index flattening applied');
+  
+  /* ================================================================== */
+  /* FORCE SINGLE-ACTIVE PLAYBACK                                       */
+  /* Pauses all videos that are not in the active container             */
+  /* Runs every 500ms to catch any rogue auto-playing videos            */
+  /* ================================================================== */
+  
+  if (location.hostname.includes('youtube.com')) {
+    setInterval(function() {
+      var videos = document.querySelectorAll('video');
+      videos.forEach(function(v) {
+        // Check if this video is inside an active container
+        var isInActive = v.parentElement && v.parentElement.closest('[is-active]');
+        
+        // If not in active container and playing, pause it
+        if (!isInActive && !v.paused) {
+          v.pause();
+          console.log('[Single-Active] Paused rogue video');
+        }
+      });
+    }, 500);
+    
+    console.log('[Single-Active Playback] Enforcement interval started');
+  }
 })();
 true;`;
 

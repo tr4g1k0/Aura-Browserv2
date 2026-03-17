@@ -903,6 +903,9 @@ export default function BrowserScreen() {
                 cacheMode="LOAD_DEFAULT"
                 // Ensure smooth scrolling
                 overScrollMode="never"
+                // VIEWPORT SANITIZATION: Keep JS bridge synced with scroll position
+                // 16ms = 60fps, ensures smooth scroll tracking for video feeds
+                scrollEventThrottle={16}
               />
             </ScrollView>
           </SwipeNavigationWrapper>
@@ -971,6 +974,8 @@ const styles = StyleSheet.create({
   webviewContainer: {
     flex: 1,
     position: 'relative',
+    // VIEWPORT SANITIZATION: Clip overflow to prevent layer stacking
+    overflow: 'hidden',
   },
   webview: {
     flex: 1,
