@@ -1,7 +1,7 @@
 // Model Download Manager
 // Handles downloading, caching, and managing ONNX model files
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { ModelConfig, ModelDownloadProgress, ModelStatus } from './types';
 import { MODEL_REGISTRY, getModelById } from './models.config';
 

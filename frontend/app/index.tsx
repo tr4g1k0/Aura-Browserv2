@@ -12,9 +12,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useBrowserStore } from '../src/store/browserStore';
 import { BrowserStatusBar } from '../src/components/StatusBar';
 import { NavigationBar } from '../src/components/NavigationBar';
-import { LiveCaptions } from '../src/components/LiveCaptions';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
+import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
 import { shouldBlockRequest, getAdBlockCSS, visionAIScannerPlaceholder } from '../src/utils/adblock';
 import * as Haptics from 'expo-haptics';
 
@@ -42,6 +42,7 @@ export default function BrowserScreen() {
   } = useBrowserStore();
 
   const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
+  const [liveCaptionsVisible, setLiveCaptionsVisible] = useState(false);
   const [adBlockCSS, setAdBlockCSS] = useState('');
 
   const activeTab = tabs.find((t) => t.isActive) || tabs[0];
@@ -240,8 +241,30 @@ export default function BrowserScreen() {
           <Ionicons name="sparkles" size={24} color="#0D0D0D" />
         </TouchableOpacity>
 
+        {/* Live Captions Toggle Button */}
+        <TouchableOpacity
+          style={[
+            styles.captionsToggleButton,
+            liveCaptionsVisible && styles.captionsToggleActive,
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setLiveCaptionsVisible(!liveCaptionsVisible);
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="text" 
+            size={20} 
+            color={liveCaptionsVisible ? '#0D0D0D' : '#00FF88'} 
+          />
+        </TouchableOpacity>
+
         {/* Accessibility Overlays */}
-        <LiveCaptions />
+        <LiveCaptionsOverlay
+          visible={liveCaptionsVisible}
+          onClose={() => setLiveCaptionsVisible(false)}
+        />
         <AmbientAlerts />
       </View>
 
@@ -347,5 +370,22 @@ const styles = StyleSheet.create({
       },
       web: {},
     }),
+  },
+  captionsToggleButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 88,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1A1A1A',
+    borderWidth: 2,
+    borderColor: '#00FF88',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captionsToggleActive: {
+    backgroundColor: '#00FF88',
+    borderColor: '#00FF88',
   },
 });
