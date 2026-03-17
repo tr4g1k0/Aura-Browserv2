@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,19 @@ import {
   ScrollView,
   Animated,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrowserStore, Tab } from '../src/store/browserStore';
+import { 
+  groupTabsByIntent, 
+  generateGroupSummary,
+  TabGroup,
+  GroupSummary,
+  isInMockMode,
+} from '../src/services/AITabAgent';
 import * as Haptics from 'expo-haptics';
 
 // Mock dummy tabs for demonstration
@@ -82,24 +90,6 @@ const MOCK_TABS: Tab[] = [
   },
 ];
 
-interface TabGroup {
-  category: string;
-  icon: string;
-  color: string;
-  tabs: Tab[];
-  isExpanded: boolean;
-}
-
-const CATEGORY_CONFIG: Record<string, { icon: string; color: string }> = {
-  Shopping: { icon: 'cart', color: '#FF6B6B' },
-  Research: { icon: 'school', color: '#4ECDC4' },
-  Entertainment: { icon: 'play-circle', color: '#A78BFA' },
-  News: { icon: 'newspaper', color: '#F59E0B' },
-  Development: { icon: 'code-slash', color: '#3B82F6' },
-  Social: { icon: 'people', color: '#EC4899' },
-  Other: { icon: 'folder', color: '#6B7280' },
-};
-
 export default function TabsManagerScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -132,11 +122,12 @@ export default function TabsManagerScreen() {
     router.back();
   };
 
-  // Mock AI Tab Grouping Function
-  const groupTabsByIntent = useCallback(async () => {
+  // AI Tab Grouping Function using AITabAgent service
+  const handleGroupByIntent = useCallback(async () => {
     if (isGrouped) {
       // Ungroup - reset to flat list
       setIsGrouped(false);
+      setTabGroups([]);
       Animated.timing(groupAnimation, {
         toValue: 0,
         duration: 300,
@@ -148,74 +139,81 @@ export default function TabsManagerScreen() {
     setIsGrouping(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Simulate AI processing delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      // Use AITabAgent service for grouping
+      const result = await groupTabsByIntent(allTabs);
+      
+      setTabGroups(result.groups);
+      setIsGrouped(true);
 
-    // Mock categorization logic
-    const categoryMap = new Map<string, Tab[]>();
+      Animated.timing(groupAnimation, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
 
-    allTabs.forEach(tab => {
-      const url = tab.url.toLowerCase();
-      const title = tab.title.toLowerCase();
-      let category = 'Other';
-
-      if (url.includes('amazon') || url.includes('shop') || url.includes('ebay') || url.includes('store')) {
-        category = 'Shopping';
-      } else if (url.includes('wikipedia') || url.includes('docs') || url.includes('stackoverflow')) {
-        category = 'Research';
-      } else if (url.includes('youtube') || url.includes('netflix') || url.includes('spotify') || url.includes('twitch')) {
-        category = 'Entertainment';
-      } else if (url.includes('news') || url.includes('ycombinator') || url.includes('reddit')) {
-        category = 'News';
-      } else if (url.includes('github') || url.includes('gitlab') || url.includes('dev.to') || title.includes('code')) {
-        category = 'Development';
-      }
-
-      if (!categoryMap.has(category)) {
-        categoryMap.set(category, []);
-      }
-      categoryMap.get(category)!.push(tab);
-    });
-
-    // Convert to TabGroup array
-    const groups: TabGroup[] = [];
-    categoryMap.forEach((tabs, category) => {
-      const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.Other;
-      groups.push({
-        category,
-        icon: config.icon,
-        color: config.color,
-        tabs,
-        isExpanded: true,
-      });
-    });
-
-    // Sort by number of tabs (most first)
-    groups.sort((a, b) => b.tabs.length - a.tabs.length);
-
-    setTabGroups(groups);
-    setIsGrouping(false);
-    setIsGrouped(true);
-
-    Animated.timing(groupAnimation, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('[TabsManager] Grouping error:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setIsGrouping(false);
+    }
   }, [isGrouped, allTabs, groupAnimation]);
 
-  const toggleGroupExpansion = (category: string) => {
+  // Generate summary for a group
+  const handleGenerateSummary = useCallback(async (groupId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Find the group
+    const group = tabGroups.find(g => g.id === groupId);
+    if (!group) return;
+
+    // Set loading state
+    setTabGroups(prev =>
+      prev.map(g =>
+        g.id === groupId ? { ...g, isSummarizing: true } : g
+      )
+    );
+
+    try {
+      // Generate summary using AITabAgent service
+      const summary = await generateGroupSummary(group);
+      
+      // Update group with summary
+      setTabGroups(prev =>
+        prev.map(g =>
+          g.id === groupId 
+            ? { ...g, summary, isSummarizing: false } 
+            : g
+        )
+      );
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('[TabsManager] Summary generation error:', error);
+      
+      // Clear loading state on error
+      setTabGroups(prev =>
+        prev.map(g =>
+          g.id === groupId ? { ...g, isSummarizing: false } : g
+        )
+      );
+      
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  }, [tabGroups]);
+
+  const toggleGroupExpansion = (groupId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTabGroups(prev =>
       prev.map(g =>
-        g.category === category ? { ...g, isExpanded: !g.isExpanded } : g
+        g.id === groupId ? { ...g, isExpanded: !g.isExpanded } : g
       )
     );
   };
 
-  const renderTabCard = (tab: Tab, showCategory = false) => (
+  const renderTabCard = (tab: Tab) => (
     <TouchableOpacity
       key={tab.id}
       style={[styles.tabCard, tab.isActive && styles.activeTabCard]}
@@ -251,6 +249,32 @@ export default function TabsManagerScreen() {
     </TouchableOpacity>
   );
 
+  // Render summary card with glassmorphism effect
+  const renderSummaryCard = (summary: GroupSummary, color: string) => (
+    <View style={[styles.summaryCard, { borderColor: `${color}40` }]}>
+      <View style={styles.summaryHeader}>
+        <Ionicons name="bulb" size={14} color={color} />
+        <Text style={[styles.summaryLabel, { color }]}>AI Summary</Text>
+        {isInMockMode() && (
+          <View style={styles.mockBadge}>
+            <Text style={styles.mockBadgeText}>MOCK</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.bulletList}>
+        {summary.bullets.map((bullet, index) => (
+          <View key={index} style={styles.bulletItem}>
+            <View style={[styles.bulletDot, { backgroundColor: color }]} />
+            <Text style={styles.bulletText}>{bullet}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={styles.summaryConfidence}>
+        {Math.round(summary.confidence * 100)}% confidence
+      </Text>
+    </View>
+  );
+
   const renderGroupedView = () => (
     <Animated.View
       style={{
@@ -264,10 +288,11 @@ export default function TabsManagerScreen() {
       }}
     >
       {tabGroups.map(group => (
-        <View key={group.category} style={styles.groupContainer}>
+        <View key={group.id} style={styles.groupContainer}>
+          {/* Group Header */}
           <TouchableOpacity
             style={styles.groupHeader}
-            onPress={() => toggleGroupExpansion(group.category)}
+            onPress={() => toggleGroupExpansion(group.id)}
             activeOpacity={0.7}
           >
             <View style={styles.groupHeaderLeft}>
@@ -290,6 +315,38 @@ export default function TabsManagerScreen() {
             />
           </TouchableOpacity>
 
+          {/* Generate Brief Button */}
+          {group.isExpanded && !group.summary && (
+            <TouchableOpacity
+              style={[styles.generateBriefButton, { borderColor: `${group.color}60` }]}
+              onPress={() => handleGenerateSummary(group.id)}
+              disabled={group.isSummarizing}
+              activeOpacity={0.7}
+            >
+              {group.isSummarizing ? (
+                <>
+                  <ActivityIndicator size="small" color={group.color} />
+                  <Text style={[styles.generateBriefText, { color: group.color }]}>
+                    Generating summary...
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="sparkles" size={16} color={group.color} />
+                  <Text style={[styles.generateBriefText, { color: group.color }]}>
+                    Generate Brief
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Summary Card (Glassmorphism) */}
+          {group.isExpanded && group.summary && (
+            renderSummaryCard(group.summary, group.color)
+          )}
+
+          {/* Tab Cards */}
           {group.isExpanded && (
             <View style={styles.groupTabs}>
               {group.tabs.map(tab => renderTabCard(tab))}
@@ -323,13 +380,13 @@ export default function TabsManagerScreen() {
         </View>
       </View>
 
-      {/* AI Group Button */}
+      {/* AI Organize Button - Prominent, neon-accented */}
       <TouchableOpacity
         style={[
-          styles.groupByIntentButton,
-          isGrouped && styles.groupByIntentButtonActive,
+          styles.organizeButton,
+          isGrouped && styles.organizeButtonActive,
         ]}
-        onPress={groupTabsByIntent}
+        onPress={handleGroupByIntent}
         disabled={isGrouping}
         activeOpacity={0.8}
       >
@@ -337,18 +394,14 @@ export default function TabsManagerScreen() {
           <ActivityIndicator size="small" color="#00FF88" />
         ) : (
           <>
-            <Ionicons
-              name={isGrouped ? 'layers' : 'sparkles'}
-              size={20}
-              color={isGrouped ? '#0D0D0D' : '#00FF88'}
-            />
+            <Text style={styles.organizeButtonEmoji}>✨</Text>
             <Text
               style={[
-                styles.groupByIntentText,
-                isGrouped && styles.groupByIntentTextActive,
+                styles.organizeButtonText,
+                isGrouped && styles.organizeButtonTextActive,
               ]}
             >
-              {isGrouped ? 'Grouped by Intent' : 'Group by Intent (AI)'}
+              {isGrouped ? 'Organized by AI' : 'Organize Tabs with AI'}
             </Text>
             {isGrouped && (
               <View style={styles.ungroupHint}>
@@ -427,42 +480,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  groupByIntentButton: {
+  // Prominent AI Organize Button
+  organizeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 16,
     marginTop: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    backgroundColor: '#1A2A1A',
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    backgroundColor: '#0D1A0D',
+    borderRadius: 16,
+    borderWidth: 2,
     borderColor: '#00FF88',
     gap: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#00FF88',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 4px 16px rgba(0, 255, 136, 0.3)',
+      },
+    }),
   },
-  groupByIntentButtonActive: {
+  organizeButtonActive: {
     backgroundColor: '#00FF88',
     borderColor: '#00FF88',
   },
-  groupByIntentText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#00FF88',
+  organizeButtonEmoji: {
+    fontSize: 20,
   },
-  groupByIntentTextActive: {
+  organizeButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#00FF88',
+    letterSpacing: 0.5,
+  },
+  organizeButtonTextActive: {
     color: '#0D0D0D',
   },
   ungroupHint: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
     marginLeft: 4,
   },
   ungroupHintText: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#0D0D0D',
+    fontWeight: '500',
   },
   scrollView: {
     flex: 1,
@@ -495,7 +568,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   groupContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   groupHeader: {
     flexDirection: 'row',
@@ -526,6 +599,103 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 2,
+  },
+  // Generate Brief Button
+  generateBriefButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    marginLeft: 8,
+    marginRight: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    gap: 8,
+  },
+  generateBriefText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  // Summary Card - Glassmorphism Style
+  summaryCard: {
+    marginBottom: 12,
+    marginLeft: 8,
+    marginRight: 8,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        backdropFilter: 'blur(10px)',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+      },
+    }),
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 6,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  mockBadge: {
+    backgroundColor: 'rgba(255, 184, 0, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 'auto',
+  },
+  mockBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FFB800',
+    letterSpacing: 0.5,
+  },
+  bulletList: {
+    gap: 10,
+  },
+  bulletItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  bulletDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 6,
+    marginRight: 10,
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#CCC',
+    lineHeight: 18,
+  },
+  summaryConfidence: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 12,
+    textAlign: 'right',
+    fontStyle: 'italic',
   },
   groupTabs: {
     paddingLeft: 8,
