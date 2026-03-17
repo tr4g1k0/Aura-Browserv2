@@ -335,6 +335,117 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* Section: Toolbar Shortcuts */}
+        {renderSectionHeader('TOOLBAR SHORTCUTS')}
+        <View style={styles.section}>
+          <Text style={styles.toolbarDescription}>
+            Choose which quick tools appear in the main toolbar
+          </Text>
+          
+          {renderToggleRow(
+            'text',
+            '#00FF88',
+            'Show Live Captioning Shortcut',
+            'Quick access to live captions from toolbar.',
+            settings.toolbarShortcuts?.showLiveCaptioning ?? false,
+            (value) => updateSetting('toolbarShortcuts', {
+              ...settings.toolbarShortcuts,
+              showLiveCaptioning: value,
+            })
+          )}
+          
+          {renderToggleRow(
+            'sparkles',
+            '#A78BFA',
+            'Show AI Agent Assistant',
+            'Quick access to AI assistant from toolbar.',
+            settings.toolbarShortcuts?.showAIAgent ?? false,
+            (value) => updateSetting('toolbarShortcuts', {
+              ...settings.toolbarShortcuts,
+              showAIAgent: value,
+            })
+          )}
+          
+          {renderToggleRow(
+            'globe',
+            '#00E5FF',
+            'Show VPN Toggle',
+            'Quick VPN on/off toggle in toolbar.',
+            settings.toolbarShortcuts?.showVPNToggle ?? false,
+            (value) => updateSetting('toolbarShortcuts', {
+              ...settings.toolbarShortcuts,
+              showVPNToggle: value,
+            })
+          )}
+          
+          {renderToggleRow(
+            'shield',
+            '#FFB800',
+            'Show Ad-Blocker Status',
+            'Show ad-blocking status indicator.',
+            settings.toolbarShortcuts?.showAdBlockStatus ?? false,
+            (value) => updateSetting('toolbarShortcuts', {
+              ...settings.toolbarShortcuts,
+              showAdBlockStatus: value,
+            })
+          )}
+        </View>
+
+        {/* Section: Address Bar Position */}
+        {renderSectionHeader('ADDRESS BAR POSITION')}
+        <View style={styles.section}>
+          <View style={styles.positionToggleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.positionOption,
+                settings.addressBarPosition === 'top' && styles.positionOptionActive,
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                updateSetting('addressBarPosition', 'top');
+              }}
+            >
+              <Ionicons 
+                name="arrow-up-circle" 
+                size={24} 
+                color={settings.addressBarPosition === 'top' ? '#00FF88' : '#666'} 
+              />
+              <Text style={[
+                styles.positionOptionText,
+                settings.addressBarPosition === 'top' && styles.positionOptionTextActive,
+              ]}>
+                Top
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.positionOption,
+                settings.addressBarPosition === 'bottom' && styles.positionOptionActive,
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                updateSetting('addressBarPosition', 'bottom');
+              }}
+            >
+              <Ionicons 
+                name="arrow-down-circle" 
+                size={24} 
+                color={settings.addressBarPosition === 'bottom' ? '#00FF88' : '#666'} 
+              />
+              <Text style={[
+                styles.positionOptionText,
+                settings.addressBarPosition === 'bottom' && styles.positionOptionTextActive,
+              ]}>
+                Bottom
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.positionDescription}>
+            Choose where the address bar appears on screen
+          </Text>
+        </View>
+
         {/* Danger Zone */}
         <View style={styles.dangerSection}>
           <Text style={styles.dangerHeader}>DANGER ZONE</Text>
@@ -597,6 +708,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#444',
     marginTop: 4,
+  },
+  toolbarDescription: {
+    fontSize: 13,
+    color: '#888',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    lineHeight: 18,
   },
   // Modal styles
   modalOverlay: {

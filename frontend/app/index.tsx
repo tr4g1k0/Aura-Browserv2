@@ -2,19 +2,16 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
-  TouchableOpacity,
   Platform,
   BackHandler,
   Text,
-  Animated,
-  Easing,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBrowserStore } from '../src/store/browserStore';
 import { useSettings } from '../src/context/SettingsContext';
 import { BrowserStatusBar } from '../src/components/StatusBar';
-import { NavigationBar } from '../src/components/NavigationBar';
+import { ChromeNavigationBar } from '../src/components/ChromeNavigationBar';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
@@ -69,9 +66,6 @@ export default function BrowserScreen() {
   const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
   const [isCacheHit, setIsCacheHit] = useState(false);
 
-  // Animation for Live Captions FAB pulse when active
-  const captionsPulseAnim = useRef(new Animated.Value(1)).current;
-
   const activeTab = tabs.find((t) => t.isActive) || tabs[0];
 
   // Load persisted state on mount
@@ -87,36 +81,6 @@ export default function BrowserScreen() {
     const selectors = await visionAIScannerPlaceholder('');
     setVisionAISelectors(selectors);
   };
-
-  // Pulse animation for Live Captions FAB when active
-  useEffect(() => {
-    if (liveCaptionsVisible) {
-      const pulse = Animated.loop(
-        Animated.sequence([
-          Animated.timing(captionsPulseAnim, {
-            toValue: 1.1,
-            duration: 800,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(captionsPulseAnim, {
-            toValue: 1,
-            duration: 800,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      pulse.start();
-      
-      return () => {
-        pulse.stop();
-        captionsPulseAnim.setValue(1);
-      };
-    } else {
-      captionsPulseAnim.setValue(1);
-    }
-  }, [liveCaptionsVisible]);
 
   // Handle Android back button
   useEffect(() => {
@@ -333,6 +297,28 @@ export default function BrowserScreen() {
         onAccessibilityPress={() => setAccessibilityModalVisible(true)}
       />
 
+      {/* Chrome-style Navigation Bar - TOP position */}
+      {userSettings.addressBarPosition === 'top' && (
+        <ChromeNavigationBar
+          onNavigate={handleNavigate}
+          onBack={() => webViewRef.current?.goBack()}
+          onForward={() => webViewRef.current?.goForward()}
+          onRefresh={() => webViewRef.current?.reload()}
+          onTabsPress={openTabsManager}
+          onSettingsPress={openSettings}
+          onLiveCaptionsPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setLiveCaptionsVisible(!liveCaptionsVisible);
+          }}
+          onAIAgentPress={openAIAgent}
+          currentUrl={activeTab?.url || ''}
+          canGoBack={activeTab?.canGoBack || false}
+          canGoForward={activeTab?.canGoForward || false}
+          liveCaptionsActive={liveCaptionsVisible}
+          position="top"
+        />
+      )}
+
       <View style={styles.webviewContainer}>
         {Platform.OS === 'web' ? (
           // Web platform: Show iframe or fallback message
@@ -412,39 +398,6 @@ export default function BrowserScreen() {
           </View>
         )}
 
-        {/* Floating AI Agent Button */}
-        <TouchableOpacity
-          style={styles.aiAgentButton}
-          onPress={openAIAgent}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="sparkles" size={24} color="#0D0D0D" />
-        </TouchableOpacity>
-
-        {/* Live Captions Toggle Button - Pulses when active */}
-        <Animated.View
-          style={[
-            styles.captionsToggleButton,
-            liveCaptionsVisible && styles.captionsToggleActive,
-            { transform: [{ scale: captionsPulseAnim }] },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.captionsToggleInner}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setLiveCaptionsVisible(!liveCaptionsVisible);
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons 
-              name="text" 
-              size={20} 
-              color={liveCaptionsVisible ? '#0D0D0D' : '#00FF88'} 
-            />
-          </TouchableOpacity>
-        </Animated.View>
-
         {/* Accessibility Overlays */}
         <LiveCaptionsOverlay
           visible={liveCaptionsVisible}
@@ -453,17 +406,27 @@ export default function BrowserScreen() {
         <AmbientAlerts />
       </View>
 
-      <NavigationBar
-        onNavigate={handleNavigate}
-        onBack={() => webViewRef.current?.goBack()}
-        onForward={() => webViewRef.current?.goForward()}
-        onRefresh={() => webViewRef.current?.reload()}
-        onTabsPress={openTabsManager}
-        onSettingsPress={openSettings}
-        currentUrl={activeTab?.url || ''}
-        canGoBack={activeTab?.canGoBack || false}
-        canGoForward={activeTab?.canGoForward || false}
-      />
+      {/* Chrome-style Navigation Bar - position based on settings */}
+      {userSettings.addressBarPosition === 'bottom' && (
+        <ChromeNavigationBar
+          onNavigate={handleNavigate}
+          onBack={() => webViewRef.current?.goBack()}
+          onForward={() => webViewRef.current?.goForward()}
+          onRefresh={() => webViewRef.current?.reload()}
+          onTabsPress={openTabsManager}
+          onSettingsPress={openSettings}
+          onLiveCaptionsPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setLiveCaptionsVisible(!liveCaptionsVisible);
+          }}
+          onAIAgentPress={openAIAgent}
+          currentUrl={activeTab?.url || ''}
+          canGoBack={activeTab?.canGoBack || false}
+          canGoForward={activeTab?.canGoForward || false}
+          liveCaptionsActive={liveCaptionsVisible}
+          position="bottom"
+        />
+      )}
 
       <AccessibilityModal
         visible={accessibilityModalVisible}
@@ -588,52 +551,6 @@ const styles = StyleSheet.create({
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       },
     }),
-  },
-  aiAgentButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#00FF88',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#00FF88',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-      web: {},
-    }),
-  },
-  captionsToggleButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: 88,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1A1A1A',
-    borderWidth: 2,
-    borderColor: '#00FF88',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  captionsToggleInner: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  captionsToggleActive: {
-    backgroundColor: '#00FF88',
-    borderColor: '#00FF88',
   },
   // Zero-Load Cache Hit Indicator
   cacheHitIndicator: {

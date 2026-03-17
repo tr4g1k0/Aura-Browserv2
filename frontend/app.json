@@ -50,7 +50,8 @@
           "supportsOpeningDocumentsInPlace": true,
           "enableFileSharing": true
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

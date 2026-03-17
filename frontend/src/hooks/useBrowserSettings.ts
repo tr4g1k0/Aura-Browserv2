@@ -39,6 +39,14 @@ const safeSetItem = async (key: string, value: string): Promise<void> => {
 
 export type SearchEngine = 'google' | 'duckduckgo' | 'bing';
 export type CaptioningLanguage = 'english' | 'spanish' | 'french' | 'german' | 'japanese' | 'chinese';
+export type AddressBarPosition = 'top' | 'bottom';
+
+export interface ToolbarShortcuts {
+  showLiveCaptioning: boolean;
+  showAIAgent: boolean;
+  showVPNToggle: boolean;
+  showAdBlockStatus: boolean;
+}
 
 export interface BrowserSettings {
   // AI & Accessibility
@@ -59,7 +67,18 @@ export interface BrowserSettings {
   
   // Display
   darkMode: boolean;
+  
+  // Toolbar Customization
+  addressBarPosition: AddressBarPosition;
+  toolbarShortcuts: ToolbarShortcuts;
 }
+
+export const DEFAULT_TOOLBAR_SHORTCUTS: ToolbarShortcuts = {
+  showLiveCaptioning: false,
+  showAIAgent: false,
+  showVPNToggle: false,
+  showAdBlockStatus: false,
+};
 
 export const DEFAULT_BROWSER_SETTINGS: BrowserSettings = {
   // AI & Accessibility
@@ -80,6 +99,10 @@ export const DEFAULT_BROWSER_SETTINGS: BrowserSettings = {
   
   // Display
   darkMode: true,
+  
+  // Toolbar Customization
+  addressBarPosition: 'bottom',
+  toolbarShortcuts: DEFAULT_TOOLBAR_SHORTCUTS,
 };
 
 const SETTINGS_STORAGE_KEY = '@access_browser_settings';
