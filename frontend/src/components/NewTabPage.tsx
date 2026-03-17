@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,10 @@ import {
   Platform,
   Keyboard,
   Dimensions,
+  Modal,
+  Pressable,
+  Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -28,52 +32,33 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useSettings } from '../context/SettingsContext';
+import { useBrowserStore, QuickLink } from '../store/browserStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// Quick Links data with minimalist white logos
-const QUICK_LINKS = [
-  {
-    id: 'google',
-    name: 'Google',
-    url: 'https://www.google.com',
-    icon: 'logo-google',
-    color: '#4285F4',
-  },
-  {
-    id: 'wikipedia',
-    name: 'Wikipedia',
-    url: 'https://www.wikipedia.org',
-    icon: 'book-outline',
-    color: '#636466',
-  },
-  {
-    id: 'youtube',
-    name: 'YouTube',
-    url: 'https://www.youtube.com',
-    icon: 'logo-youtube',
-    color: '#FF0000',
-  },
-  {
-    id: 'duckduckgo',
-    name: 'DuckDuckGo',
-    url: 'https://duckduckgo.com',
-    icon: 'shield-checkmark',
-    color: '#DE5833',
-  },
-];
 
 interface NewTabPageProps {
   onNavigate: (url: string) => void;
   onSearch: (query: string) => void;
 }
 
-// Animated Quick Link Tile Component
+// Get first letter of title for display
+const getInitial = (title: string): string => {
+  return title.charAt(0).toUpperCase();
+};
+
+// Generate a random color for new links
+const getRandomColor = (): string => {
+  const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+// Animated Quick Link Tile Component with long-press delete
 const QuickLinkTile: React.FC<{
-  link: typeof QUICK_LINKS[0];
+  link: QuickLink;
   index: number;
   onPress: (url: string) => void;
-}> = ({ link, index, onPress }) => {
+  onLongPress: (link: QuickLink) => void;
+}> = ({ link, index, onPress, onLongPress }) => {
   const scale = useSharedValue(0);
   const pressed = useSharedValue(0);
 
@@ -118,36 +103,56 @@ const QuickLinkTile: React.FC<{
     onPress(link.url);
   };
 
+  const handleLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onLongPress(link);
+  };
+
   const isWeb = Platform.OS === 'web';
+  const linkColor = link.color || '#00FF88';
+  const hasIcon = link.icon && link.icon.length > 0;
 
   return (
     <Animated.View style={[styles.quickLinkWrapper, animatedStyle]}>
       {/* Glow effect behind the tile */}
-      <Animated.View style={[styles.quickLinkGlow, { backgroundColor: link.color }, glowStyle]} />
+      <Animated.View style={[styles.quickLinkGlow, { backgroundColor: linkColor }, glowStyle]} />
       
-      <TouchableOpacity
+      <Pressable
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        activeOpacity={0.9}
+        onLongPress={handleLongPress}
+        delayLongPress={500}
         style={styles.quickLinkTouchable}
       >
         {isWeb ? (
           <View style={styles.quickLinkTile}>
-            <View style={styles.quickLinkIconContainer}>
-              <Ionicons name={link.icon as any} size={28} color="#FFF" />
+            <View style={[styles.quickLinkIconContainer, { backgroundColor: `${linkColor}20` }]}>
+              {hasIcon ? (
+                <Ionicons name={link.icon as any} size={28} color="#FFF" />
+              ) : (
+                <Text style={[styles.quickLinkInitial, { color: linkColor }]}>
+                  {getInitial(link.title)}
+                </Text>
+              )}
             </View>
-            <Text style={styles.quickLinkLabel}>{link.name}</Text>
+            <Text style={styles.quickLinkLabel} numberOfLines={1}>{link.title}</Text>
           </View>
         ) : (
           <BlurView tint="dark" intensity={40} style={styles.quickLinkTile}>
-            <View style={styles.quickLinkIconContainer}>
-              <Ionicons name={link.icon as any} size={28} color="#FFF" />
+            <View style={[styles.quickLinkIconContainer, { backgroundColor: `${linkColor}20` }]}>
+              {hasIcon ? (
+                <Ionicons name={link.icon as any} size={28} color="#FFF" />
+              ) : (
+                <Text style={[styles.quickLinkInitial, { color: linkColor }]}>
+                  {getInitial(link.title)}
+                </Text>
+              )}
             </View>
-            <Text style={styles.quickLinkLabel}>{link.name}</Text>
+            <Text style={styles.quickLinkLabel} numberOfLines={1}>{link.title}</Text>
           </BlurView>
         )}
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   );
 };
@@ -339,9 +344,196 @@ const AnimatedMeshGradient: React.FC = () => {
   );
 };
 
+// Add Link Button Component
+const AddLinkButton: React.FC<{
+  index: number;
+  onPress: () => void;
+}> = ({ index, onPress }) => {
+  const scale = useSharedValue(0);
+
+  useEffect(() => {
+    scale.value = withDelay(
+      index * 100 + 300,
+      withSpring(1, { damping: 12, stiffness: 150 })
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: scale.value,
+  }));
+
+  const isWeb = Platform.OS === 'web';
+
+  return (
+    <Animated.View style={[styles.quickLinkWrapper, animatedStyle]}>
+      <TouchableOpacity
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onPress();
+        }}
+        activeOpacity={0.8}
+        style={styles.quickLinkTouchable}
+      >
+        {isWeb ? (
+          <View style={[styles.quickLinkTile, styles.addLinkTile]}>
+            <View style={styles.addLinkIconContainer}>
+              <Ionicons name="add" size={28} color="#00FF88" />
+            </View>
+            <Text style={[styles.quickLinkLabel, { color: '#00FF88' }]}>Add</Text>
+          </View>
+        ) : (
+          <BlurView tint="dark" intensity={40} style={[styles.quickLinkTile, styles.addLinkTile]}>
+            <View style={styles.addLinkIconContainer}>
+              <Ionicons name="add" size={28} color="#00FF88" />
+            </View>
+            <Text style={[styles.quickLinkLabel, { color: '#00FF88' }]}>Add</Text>
+          </BlurView>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// Add Quick Link Modal Component
+const AddLinkModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  onSave: (title: string, url: string) => void;
+}> = ({ visible, onClose, onSave }) => {
+  const [title, setTitle] = useState('');
+  const [url, setUrl] = useState('');
+
+  const handleSave = () => {
+    if (title.trim() && url.trim()) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      onSave(title.trim(), url.trim());
+      setTitle('');
+      setUrl('');
+      onClose();
+    }
+  };
+
+  const handleClose = () => {
+    setTitle('');
+    setUrl('');
+    onClose();
+  };
+
+  const isWeb = Platform.OS === 'web';
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={handleClose} />
+        
+        {isWeb ? (
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Quick Link</Text>
+            
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>Site Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={title}
+                onChangeText={setTitle}
+                placeholder="e.g., GitHub"
+                placeholderTextColor="#666"
+                autoCapitalize="words"
+              />
+            </View>
+
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>URL</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={url}
+                onChangeText={setUrl}
+                placeholder="e.g., github.com"
+                placeholderTextColor="#666"
+                autoCapitalize="none"
+                keyboardType="url"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalCancelButton} onPress={handleClose}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveButton, (!title.trim() || !url.trim()) && styles.modalSaveButtonDisabled]}
+                onPress={handleSave}
+                disabled={!title.trim() || !url.trim()}
+              >
+                <Text style={styles.modalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <BlurView tint="dark" intensity={80} style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Quick Link</Text>
+            
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>Site Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={title}
+                onChangeText={setTitle}
+                placeholder="e.g., GitHub"
+                placeholderTextColor="#666"
+                autoCapitalize="words"
+              />
+            </View>
+
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>URL</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={url}
+                onChangeText={setUrl}
+                placeholder="e.g., github.com"
+                placeholderTextColor="#666"
+                autoCapitalize="none"
+                keyboardType="url"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalCancelButton} onPress={handleClose}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveButton, (!title.trim() || !url.trim()) && styles.modalSaveButtonDisabled]}
+                onPress={handleSave}
+                disabled={!title.trim() || !url.trim()}
+              >
+                <Text style={styles.modalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        )}
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
 export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch }) => {
   const insets = useSafeAreaInsets();
   const { settings } = useSettings();
+  const { quickLinks, addQuickLink, removeQuickLink } = useBrowserStore();
+  
+  // Modal state
+  const [addModalVisible, setAddModalVisible] = useState(false);
 
   // Get search engine name for placeholder
   const searchEngineName = settings.defaultSearchEngine === 'duckduckgo' 
@@ -356,6 +548,39 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch }) 
 
   const handleQuickLinkPress = (url: string) => {
     onNavigate(url);
+  };
+
+  const handleQuickLinkLongPress = (link: QuickLink) => {
+    // Show delete confirmation
+    if (Platform.OS === 'web') {
+      // For web, use window.confirm
+      const confirmed = window.confirm(`Delete "${link.title}" shortcut?`);
+      if (confirmed) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        removeQuickLink(link.id);
+      }
+    } else {
+      // For native, use Alert
+      Alert.alert(
+        'Delete Shortcut',
+        `Do you want to delete "${link.title}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              removeQuickLink(link.id);
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const handleAddLink = (title: string, url: string) => {
+    addQuickLink(title, url);
   };
 
   return (
@@ -390,14 +615,20 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch }) 
         >
           <Text style={styles.quickLinksTitle}>Quick Links</Text>
           <View style={styles.quickLinksGrid}>
-            {QUICK_LINKS.map((link, index) => (
+            {quickLinks.map((link, index) => (
               <QuickLinkTile
                 key={link.id}
                 link={link}
                 index={index}
                 onPress={handleQuickLinkPress}
+                onLongPress={handleQuickLinkLongPress}
               />
             ))}
+            {/* Add Button at the end */}
+            <AddLinkButton
+              index={quickLinks.length}
+              onPress={() => setAddModalVisible(true)}
+            />
           </View>
         </Animated.View>
 
@@ -414,6 +645,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch }) 
           </Text>
         </Animated.View>
       </View>
+
+      {/* Add Quick Link Modal */}
+      <AddLinkModal
+        visible={addModalVisible}
+        onClose={() => setAddModalVisible(false)}
+        onSave={handleAddLink}
+      />
     </View>
   );
 };
@@ -598,6 +836,138 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#AAA',
     textAlign: 'center',
+    maxWidth: 70,
+  },
+  quickLinkInitial: {
+    fontSize: 24,
+    fontWeight: '700',
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  // Add Link Button Styles
+  addLinkTile: {
+    borderStyle: 'dashed',
+    borderColor: 'rgba(0, 255, 136, 0.4)',
+    backgroundColor: 'rgba(0, 255, 136, 0.05)',
+  },
+  addLinkIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 255, 136, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalContent: {
+    width: SCREEN_WIDTH - 48,
+    maxWidth: 400,
+    backgroundColor: 'rgba(30, 30, 30, 0.95)',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 20,
+      },
+      web: {
+        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
+      },
+    }),
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 24,
+    textAlign: 'center',
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  modalInputContainer: {
+    marginBottom: 16,
+  },
+  modalInputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#888',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  modalInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: '#FFF',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalCancelText: {
+    color: '#888',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalSaveButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#00FF88',
+    alignItems: 'center',
+  },
+  modalSaveButtonDisabled: {
+    backgroundColor: 'rgba(0, 255, 136, 0.3)',
+  },
+  modalSaveText: {
+    color: '#0D0D0D',
+    fontSize: 16,
+    fontWeight: '700',
   },
   // Footer Styles
   spacer: {

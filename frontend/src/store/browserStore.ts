@@ -77,6 +77,22 @@ export interface Bookmark {
   addedAt: number;
 }
 
+export interface QuickLink {
+  id: string;
+  title: string;
+  url: string;
+  icon?: string;    // Ionicon name (optional)
+  color?: string;   // Accent color (optional)
+}
+
+// Default Quick Links
+const DEFAULT_QUICK_LINKS: QuickLink[] = [
+  { id: '1', title: 'Google', url: 'https://google.com', icon: 'logo-google', color: '#4285F4' },
+  { id: '2', title: 'Wikipedia', url: 'https://wikipedia.org', icon: 'book-outline', color: '#636466' },
+  { id: '3', title: 'YouTube', url: 'https://youtube.com', icon: 'logo-youtube', color: '#FF0000' },
+  { id: '4', title: 'DuckDuckGo', url: 'https://duckduckgo.com', icon: 'shield-checkmark', color: '#DE5833' },
+];
+
 interface BrowserState {
   tabs: Tab[];
   ghostTabs: Tab[];  // Separate tabs for Ghost Mode
@@ -85,6 +101,7 @@ interface BrowserState {
   cachedPages: CachedPage[];
   history: HistoryEntry[];
   bookmarks: Bookmark[];
+  quickLinks: QuickLink[];  // Customizable Quick Links
   isLoading: boolean;
   searchQuery: string;
   ambientAlerts: string[];
@@ -127,6 +144,10 @@ interface BrowserState {
   // TTS actions
   cycleTTSRate: () => void;
   setTTSRate: (rate: number) => void;
+  // Quick Links actions
+  addQuickLink: (title: string, url: string) => void;
+  removeQuickLink: (id: string) => void;
+  updateQuickLink: (id: string, updates: Partial<QuickLink>) => void;
   loadPersistedState: () => Promise<void>;
   persistState: () => Promise<void>;
 }
@@ -159,6 +180,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
   cachedPages: [],
   history: [],
   bookmarks: [],
+  quickLinks: DEFAULT_QUICK_LINKS,  // Pre-populated Quick Links
   isLoading: false,
   searchQuery: '',
   ambientAlerts: [],
@@ -549,6 +571,46 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
     set({ ttsRate: rate });
   },
 
+  // Quick Links Actions
+  addQuickLink: (title: string, url: string) => {
+    const newLink: QuickLink = {
+      id: generateId(),
+      title,
+      url: url.startsWith('http') ? url : `https://${url}`,
+      color: '#00FF88',  // Default neon green
+    };
+    
+    console.log(`[QuickLinks] Added: ${title} → ${url}`);
+    set((state) => ({
+      quickLinks: [...state.quickLinks, newLink],
+    }));
+    
+    // Persist the change
+    get().persistState();
+  },
+
+  removeQuickLink: (id: string) => {
+    console.log(`[QuickLinks] Removed: ${id}`);
+    set((state) => ({
+      quickLinks: state.quickLinks.filter((link) => link.id !== id),
+    }));
+    
+    // Persist the change
+    get().persistState();
+  },
+
+  updateQuickLink: (id: string, updates: Partial<QuickLink>) => {
+    console.log(`[QuickLinks] Updated: ${id}`, updates);
+    set((state) => ({
+      quickLinks: state.quickLinks.map((link) =>
+        link.id === id ? { ...link, ...updates } : link
+      ),
+    }));
+    
+    // Persist the change
+    get().persistState();
+  },
+
   loadPersistedState: async () => {
     try {
       const saved = await safeGetItem('browser-state');
@@ -560,6 +622,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
           activeTabId: parsed.activeTabId || state.tabs[0]?.id,
           history: parsed.history || state.history,
           bookmarks: parsed.bookmarks || state.bookmarks,
+          quickLinks: parsed.quickLinks || state.quickLinks,
         }));
       }
     } catch (e) {
@@ -579,6 +642,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
           activeTabId: state.activeTabId,
           history: state.history,
           bookmarks: state.bookmarks,
+          quickLinks: state.quickLinks,
         })
       );
     } catch (e) {
