@@ -212,8 +212,62 @@ export default function BrowserScreen() {
     }
   }, [activeTab, updateTab, userSettings.defaultSearchEngine, settings.predictiveCachingEnabled]);
 
+  // Track previous URL for memory cleanup on navigation
+  const previousUrlRef = useRef<string>('');
+
+  /**
+   * Memory cleanup script for heavy video pages
+   * Forces WebView to flush video buffers from memory
+   */
+  const memoryCleanupScript = `
+    (function() {
+      try {
+        // Pause all videos
+        document.querySelectorAll('video').forEach(v => {
+          try { v.pause(); v.src = ''; v.load(); } catch(e) {}
+        });
+        
+        // Remove video source elements
+        document.querySelectorAll('source').forEach(s => s.remove());
+        
+        // Try to trigger garbage collection if exposed
+        if (window.gc) { window.gc(); }
+        
+        console.log('[Memory Cleanup] Video buffers flushed');
+      } catch(e) {}
+    })();
+    true;
+  `;
+
   const handleNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     if (activeTab) {
+      // Check if navigating AWAY from a heavy video page (YouTube, TikTok, etc.)
+      const prevUrl = previousUrlRef.current;
+      const isLeavingVideoPage = prevUrl && (
+        prevUrl.includes('youtube.com/shorts') ||
+        prevUrl.includes('youtube.com/watch') ||
+        prevUrl.includes('tiktok.com') ||
+        prevUrl.includes('/reels') ||
+        prevUrl.includes('/shorts')
+      );
+      
+      const isEnteringVideoPage = navState.url && (
+        navState.url.includes('youtube.com/shorts') ||
+        navState.url.includes('youtube.com/watch') ||
+        navState.url.includes('tiktok.com') ||
+        navState.url.includes('/reels') ||
+        navState.url.includes('/shorts')
+      );
+      
+      // Memory cleanup when leaving video pages (but not going to another video page)
+      if (isLeavingVideoPage && !isEnteringVideoPage && !navState.loading) {
+        console.log('[Memory Cleanup] Leaving video page, flushing buffers...');
+        webViewRef.current?.injectJavaScript(memoryCleanupScript);
+      }
+      
+      // Update previous URL reference
+      previousUrlRef.current = navState.url || '';
+      
       updateTab(activeTab.id, {
         url: navState.url,
         title: navState.title || 'Loading...',

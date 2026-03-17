@@ -447,7 +447,7 @@ export const gpuLayerSquashingScript = `
 (function(){
   'use strict';
   
-  /* LAYER SQUASHING v1.0 - Force GPU Compositor Layers */
+  /* LAYER SQUASHING v1.1 - Force GPU Compositor Layers + DOM Isolation */
   /* This script MUST execute immediately for max performance */
   
   var style = document.createElement('style');
@@ -502,6 +502,49 @@ export const gpuLayerSquashingScript = `
   }
   
   console.log('[GPU Layer Squashing] Compositor layers forced for video elements');
+  
+  /* ================================================================== */
+  /* STRICT DOM ISOLATION - Skip Layout/Paint for surrounding UI       */
+  /* ================================================================== */
+  
+  var isolationStyle = document.createElement('style');
+  isolationStyle.id = 'dom-isolation';
+  isolationStyle.innerHTML = [
+    /* contain: strict tells WebView these elements have fixed size */
+    /* Browser skips Layout/Paint calculations for surrounding UI */
+    /* Saves MASSIVE CPU cycles during video feed scrolls */
+    'ytd-shorts, ytd-reel-video-renderer, .video-stream, #player-container, #shorts-player {',
+    '  contain: strict !important;',
+    '  overflow: hidden;',
+    '}',
+    
+    /* Isolate the entire shorts feed container */
+    '#shorts-inner-container, ytd-reel-shelf-renderer, ytd-shorts-player-container {',
+    '  contain: strict !important;',
+    '  overflow: hidden;',
+    '}',
+    
+    /* Isolate individual reel items */
+    'ytd-reel-video-renderer, .reel-video-in-sequence {',
+    '  contain: strict !important;',
+    '  overflow: hidden;',
+    '  isolation: isolate;',
+    '}',
+    
+    /* TikTok/Instagram isolation */
+    '[class*="video-feed-item"], [class*="reel-item"], [class*="short-video"] {',
+    '  contain: strict !important;',
+    '  overflow: hidden;',
+    '}'
+  ].join('\\n');
+  
+  if (document.head) {
+    document.head.appendChild(isolationStyle);
+  } else {
+    document.documentElement.appendChild(isolationStyle);
+  }
+  
+  console.log('[DOM Isolation] contain:strict applied - Layout/Paint skipped for surrounding UI');
 })();
 true;`;
 
