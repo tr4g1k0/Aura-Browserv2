@@ -633,71 +633,103 @@ export const gpuLayerSquashingScript = `
   }
   
   /* ================================================================== */
-  /* VIEWPORT SANITIZATION v1.0                                         */
-  /* Fixes: Multiple video layers stacking, performance lag             */
-  /* Solution: Z-Index flattening + Single-Active playback enforcement  */
+  /* PURE VIDEO SCRIPT v2.0 - AGGRESSIVE YOUTUBE SHORTS FIX             */
+  /* Bypasses YouTube's heavy "Shorts" engine                           */
+  /* Forces high-performance rendering by hiding inactive videos        */
   /* ================================================================== */
   
-  // Z-INDEX FLATTENING: Force strict stacking context
-  // Hide inactive videos completely (zero height, invisible, no pointer events)
-  var stackFix = document.createElement('style');
-  stackFix.id = 'viewport-sanitization';
-  stackFix.innerHTML = [
-    /* Force column layout for Shorts container */
+  // KILL THE BLANK VIEWPORT: Force 100vh height and native scrolling
+  // YouTube tries to "lazy load" videos - this forces them to be visible
+  var pureVideoStyle = document.createElement('style');
+  pureVideoStyle.id = 'pure-video-style';
+  pureVideoStyle.innerHTML = [
+    /* Force Shorts container to full viewport with native scrolling */
     'ytd-shorts {',
-    '  display: flex !important;',
-    '  flex-direction: column !important;',
+    '  height: 100vh !important;',
+    '  overflow-y: scroll !important;',
+    '  -webkit-overflow-scrolling: touch !important;',
+    '  scroll-snap-type: y mandatory;',
     '}',
     
-    /* CRITICAL: Make inactive reels invisible AND zero-height */
-    /* This stops GPU from trying to draw hidden videos */
-    'ytd-reel-video-renderer:not([is-active]) {',
-    '  visibility: hidden !important;',
-    '  opacity: 0 !important;',
-    '  pointer-events: none !important;',
-    '  height: 0 !important;',
-    '  overflow: hidden !important;',
-    '  position: absolute !important;',
-    '  z-index: -1 !important;',
+    /* Each reel takes full viewport - no containment */
+    'ytd-reel-video-renderer {',
+    '  height: 100vh !important;',
+    '  contain: none !important;',
+    '  scroll-snap-align: start;',
     '}',
     
-    /* Only the active reel gets full visibility */
+    /* Active reel must be fully visible */
     'ytd-reel-video-renderer[is-active] {',
+    '  display: block !important;',
     '  visibility: visible !important;',
     '  opacity: 1 !important;',
-    '  pointer-events: auto !important;',
-    '  height: auto !important;',
-    '  position: relative !important;',
-    '  z-index: 1 !important;',
+    '  height: 100vh !important;',
     '}',
     
-    /* Disable "Infinite" DOM - limit YouTube pre-rendering */
-    'ytd-item-section-renderer {',
-    '  contain: content !important;',
+    /* Force video element to fill container */
+    'ytd-reel-video-renderer video, #shorts-player video {',
+    '  width: 100% !important;',
+    '  height: 100% !important;',
+    '  object-fit: cover !important;',
     '}',
     
-    /* Additional feed containers - limit pre-render */
-    'ytd-section-list-renderer, ytd-rich-grid-renderer {',
-    '  contain: content !important;',
-    '}',
-    
-    /* Shorts-specific: Only render what's visible */
-    '#shorts-inner-container > *:not(:first-child):not(:nth-child(2)) {',
-    '  content-visibility: auto;',
-    '  contain-intrinsic-size: 1px 100vh;',
+    /* Remove any lazy-loading CSS that might cause blank screens */
+    'ytd-reel-video-renderer[is-active] *, #shorts-player * {',
+    '  content-visibility: visible !important;',
     '}'
   ].join('\\n');
   
   if (document.head) {
-    document.head.appendChild(stackFix);
+    document.head.appendChild(pureVideoStyle);
   } else {
-    document.documentElement.appendChild(stackFix);
+    document.documentElement.appendChild(pureVideoStyle);
   }
   
-  console.log('[Viewport Sanitization] Z-Index flattening applied');
+  console.log('[Pure Video] Kill Blank Viewport CSS injected');
   
   /* ================================================================== */
-  /* FORCE SINGLE-ACTIVE PLAYBACK                                       */
+  /* PURE VIDEO CLEANER - Aggressive DOM cleaning                       */
+  /* Manually hides every video except the one currently being watched  */
+  /* Runs every 1 second to catch any new videos YouTube adds           */
+  /* ================================================================== */
+  
+  if (location.hostname.includes('youtube.com')) {
+    var pureVideoCleaner = setInterval(function() {
+      var activeShort = document.querySelector('[is-active]');
+      
+      if (activeShort) {
+        // Hide ALL inactive videos - not just CSS, but display:none
+        document.querySelectorAll('ytd-reel-video-renderer:not([is-active])').forEach(function(el) {
+          el.style.display = 'none';
+          
+          // Also pause any video inside inactive renderers
+          var video = el.querySelector('video');
+          if (video && !video.paused) {
+            video.pause();
+          }
+        });
+        
+        // Ensure active short is visible
+        activeShort.style.display = 'block';
+        activeShort.style.height = '100vh';
+        activeShort.style.visibility = 'visible';
+        activeShort.style.opacity = '1';
+        
+        // Force the active video to play
+        var activeVideo = activeShort.querySelector('video');
+        if (activeVideo && activeVideo.paused && activeVideo.readyState >= 2) {
+          activeVideo.play().catch(function(e) {
+            console.log('[Pure Video] Auto-play blocked:', e.message);
+          });
+        }
+      }
+    }, 1000);
+    
+    console.log('[Pure Video] Aggressive cleaner started (1s interval)');
+  }
+  
+  /* ================================================================== */
+  /* FORCE SINGLE-ACTIVE PLAYBACK - Backup video pausing                */
   /* Pauses all videos that are not in the active container             */
   /* Runs every 500ms to catch any rogue auto-playing videos            */
   /* ================================================================== */
@@ -705,6 +737,8 @@ export const gpuLayerSquashingScript = `
   if (location.hostname.includes('youtube.com')) {
     setInterval(function() {
       var videos = document.querySelectorAll('video');
+      var activeCount = 0;
+      
       videos.forEach(function(v) {
         // Check if this video is inside an active container
         var isInActive = v.parentElement && v.parentElement.closest('[is-active]');
@@ -713,8 +747,21 @@ export const gpuLayerSquashingScript = `
         if (!isInActive && !v.paused) {
           v.pause();
           console.log('[Single-Active] Paused rogue video');
+        } else if (isInActive && !v.paused) {
+          activeCount++;
         }
       });
+      
+      // If no active videos are playing, try to start the active one
+      if (activeCount === 0) {
+        var activeShort = document.querySelector('[is-active]');
+        if (activeShort) {
+          var activeVideo = activeShort.querySelector('video');
+          if (activeVideo && activeVideo.paused && activeVideo.readyState >= 2) {
+            activeVideo.play().catch(function(e) {});
+          }
+        }
+      }
     }, 500);
     
     console.log('[Single-Active Playback] Enforcement interval started');

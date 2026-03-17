@@ -974,7 +974,9 @@ export default function BrowserScreen() {
                 scalesPageToFit={true}
                 // SETTINGS-DRIVEN PROPS (observed from global settings)
                 cacheEnabled={!isGhostMode && !userSettings.doNotTrack}
-                incognito={isGhostMode || userSettings.alwaysOnVPN}
+                // YOUTUBE FIX: Don't use strict incognito mode for YouTube
+                // YouTube's video player can break in strict incognito mode
+                incognito={isGhostMode && !activeTab?.url?.includes('youtube.com')}
                 // Desktop Mode: Use desktop user agent if enabled (per-tab or global default)
                 userAgent={activeTab?.isDesktopMode || userSettings.requestDesktopSite ? DESKTOP_USER_AGENT : undefined}
                 // HARDWARE ACCELERATION - Force GPU rendering for video frames
@@ -989,8 +991,9 @@ export default function BrowserScreen() {
                 renderToHardwareTextureAndroid={true}
                 // Reduce memory usage by removing offscreen views
                 removeClippedSubviews={true}
-                // Allow mixed content for better compatibility
-                mixedContentMode="compatibility"
+                // YOUTUBE FIX: Use "always" to ensure video player works correctly
+                // "compatibility" mode can block some video resources
+                mixedContentMode="always"
                 // Reduce memory footprint
                 cacheMode="LOAD_DEFAULT"
                 // Ensure smooth scrolling
