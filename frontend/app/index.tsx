@@ -551,21 +551,18 @@ export default function BrowserScreen() {
     }
 
     // Extract page content for predictive caching and prefetch prominent links
-    if (settings.predictiveCachingEnabled) {
-      // Cache current page content
-      webViewRef.current?.injectJavaScript(`
-        (function() {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'PAGE_CONTENT',
-            html: document.documentElement.outerHTML,
-            url: window.location.href
-          }));
-        })();
-        true;
-      `);
+    // PERFORMANCE: Only run once per unique URL to avoid duplicate work
+    if (settings.predictiveCachingEnabled && activeTab?.url) {
+      const currentUrl = activeTab.url;
       
-      // Extract prominent links for predictive prefetching
-      webViewRef.current?.injectJavaScript(linkExtractionScript);
+      // Skip if we've already processed this URL recently
+      const lastProcessedUrl = (window as any).__lastProcessedUrl;
+      if (lastProcessedUrl !== currentUrl) {
+        (window as any).__lastProcessedUrl = currentUrl;
+        
+        // Extract prominent links for predictive prefetching (lightweight)
+        webViewRef.current?.injectJavaScript(linkExtractionScript);
+      }
     }
 
     /**
@@ -575,16 +572,22 @@ export default function BrowserScreen() {
      * 
      * PRIVACY GUARD: All AI History processing happens 100% locally.
      * No page content ever leaves this device.
+     * 
+     * PERFORMANCE: Debounced to prevent multiple timers stacking
      */
-    if (!isGhostMode && userSettings.aiHistoryEnabled !== false) {
+    if (!isGhostMode && userSettings.aiHistoryEnabled !== false && activeTab?.url) {
+      // Clear any existing timer to prevent stacking
+      if ((window as any).__semanticHistoryTimer) {
+        clearTimeout((window as any).__semanticHistoryTimer);
+      }
+      
       // Wait 3 seconds before capturing page context
-      // This ensures the user is actually staying on the page
-      setTimeout(() => {
+      (window as any).__semanticHistoryTimer = setTimeout(() => {
         console.log('[Semantic History] Capturing page context after 3s delay...');
         webViewRef.current?.injectJavaScript(pageContextExtractionScript);
       }, 3000);
     }
-  }, [userSettings.aggressiveAdBlocking, userSettings.aiHistoryEnabled, settings.predictiveCachingEnabled, visionAISelectors, cachedPageSource, activeTab?.scrollY, isGhostMode]);
+  }, [userSettings.aggressiveAdBlocking, userSettings.aiHistoryEnabled, settings.predictiveCachingEnabled, visionAISelectors, cachedPageSource, activeTab?.scrollY, activeTab?.url, isGhostMode]);
 
   const handleMessage = useCallback((event: any) => {
     try {

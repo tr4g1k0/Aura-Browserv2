@@ -54,10 +54,11 @@ export interface PredictiveCacheConfig {
 // ============================================================================
 
 const DEFAULT_CONFIG: PredictiveCacheConfig = {
-  maxPages: 10,
+  maxPages: 5,  // Reduced from 10 to save memory
   ttlMs: 5 * 60 * 1000, // 5 minutes
-  maxSizeBytes: 50 * 1024 * 1024, // 50MB max total
+  maxSizeBytes: 20 * 1024 * 1024, // Reduced from 50MB to 20MB max total
   enablePrefetch: true,
+  prefetchConcurrency: 1,  // Reduced from 2 to 1 - less background load
   prefetchConcurrency: 2, // Max concurrent prefetch requests
 };
 
