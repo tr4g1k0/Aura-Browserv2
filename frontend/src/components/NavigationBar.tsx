@@ -49,19 +49,13 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
 
   const handleSubmit = () => {
     Keyboard.dismiss();
-    let url = inputValue.trim();
+    const input = inputValue.trim();
     
-    if (!url) return;
+    if (!input) return;
     
-    // Check if it's a search query or URL
-    if (!url.includes('.') || url.includes(' ')) {
-      // Treat as search query
-      url = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
-    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = `https://${url}`;
-    }
-    
-    onNavigate(url);
+    // Pass raw input to parent's onNavigate handler
+    // The parent uses parseUrlInput utility for proper URL/search parsing
+    onNavigate(input);
     setIsFocused(false);
   };
 

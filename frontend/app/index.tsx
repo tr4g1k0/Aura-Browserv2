@@ -10,12 +10,14 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBrowserStore } from '../src/store/browserStore';
+import { useSettings } from '../src/context/SettingsContext';
 import { BrowserStatusBar } from '../src/components/StatusBar';
 import { NavigationBar } from '../src/components/NavigationBar';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
 import { shouldBlockRequest, getAdBlockCSS, visionAIScannerPlaceholder } from '../src/utils/adblock';
+import { parseUrlInput, getDisplayHostname } from '../src/utils/urlParser';
 import * as Haptics from 'expo-haptics';
 
 // Conditionally import WebView only on native platforms
@@ -40,6 +42,9 @@ export default function BrowserScreen() {
     loadPersistedState,
     addCachedPage,
   } = useBrowserStore();
+
+  // Access user settings for search engine preference
+  const { settings: userSettings } = useSettings();
 
   const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
   const [liveCaptionsVisible, setLiveCaptionsVisible] = useState(false);
@@ -72,11 +77,21 @@ export default function BrowserScreen() {
     }
   }, [activeTab?.canGoBack]);
 
-  const handleNavigate = useCallback((url: string) => {
-    if (activeTab) {
-      updateTab(activeTab.id, { url });
+  /**
+   * Handle navigation - parse user input and navigate to URL
+   * Uses the user's preferred search engine from settings
+   */
+  const handleNavigate = useCallback((input: string) => {
+    if (!input.trim()) return;
+    
+    // Parse the input using user's preferred search engine
+    const parsedUrl = parseUrlInput(input, userSettings.defaultSearchEngine);
+    
+    if (parsedUrl && activeTab) {
+      console.log(`[Browser] Navigating to: ${parsedUrl}`);
+      updateTab(activeTab.id, { url: parsedUrl });
     }
-  }, [activeTab, updateTab]);
+  }, [activeTab, updateTab, userSettings.defaultSearchEngine]);
 
   const handleNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     if (activeTab) {
