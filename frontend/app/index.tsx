@@ -10,8 +10,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBrowserStore } from '../src/store/browserStore';
 import { useSettings } from '../src/context/SettingsContext';
-import { BrowserStatusBar } from '../src/components/StatusBar';
-import { ChromeNavigationBar } from '../src/components/ChromeNavigationBar';
+import { UnifiedTopBar } from '../src/components/UnifiedTopBar';
 import { NewTabPage } from '../src/components/NewTabPage';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
@@ -301,31 +300,14 @@ export default function BrowserScreen() {
 
   return (
     <View style={styles.container}>
-      <BrowserStatusBar
+      {/* Unified Top Bar - Single sleek row with all controls */}
+      <UnifiedTopBar
+        onNavigate={handleNavigate}
+        onTabsPress={openTabsManager}
+        onSettingsPress={openSettings}
         onAccessibilityPress={() => setAccessibilityModalVisible(true)}
+        currentUrl={activeTab?.url || ''}
       />
-
-      {/* Chrome-style Navigation Bar - TOP position */}
-      {userSettings.addressBarPosition === 'top' && (
-        <ChromeNavigationBar
-          onNavigate={handleNavigate}
-          onBack={() => webViewRef.current?.goBack()}
-          onForward={() => webViewRef.current?.goForward()}
-          onRefresh={() => webViewRef.current?.reload()}
-          onTabsPress={openTabsManager}
-          onSettingsPress={openSettings}
-          onLiveCaptionsPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setLiveCaptionsVisible(!liveCaptionsVisible);
-          }}
-          onAIAgentPress={openAIAgent}
-          currentUrl={activeTab?.url || ''}
-          canGoBack={activeTab?.canGoBack || false}
-          canGoForward={activeTab?.canGoForward || false}
-          liveCaptionsActive={liveCaptionsVisible}
-          position="top"
-        />
-      )}
 
       <View style={styles.webviewContainer}>
         {Platform.OS === 'web' ? (
@@ -385,27 +367,6 @@ export default function BrowserScreen() {
       </View>
 
       {/* Chrome-style Navigation Bar - position based on settings */}
-      {userSettings.addressBarPosition === 'bottom' && (
-        <ChromeNavigationBar
-          onNavigate={handleNavigate}
-          onBack={() => webViewRef.current?.goBack()}
-          onForward={() => webViewRef.current?.goForward()}
-          onRefresh={() => webViewRef.current?.reload()}
-          onTabsPress={openTabsManager}
-          onSettingsPress={openSettings}
-          onLiveCaptionsPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setLiveCaptionsVisible(!liveCaptionsVisible);
-          }}
-          onAIAgentPress={openAIAgent}
-          currentUrl={activeTab?.url || ''}
-          canGoBack={activeTab?.canGoBack || false}
-          canGoForward={activeTab?.canGoForward || false}
-          liveCaptionsActive={liveCaptionsVisible}
-          position="bottom"
-        />
-      )}
-
       <AccessibilityModal
         visible={accessibilityModalVisible}
         onClose={() => setAccessibilityModalVisible(false)}
