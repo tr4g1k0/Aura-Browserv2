@@ -439,22 +439,24 @@ export const adBusterScript = createAdBusterScript();
 // ============================================================================
 
 /**
- * CRITICAL: Aggressive GPU Layer Squashing Script
+ * CRITICAL: Aggressive GPU Layer Squashing Script v1.3
  * This MUST run FIRST before any other scripts to force GPU compositing
  * Moves ALL video rendering off CPU onto Graphics Chip
  * 
- * v1.2 - Fixed blank screen issue:
- * - Changed contain: strict to contain: content (allows size pre-calculation)
- * - Removed overflow: hidden (was clipping next video)
- * - Added content-visibility: auto for viewport pre-rendering
- * - Limited translate3d to active video only (prevents Layer Explosion)
+ * v1.3 - YouTube Shorts Auto-Play Fix:
+ * - Changed to "contain: layout style" (removes SIZE containment)
+ * - SIZE containment was telling YouTube the next video is 0px
+ * - This broke the Intersection Observer that triggers auto-play
+ * - Added force GPU rule for Shorts containers
+ * - Added resize event dispatch to wake up Intersection Observers
  */
 export const gpuLayerSquashingScript = `
 (function(){
   'use strict';
   
-  /* LAYER SQUASHING v1.2 - GPU Layers + Balanced DOM Isolation */
-  /* Fixed: Blank screen on YouTube feeds */
+  /* LAYER SQUASHING v1.3 - YouTube Shorts Auto-Play Fix */
+  /* Key Fix: Use "contain: layout style" instead of "content/strict" */
+  /* This allows the Intersection Observer to calculate video heights correctly */
   
   var style = document.createElement('style');
   style.id = 'gpu-layer-squashing';
@@ -462,42 +464,10 @@ export const gpuLayerSquashingScript = `
     /* Disable tap highlight and enable font smoothing globally */
     '* { -webkit-tap-highlight-color: rgba(0,0,0,0); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }',
     
-    /* GPU Layer for ACTIVE video elements only (not all elements) */
-    /* Prevents "Layer Explosion" which causes white/blank screens */
-    'video:not([paused]), video.playing, .html5-main-video {',
-    '  transform: translate3d(0,0,0);',
-    '  will-change: transform;',
-    '  backface-visibility: hidden;',
-    '  -webkit-backface-visibility: hidden;',
-    '}',
-    
-    /* YouTube player containers - lighter GPU hints */
-    '.html5-video-player, ytd-player, #player-container {',
-    '  will-change: contents;',
-    '  backface-visibility: hidden;',
-    '}',
-    
-    /* YouTube Shorts - GPU layer only for visible item */
-    'ytd-reel-video-renderer[is-active] {',
-    '  transform: translate3d(0,0,0);',
-    '  will-change: transform, opacity;',
-    '}',
-    
-    /* Shorts container needs smooth scrolling */
-    '#shorts-container, .ytd-shorts {',
-    '  -webkit-overflow-scrolling: touch;',
-    '}',
-    
     /* Disable overscroll glow effect that causes frame drops */
     'html, body {',
     '  overscroll-behavior: none;',
     '  -webkit-overflow-scrolling: touch;',
-    '}',
-    
-    /* TikTok/Instagram - only active video gets GPU layer */
-    '[class*="video-card"].active, [class*="VideoPlayer"].playing {',
-    '  transform: translate3d(0,0,0);',
-    '  will-change: transform;',
     '}'
   ].join('\\n');
   
@@ -508,47 +478,89 @@ export const gpuLayerSquashingScript = `
     document.documentElement.appendChild(style);
   }
   
-  console.log('[GPU Layer Squashing] v1.2 - Active video GPU layers only');
+  /* ================================================================== */
+  /* FORCE GPU-ONLY VIDEO - Keeps video engine on hardware chip         */
+  /* translateZ(0) + will-change forces compositor layer                */
+  /* webkit-perspective + backface-visibility = smoother transitions    */
+  /* ================================================================== */
+  
+  var flowStyle = document.createElement('style');
+  flowStyle.id = 'gpu-flow-style';
+  flowStyle.innerHTML = [
+    'ytd-shorts, #player-container, video, #shorts-player, .html5-video-player {',
+    '  transform: translateZ(0) !important;',
+    '  will-change: transform !important;',
+    '  -webkit-perspective: 1000 !important;',
+    '  -webkit-backface-visibility: hidden !important;',
+    '  backface-visibility: hidden !important;',
+    '}',
+    
+    /* YouTube Shorts - specific containers */
+    'ytd-reel-video-renderer, #shorts-container, .reel-video-in-sequence {',
+    '  transform: translateZ(0) !important;',
+    '  will-change: transform, opacity !important;',
+    '  -webkit-backface-visibility: hidden !important;',
+    '}',
+    
+    /* Shorts container needs smooth scrolling */
+    '#shorts-container, .ytd-shorts, #shorts-inner-container {',
+    '  -webkit-overflow-scrolling: touch;',
+    '}',
+    
+    /* TikTok/Instagram - similar GPU treatment */
+    '[class*="video-card"], [class*="VideoPlayer"], [class*="video-player"] {',
+    '  transform: translateZ(0) !important;',
+    '  will-change: transform !important;',
+    '}'
+  ].join('\\n');
+  
+  if (document.head) {
+    document.head.appendChild(flowStyle);
+  } else {
+    document.documentElement.appendChild(flowStyle);
+  }
+  
+  console.log('[GPU Layer Squashing] v1.3 - Force GPU video layers injected');
   
   /* ================================================================== */
-  /* DOM ISOLATION - Use "content" instead of "strict"                  */
-  /* "content" allows size pre-calculation for upcoming videos          */
+  /* DOM ISOLATION - "layout style" ONLY (no size containment!)         */
+  /* CRITICAL: "contain: content" or "strict" includes SIZE containment */
+  /* SIZE containment tells browser the element is 0px until painted    */
+  /* This breaks YouTube's Intersection Observer for auto-play          */
   /* ================================================================== */
   
   var isolationStyle = document.createElement('style');
   isolationStyle.id = 'dom-isolation';
   isolationStyle.innerHTML = [
-    /* contain: content allows browser to pre-calculate layout */
-    /* NO overflow: hidden - was clipping next video before render */
-    'ytd-shorts, ytd-reel-video-renderer, .video-stream, #player-container, #shorts-player {',
-    '  contain: content !important;',
+    /* contain: layout style - NO SIZE containment */
+    /* This allows browser to know the actual height of upcoming videos */
+    'ytd-shorts, ytd-reel-video-renderer, .video-stream, #shorts-player {',
+    '  contain: layout style !important;',
     '}',
     
-    /* Isolate the shorts feed container */
-    '#shorts-inner-container, ytd-reel-shelf-renderer {',
-    '  contain: content !important;',
+    /* Shorts feed container - layout style only */
+    '#shorts-inner-container, ytd-reel-shelf-renderer, #shorts-container {',
+    '  contain: layout style !important;',
     '}',
     
-    /* Individual reel items - content containment only */
-    'ytd-reel-video-renderer, .reel-video-in-sequence {',
-    '  contain: content !important;',
+    /* Individual reel items - layout style + isolation */
+    '.reel-video-in-sequence {',
+    '  contain: layout style !important;',
     '  isolation: isolate;',
     '}',
     
+    /* YouTube player container - needs proper height calculation */
+    '#player-container, .html5-video-player {',
+    '  contain: layout style !important;',
+    '}',
+    
     /* ================================================================== */
-    /* VIEWPORT PRE-RENDER - Placeholder for off-screen videos           */
-    /* content-visibility: auto = only fully render when near viewport   */
-    /* contain-intrinsic-size = placeholder size for layout calculation  */
+    /* VIEWPORT PRE-RENDER - For regular YouTube feed (not Shorts)       */
+    /* content-visibility: auto is OK for non-Shorts feed items          */
     /* ================================================================== */
     'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer {',
     '  content-visibility: auto;',
     '  contain-intrinsic-size: 1px 300px;',
-    '}',
-    
-    /* YouTube Shorts items - taller placeholder */
-    'ytd-reel-video-renderer:not([is-active]) {',
-    '  content-visibility: auto;',
-    '  contain-intrinsic-size: 1px 600px;',
     '}',
     
     /* YouTube feed items */
@@ -557,9 +569,9 @@ export const gpuLayerSquashingScript = `
     '  contain-intrinsic-size: 1px 250px;',
     '}',
     
-    /* TikTok/Instagram feed items */
-    '[class*="video-feed-item"], [class*="reel-item"], [class*="short-video"] {',
-    '  contain: content !important;',
+    /* TikTok/Instagram feed items - OK with layout style containment */
+    '[class*="video-feed-item"], [class*="reel-item"]:not(ytd-reel-video-renderer) {',
+    '  contain: layout style !important;',
     '  content-visibility: auto;',
     '  contain-intrinsic-size: 1px 500px;',
     '}'
@@ -571,7 +583,54 @@ export const gpuLayerSquashingScript = `
     document.documentElement.appendChild(isolationStyle);
   }
   
-  console.log('[DOM Isolation] v1.2 - contain:content + viewport pre-render');
+  console.log('[DOM Isolation] v1.3 - contain:layout style (no size containment)');
+  
+  /* ================================================================== */
+  /* INTERSECTION OBSERVER FIX                                          */
+  /* YouTube uses IntersectionObserver to detect when to auto-play      */
+  /* Dispatch resize event to force recalculation of element positions  */
+  /* This "wakes up" the next video in the Shorts feed                  */
+  /* ================================================================== */
+  
+  function triggerIntersectionRecalc() {
+    // Force resize event to recalculate all IntersectionObservers
+    window.dispatchEvent(new Event('resize'));
+    
+    // Also trigger scroll event for good measure
+    window.dispatchEvent(new Event('scroll'));
+    
+    console.log('[Intersection Fix] Triggered resize/scroll for observer recalc');
+  }
+  
+  // Run on initial load
+  if (document.readyState === 'complete') {
+    setTimeout(triggerIntersectionRecalc, 500);
+  } else {
+    window.addEventListener('load', function() {
+      setTimeout(triggerIntersectionRecalc, 500);
+    });
+  }
+  
+  // Also run when navigating within YouTube (SPA navigation)
+  var lastUrl = location.href;
+  var urlObserver = new MutationObserver(function() {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      console.log('[Intersection Fix] URL changed, triggering recalc');
+      setTimeout(triggerIntersectionRecalc, 300);
+    }
+  });
+  
+  urlObserver.observe(document.body, { childList: true, subtree: true });
+  
+  // Periodic recalc for Shorts scrolling
+  var isYouTubeShorts = location.pathname.includes('/shorts');
+  if (isYouTubeShorts) {
+    setInterval(function() {
+      window.dispatchEvent(new Event('resize'));
+    }, 2000);
+    console.log('[Intersection Fix] YouTube Shorts detected - periodic recalc enabled');
+  }
 })();
 true;`;
 

@@ -858,9 +858,13 @@ export default function BrowserScreen() {
                 startInLoadingState
                 allowsBackForwardNavigationGestures
                 allowsInlineMediaPlayback
-                // MEDIA PLAYBACK POLICY: Require user action to prevent background video preloading
-                // This stops the browser from "thinking" about multiple videos at once
-                mediaPlaybackRequiresUserAction={true}
+                // MEDIA PLAYBACK POLICY: 
+                // - YouTube URLs: Allow auto-play for Shorts to work properly
+                // - Other sites: Require user action to prevent background video preloading
+                mediaPlaybackRequiresUserAction={
+                  !activeTab.url.includes('youtube.com') && 
+                  !activeTab.url.includes('youtu.be')
+                }
                 // iOS File Download Handler
                 onFileDownload={({ nativeEvent: { downloadUrl } }) => {
                   handleFileDownload(downloadUrl);
