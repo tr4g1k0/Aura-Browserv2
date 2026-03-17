@@ -406,56 +406,61 @@ export default function SettingsScreen() {
         {/* Section: Address Bar Position */}
         {renderSectionHeader('ADDRESS BAR POSITION')}
         <View style={styles.section}>
-          <View style={styles.positionToggleContainer}>
-            <TouchableOpacity
-              style={[
-                styles.positionOption,
-                settings.addressBarPosition === 'top' && styles.positionOptionActive,
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                updateSetting('addressBarPosition', 'top');
-              }}
-            >
-              <Ionicons 
-                name="arrow-up-circle" 
-                size={24} 
-                color={settings.addressBarPosition === 'top' ? '#00FF88' : '#666'} 
-              />
-              <Text style={[
-                styles.positionOptionText,
-                settings.addressBarPosition === 'top' && styles.positionOptionTextActive,
-              ]}>
-                Top
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.addressBarSettingContainer}>
+            <Text style={styles.addressBarLabel}>Bar Location</Text>
+            <Text style={styles.addressBarSubtext}>Choose where the address bar appears on screen</Text>
             
-            <TouchableOpacity
-              style={[
-                styles.positionOption,
-                settings.addressBarPosition === 'bottom' && styles.positionOptionActive,
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                updateSetting('addressBarPosition', 'bottom');
-              }}
-            >
-              <Ionicons 
-                name="arrow-down-circle" 
-                size={24} 
-                color={settings.addressBarPosition === 'bottom' ? '#00FF88' : '#666'} 
-              />
-              <Text style={[
-                styles.positionOptionText,
-                settings.addressBarPosition === 'bottom' && styles.positionOptionTextActive,
-              ]}>
-                Bottom
-              </Text>
-            </TouchableOpacity>
+            {/* Horizontal Segmented Control */}
+            <View style={styles.segmentedControl}>
+              <TouchableOpacity
+                style={[
+                  styles.segmentButton,
+                  settings.addressBarPosition === 'top' && styles.segmentButtonActive,
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateSetting('addressBarPosition', 'top');
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name="arrow-up" 
+                  size={16} 
+                  color={settings.addressBarPosition === 'top' ? '#000000' : '#FFFFFF'} 
+                />
+                <Text style={[
+                  styles.segmentButtonText,
+                  settings.addressBarPosition === 'top' && styles.segmentButtonTextActive,
+                ]}>
+                  Top
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.segmentButton,
+                  settings.addressBarPosition === 'bottom' && styles.segmentButtonActive,
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateSetting('addressBarPosition', 'bottom');
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name="arrow-down" 
+                  size={16} 
+                  color={settings.addressBarPosition === 'bottom' ? '#000000' : '#FFFFFF'} 
+                />
+                <Text style={[
+                  styles.segmentButtonText,
+                  settings.addressBarPosition === 'bottom' && styles.segmentButtonTextActive,
+                ]}>
+                  Bottom
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <Text style={styles.positionDescription}>
-            Choose where the address bar appears on screen
-          </Text>
         </View>
 
         {/* Danger Zone */}
@@ -728,6 +733,59 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
     lineHeight: 18,
+  },
+  // Address Bar Position Styles
+  addressBarSettingContainer: {
+    padding: 16,
+  },
+  addressBarLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  addressBarSubtext: {
+    fontSize: 13,
+    color: '#A0A0A0',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    padding: 4,
+  },
+  segmentButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 6,
+  },
+  segmentButtonActive: {
+    backgroundColor: '#00FFAA',
+  },
+  segmentButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  segmentButtonTextActive: {
+    color: '#000000',
   },
   // Modal styles
   modalOverlay: {
