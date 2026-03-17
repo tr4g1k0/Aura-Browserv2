@@ -24,6 +24,7 @@ import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
 import { downloadManager } from '../src/services/FileDownloadManager';
 import { ttsService, contentExtractionScript } from '../src/services/TextToSpeechService';
+import { TTSControlBar } from '../src/components/TTSControlBar';
 import { 
   isAdOrTracker, 
   adBusterScript, 
@@ -67,6 +68,7 @@ export default function BrowserScreen() {
     addCachedPage,
     addToHistory,
     saveTabScrollPosition,
+    ttsRate,
   } = useBrowserStore();
 
   // Access user settings for search engine preference
@@ -446,6 +448,7 @@ export default function BrowserScreen() {
 
   /**
    * Handle TTS content - speak the extracted text
+   * Uses the ttsRate from the store for pace control
    */
   const handleTTSContent = useCallback((content: string) => {
     if (!content || content.trim().length === 0) {
@@ -457,9 +460,13 @@ export default function BrowserScreen() {
     setIsReading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+    // Get current TTS rate from store
+    const currentRate = useBrowserStore.getState().ttsRate;
+    console.log(`[TTS] Starting with rate: ${currentRate}x`);
+
     ttsService.speak(content, {
       pitch: 1.0,
-      rate: 1.0,
+      rate: currentRate,  // Use rate from store
       onStart: () => {
         console.log('[TTS] Started reading');
       },
@@ -728,6 +735,13 @@ export default function BrowserScreen() {
           filename={downloadFilename}
           progress={downloadProgress}
           onDismiss={dismissDownloadToast}
+        />
+
+        {/* TTS Floating Control Bar */}
+        <TTSControlBar
+          visible={isReading}
+          onStop={handleStopReading}
+          isGhostMode={isGhostMode}
         />
       </View>
 

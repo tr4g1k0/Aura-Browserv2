@@ -90,6 +90,8 @@ interface BrowserState {
   ambientAlerts: string[];
   liveCaptions: string[];
   isGhostMode: boolean;  // Ghost Mode (Incognito) flag
+  // TTS (Text-to-Speech) state
+  ttsRate: number;       // Speech rate (0.8, 1.0, 1.25, 1.5, 2.0)
   
   // Actions
   addTab: (url?: string) => void;
@@ -122,6 +124,9 @@ interface BrowserState {
   // Ghost Mode actions
   toggleGhostMode: () => void;
   setGhostMode: (enabled: boolean) => void;
+  // TTS actions
+  cycleTTSRate: () => void;
+  setTTSRate: (rate: number) => void;
   loadPersistedState: () => Promise<void>;
   persistState: () => Promise<void>;
 }
@@ -158,6 +163,8 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
   searchQuery: '',
   ambientAlerts: [],
   liveCaptions: [],
+  // TTS state
+  ttsRate: 1.0,  // Default speech rate
   isGhostMode: false,
   ghostTabs: [],
 
@@ -522,6 +529,24 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
     if (enabled !== get().isGhostMode) {
       get().toggleGhostMode();
     }
+  },
+
+  // TTS Rate Actions
+  // Cycles through: 1.0 → 1.25 → 1.5 → 2.0 → 0.8 → 1.0
+  cycleTTSRate: () => {
+    const rateSequence = [1.0, 1.25, 1.5, 2.0, 0.8];
+    const currentRate = get().ttsRate;
+    const currentIndex = rateSequence.indexOf(currentRate);
+    const nextIndex = (currentIndex + 1) % rateSequence.length;
+    const newRate = rateSequence[nextIndex];
+    
+    console.log(`[TTS] Rate changed: ${currentRate}x → ${newRate}x`);
+    set({ ttsRate: newRate });
+  },
+
+  setTTSRate: (rate: number) => {
+    console.log(`[TTS] Rate set to: ${rate}x`);
+    set({ ttsRate: rate });
   },
 
   loadPersistedState: async () => {
