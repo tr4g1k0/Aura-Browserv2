@@ -52,9 +52,33 @@ export default function SettingsScreen() {
     router.back();
   };
 
+  /**
+   * Light Impact Haptic - for general settings
+   */
   const handleToggle = (key: keyof typeof settings, value: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     updateSetting(key, value);
+  };
+
+  /**
+   * Heavy Impact Haptic - for critical system toggles
+   * Used for: VPN, Ad-Blocking, Live Captioning, AI features
+   * Feels like flipping a heavy mechanical switch
+   */
+  const handleHeavyToggle = (key: keyof typeof settings, value: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    updateSetting(key, value);
+  };
+
+  /**
+   * Heavy Impact Haptic for toolbar shortcuts
+   */
+  const handleToolbarShortcutToggle = (shortcutKey: string, value: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    updateSetting('toolbarShortcuts', {
+      ...settings.toolbarShortcuts,
+      [shortcutKey]: value,
+    });
   };
 
   const handleClearData = () => {
@@ -291,7 +315,7 @@ export default function SettingsScreen() {
             'Live Captioning',
             'Show real-time captions for audio content.',
             settings.liveCaptioningEnabled,
-            (value) => handleToggle('liveCaptioningEnabled', value)
+            (value) => handleHeavyToggle('liveCaptioningEnabled', value)
           )}
           
           {renderToggleRow(
@@ -300,7 +324,7 @@ export default function SettingsScreen() {
             'Ambient Awareness',
             'Detect environmental sounds while browsing.',
             settings.ambientAwarenessEnabled,
-            (value) => handleToggle('ambientAwarenessEnabled', value)
+            (value) => handleHeavyToggle('ambientAwarenessEnabled', value)
           )}
         </View>
 
@@ -313,7 +337,7 @@ export default function SettingsScreen() {
             'Aggressive Ad & Tracker Blocking',
             'Block ads, trackers, and malicious scripts.',
             settings.aggressiveAdBlocking,
-            (value) => handleToggle('aggressiveAdBlocking', value)
+            (value) => handleHeavyToggle('aggressiveAdBlocking', value)
           )}
           
           {renderToggleRow(
@@ -322,7 +346,7 @@ export default function SettingsScreen() {
             'Always-On VPN',
             'Route all traffic through secure VPN.',
             settings.alwaysOnVPN,
-            (value) => handleToggle('alwaysOnVPN', value)
+            (value) => handleHeavyToggle('alwaysOnVPN', value)
           )}
           
           {renderToggleRow(
@@ -348,10 +372,7 @@ export default function SettingsScreen() {
             'Show Live Captioning Shortcut',
             'Quick access to live captions from toolbar.',
             settings.toolbarShortcuts?.showLiveCaptioning ?? false,
-            (value) => updateSetting('toolbarShortcuts', {
-              ...settings.toolbarShortcuts,
-              showLiveCaptioning: value,
-            })
+            (value) => handleToolbarShortcutToggle('showLiveCaptioning', value)
           )}
           
           {renderToggleRow(
@@ -360,10 +381,7 @@ export default function SettingsScreen() {
             'Show AI Agent Assistant',
             'Quick access to AI assistant from toolbar.',
             settings.toolbarShortcuts?.showAIAgent ?? false,
-            (value) => updateSetting('toolbarShortcuts', {
-              ...settings.toolbarShortcuts,
-              showAIAgent: value,
-            })
+            (value) => handleToolbarShortcutToggle('showAIAgent', value)
           )}
           
           {renderToggleRow(
@@ -372,10 +390,7 @@ export default function SettingsScreen() {
             'Show VPN Toggle',
             'Quick VPN on/off toggle in toolbar.',
             settings.toolbarShortcuts?.showVPNToggle ?? false,
-            (value) => updateSetting('toolbarShortcuts', {
-              ...settings.toolbarShortcuts,
-              showVPNToggle: value,
-            })
+            (value) => handleToolbarShortcutToggle('showVPNToggle', value)
           )}
           
           {renderToggleRow(
@@ -384,10 +399,7 @@ export default function SettingsScreen() {
             'Show Ad-Blocker Status',
             'Show ad-blocking status indicator.',
             settings.toolbarShortcuts?.showAdBlockStatus ?? false,
-            (value) => updateSetting('toolbarShortcuts', {
-              ...settings.toolbarShortcuts,
-              showAdBlockStatus: value,
-            })
+            (value) => handleToolbarShortcutToggle('showAdBlockStatus', value)
           )}
         </View>
 
