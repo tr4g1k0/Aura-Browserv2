@@ -167,9 +167,8 @@ export const SwipeNavigationWrapper: React.FC<SwipeNavigationWrapperProps> = ({
       <PanGestureHandler
         onGestureEvent={onGestureEvent}
         onHandlerStateChange={onHandlerStateChange}
-        activeOffsetX={[-10, 10]}
-        failOffsetY={[-MAX_VERTICAL_MOVEMENT, MAX_VERTICAL_MOVEMENT]}
-        minDist={10}
+        activeOffsetX={[-15, 15]}
+        activeOffsetY={[-MAX_VERTICAL_MOVEMENT, MAX_VERTICAL_MOVEMENT]}
       >
         <View style={styles.gestureContainer}>
           {children}

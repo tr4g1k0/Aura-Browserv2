@@ -5,6 +5,8 @@ import {
   Platform,
   BackHandler,
   Text,
+  ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,6 +64,7 @@ export default function BrowserScreen() {
   const [liveCaptionsVisible, setLiveCaptionsVisible] = useState(false);
   const [visionAISelectors, setVisionAISelectors] = useState<string[]>([]);
   const [adsBlocked, setAdsBlocked] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Zero-Load Predictive Caching state
   const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
@@ -266,6 +269,14 @@ export default function BrowserScreen() {
     router.push('/settings');
   };
 
+  // Pull-to-refresh handler with haptic feedback
+  const handleRefresh = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsRefreshing(true);
+    webViewRef.current?.reload();
+    // The refresh spinner will be hidden when onLoadEnd is called
+  }, []);
+
   // VPN status indicator injection (MOCK)
   const vpnScript = settings.vpnEnabled ? `
     (function() {
@@ -331,31 +342,53 @@ export default function BrowserScreen() {
             onGoForward={() => webViewRef.current?.goForward()}
             enabled={Platform.OS === 'android'}
           >
-            <WebView
-              ref={webViewRef}
-              source={
-                // Zero-Load: Use cached HTML if available, otherwise use URI
-                cachedPageSource && isCacheHit
-                  ? { html: cachedPageSource.html, baseUrl: cachedPageSource.baseUrl }
-                  : { uri: activeTab.url }
+            <ScrollView
+              style={styles.webviewScrollView}
+              contentContainerStyle={styles.webviewScrollContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  tintColor="#00FF88"                    // iOS spinner color (Neon Green)
+                  colors={['#00FF88', '#00E5FF']}        // Android spinner colors
+                  progressBackgroundColor="#1A1A1A"      // Android spinner background
+                  title="Refreshing..."                  // iOS refresh text
+                  titleColor="#00FF88"                   // iOS refresh text color
+                />
               }
-              style={styles.webview}
-              onNavigationStateChange={handleNavigationStateChange}
-              onShouldStartLoadWithRequest={handleShouldStartLoad}
-              onLoadStart={() => setLoading(true)}
-              onLoadEnd={handleLoadEnd}
-              onMessage={handleMessage}
-              injectedJavaScript={getInjectedScript()}
-              javaScriptEnabled
-              domStorageEnabled
-              startInLoadingState
-              allowsBackForwardNavigationGestures
-              allowsInlineMediaPlayback
-              mediaPlaybackRequiresUserAction={false}
-              pullToRefreshEnabled
-              cacheEnabled
-              incognito={settings.vpnEnabled} // Enhanced privacy when VPN is on
-            />
+            >
+              <WebView
+                ref={webViewRef}
+                source={
+                  // Zero-Load: Use cached HTML if available, otherwise use URI
+                  cachedPageSource && isCacheHit
+                    ? { html: cachedPageSource.html, baseUrl: cachedPageSource.baseUrl }
+                    : { uri: activeTab.url }
+                }
+                style={styles.webview}
+                onNavigationStateChange={handleNavigationStateChange}
+                onShouldStartLoadWithRequest={handleShouldStartLoad}
+                onLoadStart={() => setLoading(true)}
+                onLoadEnd={(event) => {
+                  handleLoadEnd(event);
+                  setIsRefreshing(false); // Stop refresh spinner
+                }}
+                onMessage={handleMessage}
+                injectedJavaScript={getInjectedScript()}
+                javaScriptEnabled
+                domStorageEnabled
+                startInLoadingState
+                allowsBackForwardNavigationGestures
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                // Clean UI settings
+                setBuiltInZoomControls={false}   // Hide Android zoom controls
+                setDisplayZoomControls={false}   // Ensure zoom controls are hidden
+                scalesPageToFit={true}
+                cacheEnabled
+                incognito={settings.vpnEnabled} // Enhanced privacy when VPN is on
+              />
+            </ScrollView>
           </SwipeNavigationWrapper>
         ) : null}
 
@@ -396,6 +429,12 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: '#0D0D0D',
+  },
+  webviewScrollView: {
+    flex: 1,
+  },
+  webviewScrollContent: {
+    flex: 1,
   },
   // Zero-Load Cache Hit Indicator
   cacheHitIndicator: {
