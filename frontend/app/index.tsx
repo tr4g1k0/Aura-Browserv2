@@ -27,6 +27,11 @@ import {
   visionAIScannerPlaceholder 
 } from '../src/utils/adblock';
 import { parseUrlInput, getDisplayHostname } from '../src/utils/urlParser';
+import { 
+  predictiveCacheService, 
+  linkExtractionScript,
+  CachedPage 
+} from '../src/services/PredictiveCacheService';
 import * as Haptics from 'expo-haptics';
 
 // Conditionally import WebView only on native platforms
@@ -59,6 +64,10 @@ export default function BrowserScreen() {
   const [liveCaptionsVisible, setLiveCaptionsVisible] = useState(false);
   const [visionAISelectors, setVisionAISelectors] = useState<string[]>([]);
   const [adsBlocked, setAdsBlocked] = useState(0);
+  
+  // Zero-Load Predictive Caching state
+  const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
+  const [isCacheHit, setIsCacheHit] = useState(false);
 
   // Animation for Live Captions FAB pulse when active
   const captionsPulseAnim = useRef(new Animated.Value(1)).current;
@@ -126,6 +135,7 @@ export default function BrowserScreen() {
   /**
    * Handle navigation - parse user input and navigate to URL
    * Uses the user's preferred search engine from settings
+   * Implements Zero-Load instant navigation from predictive cache
    */
   const handleNavigate = useCallback((input: string) => {
     if (!input.trim()) return;
@@ -135,9 +145,38 @@ export default function BrowserScreen() {
     
     if (parsedUrl && activeTab) {
       console.log(`[Browser] Navigating to: ${parsedUrl}`);
+      
+      // Zero-Load: Check if page is in predictive cache
+      if (settings.predictiveCachingEnabled) {
+        const cached = predictiveCacheService.get(parsedUrl);
+        
+        if (cached) {
+          console.log(`[Zero-Load] CACHE HIT! Instant loading: ${parsedUrl}`);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          
+          // Set cached page source for instant rendering
+          setCachedPageSource(cached);
+          setIsCacheHit(true);
+          
+          // Update tab with the cached URL
+          updateTab(activeTab.id, { 
+            url: parsedUrl,
+            title: 'Loading...',
+          });
+          return;
+        } else {
+          console.log(`[Zero-Load] Cache miss, fetching: ${parsedUrl}`);
+        }
+      }
+      
+      // Clear any cached source before normal navigation
+      setCachedPageSource(null);
+      setIsCacheHit(false);
+      
+      // Normal navigation
       updateTab(activeTab.id, { url: parsedUrl });
     }
-  }, [activeTab, updateTab, userSettings.defaultSearchEngine]);
+  }, [activeTab, updateTab, userSettings.defaultSearchEngine, settings.predictiveCachingEnabled]);
 
   const handleNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     if (activeTab) {
@@ -173,10 +212,16 @@ export default function BrowserScreen() {
   /**
    * Layer 2: DOM Injection
    * Injects the adBusterScript to hide ad elements via CSS
-   * Also handles predictive caching
+   * Also handles predictive caching and link extraction
    */
   const handleLoadEnd = useCallback(() => {
     setLoading(false);
+    
+    // Clear any cached page source after loading completes
+    if (cachedPageSource) {
+      setCachedPageSource(null);
+      setIsCacheHit(false);
+    }
     
     // Inject Smart Shield ad-buster script if ad blocking is enabled
     // This is Layer 2: DOM-based element hiding
@@ -189,8 +234,9 @@ export default function BrowserScreen() {
       webViewRef.current?.injectJavaScript(script);
     }
 
-    // Extract page content for predictive caching
+    // Extract page content for predictive caching and prefetch prominent links
     if (settings.predictiveCachingEnabled) {
+      // Cache current page content
       webViewRef.current?.injectJavaScript(`
         (function() {
           window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -201,20 +247,32 @@ export default function BrowserScreen() {
         })();
         true;
       `);
+      
+      // Extract prominent links for predictive prefetching
+      webViewRef.current?.injectJavaScript(linkExtractionScript);
     }
-  }, [userSettings.aggressiveAdBlocking, settings.predictiveCachingEnabled, visionAISelectors]);
+  }, [userSettings.aggressiveAdBlocking, settings.predictiveCachingEnabled, visionAISelectors, cachedPageSource]);
 
   const handleMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       
       if (data.type === 'PAGE_CONTENT') {
-        // Store for predictive caching
+        // Store in browser store for legacy caching
         addCachedPage({
           url: data.url,
           html: data.html.substring(0, 50000), // Limit size
           timestamp: Date.now(),
         });
+        
+        // Also store in predictive cache service
+        predictiveCacheService.set(data.url, data.html, 'text/html');
+      }
+      
+      if (data.type === 'PREDICTIVE_LINKS') {
+        // Prefetch the prominent links in the background
+        console.log('[Zero-Load] Prefetching links:', data.links);
+        predictiveCacheService.prefetchMultiple(data.links);
       }
     } catch (e) {
       // Ignore non-JSON messages
@@ -321,7 +379,12 @@ export default function BrowserScreen() {
         ) : activeTab && WebView ? (
           <WebView
             ref={webViewRef}
-            source={{ uri: activeTab.url }}
+            source={
+              // Zero-Load: Use cached HTML if available, otherwise use URI
+              cachedPageSource && isCacheHit
+                ? { html: cachedPageSource.html, baseUrl: cachedPageSource.baseUrl }
+                : { uri: activeTab.url }
+            }
             style={styles.webview}
             onNavigationStateChange={handleNavigationStateChange}
             onShouldStartLoadWithRequest={handleShouldStartLoad}
@@ -340,6 +403,14 @@ export default function BrowserScreen() {
             incognito={settings.vpnEnabled} // Enhanced privacy when VPN is on
           />
         ) : null}
+
+        {/* Cache Hit Indicator - shows when page loaded from cache */}
+        {isCacheHit && (
+          <View style={styles.cacheHitIndicator}>
+            <Ionicons name="flash" size={14} color="#00FF88" />
+            <Text style={styles.cacheHitText}>Instant Load</Text>
+          </View>
+        )}
 
         {/* Floating AI Agent Button */}
         <TouchableOpacity
@@ -563,5 +634,26 @@ const styles = StyleSheet.create({
   captionsToggleActive: {
     backgroundColor: '#00FF88',
     borderColor: '#00FF88',
+  },
+  // Zero-Load Cache Hit Indicator
+  cacheHitIndicator: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 255, 136, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 136, 0.3)',
+  },
+  cacheHitText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#00FF88',
+    marginLeft: 4,
+    letterSpacing: 0.5,
   },
 });
