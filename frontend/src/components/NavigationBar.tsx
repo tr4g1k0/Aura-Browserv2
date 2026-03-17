@@ -18,6 +18,7 @@ interface NavigationBarProps {
   onForward: () => void;
   onRefresh: () => void;
   onTabsPress: () => void;
+  onSettingsPress: () => void;
   currentUrl: string;
   canGoBack: boolean;
   canGoForward: boolean;
@@ -29,6 +30,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   onForward,
   onRefresh,
   onTabsPress,
+  onSettingsPress,
   currentUrl,
   canGoBack,
   canGoForward,
@@ -154,6 +156,14 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
             </View>
           </View>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => handleButtonPress(onSettingsPress)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="settings-outline" size={20} color="#888" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -219,5 +229,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1A1A1A',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

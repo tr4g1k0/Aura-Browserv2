@@ -159,6 +159,11 @@ export default function BrowserScreen() {
     router.push('/ai-agent');
   };
 
+  const openSettings = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/settings');
+  };
+
   // VPN status indicator injection (MOCK)
   const vpnScript = settings.vpnEnabled ? `
     (function() {
@@ -282,6 +287,7 @@ export default function BrowserScreen() {
         onForward={() => webViewRef.current?.goForward()}
         onRefresh={() => webViewRef.current?.reload()}
         onTabsPress={openTabsManager}
+        onSettingsPress={openSettings}
         currentUrl={activeTab?.url || ''}
         canGoBack={activeTab?.canGoBack || false}
         canGoForward={activeTab?.canGoForward || false}
