@@ -10,22 +10,39 @@ import {
   Platform,
   Animated,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrowserStore } from '../src/store/browserStore';
+import {
+  parseAgentCommand,
+  formatSitemapForDisplay,
+  PageSitemap,
+} from '../src/services/AIAgentExecutionService';
 import * as Haptics from 'expo-haptics';
 
 interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
   isTyping?: boolean;
+  isAction?: boolean;
+  actionType?: string;
+  actionSuccess?: boolean;
 }
 
-// Mock responses for different commands
+// Action result types we can receive from the WebView
+interface ActionResult {
+  type: string;
+  success?: boolean;
+  message?: string;
+  sitemap?: PageSitemap;
+}
+
+// Mock responses for informational commands
 const MOCK_RESPONSES: Record<string, (context: any) => string> = {
   summarize: (ctx) => `📋 **Summary of ${ctx.title || 'this page'}**
 
@@ -34,7 +51,7 @@ const MOCK_RESPONSES: Record<string, (context: any) => string> = {
 • The content is well-structured with clear navigation
 • Estimated reading time: 3-5 minutes
 
-_Tip: Ask me to "find prices" or "extract links" for more actions!_`,
+_Tip: Try "scroll down" or "find the search field" for actions!_`,
 
   prices: () => `💰 **Prices Found on This Page:**
 
@@ -52,7 +69,7 @@ _Tip: Ask me to "find prices" or "extract links" for more actions!_`,
 • Social Media: Twitter, LinkedIn, GitHub
 • Resources: Documentation, FAQ, Support
 
-Would you like me to open any of these?`,
+Would you like me to click any of these?`,
 
   contact: () => `📧 **Contact Information Found:**
 
@@ -65,14 +82,55 @@ Shall I copy any of this information?`,
 
   default: (ctx) => `I understand you want to: "${ctx.command}"
 
-Here's what I can help with on ${ctx.domain || 'this page'}:
+Here's what I can do on ${ctx.domain || 'this page'}:
 
-• **Summarize** - Get a quick overview
-• **Find prices** - Locate pricing info
-• **Extract links** - List all links
-• **Find contact** - Get contact details
+📖 **Information:**
+• "Summarize this page"
+• "Find prices" / "Extract links"
+
+🎮 **Actions:**
+• "Scroll down" / "Scroll up"
+• "Click the [button name]"
+• "Type [text] in the search field"
+• "Find the login button"
 
 Try one of these commands!`,
+};
+
+// Action-specific mock responses
+const ACTION_RESPONSES: Record<string, (result: ActionResult, ctx: any) => string> = {
+  SCROLL: (result) => `✅ **${result.message || 'Scrolled successfully'}**
+
+The page has been scrolled. What would you like to do next?
+• "Scroll more" - Continue scrolling
+• "Go back to top" - Return to the beginning`,
+
+  CLICK: (result) => result.success 
+    ? `✅ **${result.message || 'Click successful!'}**
+
+I clicked the element. The page may be updating...`
+    : `⚠️ **${result.message || 'Could not find that element'}**
+
+Try being more specific, like:
+• "Click the Sign In button"
+• "Click Submit"`,
+
+  INPUT: (result) => result.success
+    ? `✅ **${result.message || 'Text entered successfully!'}**
+
+The text has been typed. Would you like me to submit the form?`
+    : `⚠️ **${result.message || 'Could not find that input field'}**
+
+Try:
+• "Type [text] in the search box"
+• "Enter [text] in the email field"`,
+
+  READ: (result, ctx) => {
+    if (result.sitemap) {
+      return formatSitemapForDisplay(result.sitemap);
+    }
+    return `📄 I'm analyzing the page structure...`;
+  },
 };
 
 export default function AIAgentScreen() {
@@ -80,7 +138,7 @@ export default function AIAgentScreen() {
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
-  const { tabs } = useBrowserStore();
+  const { tabs, isLoading: pageIsLoading } = useBrowserStore();
 
   const activeTab = tabs.find((t) => t.isActive) || tabs[0];
 
@@ -92,17 +150,28 @@ export default function AIAgentScreen() {
 
 I can help you interact with **${activeTab?.title || 'the current page'}**.
 
-Try these commands:
+🎮 **Actions I can perform:**
+• "Scroll down" / "Scroll up"
+• "Click the [button name]"
+• "Type [text] in the [field name]"
+• "Find the login button"
+
+📖 **Information I can get:**
 • "Summarize this page"
-• "Find the cheapest price"
-• "Extract all links"
-• "Find contact information"`,
+• "Find prices" / "Extract links"
+
+What would you like me to do?`,
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isWaitingForPage, setIsWaitingForPage] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const typingDots = useRef(new Animated.Value(0)).current;
+
+  // Track action queue for safety guardrail
+  const actionQueueRef = useRef<Array<{ command: string; timestamp: number }>>([]);
 
   // Typing animation
   useEffect(() => {
@@ -126,6 +195,21 @@ Try these commands:
     }
   }, [isTyping]);
 
+  // Safety guardrail: Check if page is loading
+  useEffect(() => {
+    if (pageIsLoading) {
+      setIsWaitingForPage(true);
+    } else if (isWaitingForPage) {
+      setIsWaitingForPage(false);
+      // Process any queued actions
+      if (pendingAction) {
+        addSystemMessage('Page loaded. Executing your command now...');
+        processCommand(pendingAction);
+        setPendingAction(null);
+      }
+    }
+  }, [pageIsLoading]);
+
   const handleClose = () => {
     Keyboard.dismiss();
     router.back();
@@ -145,6 +229,29 @@ Try these commands:
       domain,
     };
   }, [activeTab]);
+
+  const addSystemMessage = (content: string) => {
+    const systemMessage: Message = {
+      id: Date.now().toString(),
+      role: 'system',
+      content,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, systemMessage]);
+  };
+
+  const addActionMessage = (actionType: string, success: boolean, message: string) => {
+    const actionMessage: Message = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: message,
+      timestamp: new Date(),
+      isAction: true,
+      actionType,
+      actionSuccess: success,
+    };
+    setMessages(prev => [...prev, actionMessage]);
+  };
 
   const getMockResponse = useCallback((command: string): string => {
     const ctx = { ...getContext(), command };
@@ -166,6 +273,108 @@ Try these commands:
     return MOCK_RESPONSES.default(ctx);
   }, [getContext]);
 
+  const processCommand = useCallback(async (command: string) => {
+    const ctx = getContext();
+    const parsedCommand = parseAgentCommand(command);
+
+    if (parsedCommand) {
+      // This is an actionable command
+      const { action, selector, value, direction } = parsedCommand;
+
+      // Send action to parent (browser) via global event
+      // In production, this would use a proper communication channel
+      const actionEvent = {
+        type: action,
+        selector,
+        value,
+        direction,
+      };
+
+      // Store the action for the browser to execute
+      if (typeof window !== 'undefined') {
+        (window as any).__AGENT_ACTION__ = actionEvent;
+        (window as any).__AGENT_ACTION_CALLBACK__ = (result: ActionResult) => {
+          const responseGenerator = ACTION_RESPONSES[action] || ACTION_RESPONSES.CLICK;
+          const response = responseGenerator(result, ctx);
+          addActionMessage(action, result.success || false, response);
+          setIsTyping(false);
+        };
+      }
+
+      // Simulate the action execution
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Generate mock response based on action type
+      const mockResult: ActionResult = {
+        type: action,
+        success: true,
+        message: action === 'SCROLL' 
+          ? `Scrolled ${direction || 'down'}` 
+          : action === 'CLICK'
+            ? `Clicked element: ${value || selector || 'button'}`
+            : action === 'INPUT'
+              ? `Entered text into ${selector || 'field'}`
+              : action === 'READ'
+                ? 'Page structure analyzed'
+                : 'Action completed',
+      };
+
+      // For READ action, generate mock sitemap
+      if (action === 'READ') {
+        mockResult.sitemap = {
+          url: activeTab?.url || '',
+          title: activeTab?.title || 'Page',
+          buttons: [
+            { tag: 'button', selector: 'button.login', text: 'Sign In', isVisible: true, isInteractive: true },
+            { tag: 'button', selector: 'button.signup', text: 'Create Account', isVisible: true, isInteractive: true },
+            { tag: 'button', selector: 'button.search', text: 'Search', isVisible: true, isInteractive: true },
+          ],
+          inputs: [
+            { tag: 'input', selector: 'input[name="search"]', type: 'text', placeholder: 'Search...', isVisible: true, isInteractive: true },
+            { tag: 'input', selector: 'input[name="email"]', type: 'email', placeholder: 'Email address', isVisible: true, isInteractive: true },
+          ],
+          links: [
+            { tag: 'a', selector: 'a.nav-home', text: 'Home', href: '/', isVisible: true, isInteractive: true },
+            { tag: 'a', selector: 'a.nav-about', text: 'About', href: '/about', isVisible: true, isInteractive: true },
+            { tag: 'a', selector: 'a.nav-contact', text: 'Contact', href: '/contact', isVisible: true, isInteractive: true },
+          ],
+          textAreas: [],
+          selects: [],
+          images: [],
+          headings: [
+            { level: 1, text: activeTab?.title || 'Welcome' },
+          ],
+        };
+      }
+
+      const responseGenerator = ACTION_RESPONSES[action] || ACTION_RESPONSES.CLICK;
+      const response = responseGenerator(mockResult, ctx);
+      addActionMessage(action, mockResult.success || false, response);
+      
+      Haptics.notificationAsync(
+        mockResult.success 
+          ? Haptics.NotificationFeedbackType.Success 
+          : Haptics.NotificationFeedbackType.Warning
+      );
+    } else {
+      // Non-actionable command - use mock responses
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const responseText = getMockResponse(command);
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+
+    setIsTyping(false);
+  }, [getContext, getMockResponse, activeTab]);
+
   const sendMessage = async () => {
     if (!input.trim() || isTyping) return;
 
@@ -184,57 +393,72 @@ Try these commands:
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI "thinking" delay (1 second as requested)
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Safety guardrail: Check if page is loading
+    if (pageIsLoading) {
+      addSystemMessage('⏳ Waiting for page to load...');
+      setPendingAction(userCommand);
+      setIsTyping(false);
+      return;
+    }
 
-    // Get mock response
-    const responseText = getMockResponse(userCommand);
-
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: responseText,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, assistantMessage]);
-    setIsTyping(false);
-
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await processCommand(userCommand);
   };
 
   useEffect(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages, isTyping]);
 
-  const renderMessage = (message: Message) => (
-    <Animated.View
-      key={message.id}
-      style={[
-        styles.messageBubble,
-        message.role === 'user' ? styles.userBubble : styles.assistantBubble,
-      ]}
-    >
-      {message.role === 'assistant' && (
-        <View style={styles.avatarContainer}>
-          <Ionicons name="sparkles" size={16} color="#00FF88" />
-        </View>
-      )}
-      <View
+  const renderMessage = (message: Message) => {
+    const isSystem = message.role === 'system';
+    const isAction = message.isAction;
+
+    return (
+      <Animated.View
+        key={message.id}
         style={[
-          styles.messageContent,
-          message.role === 'user' ? styles.userContent : styles.assistantContent,
+          styles.messageBubble,
+          message.role === 'user' ? styles.userBubble : styles.assistantBubble,
+          isSystem && styles.systemBubble,
         ]}
       >
-        <Text style={[
-          styles.messageText,
-          message.role === 'user' && styles.userMessageText,
-        ]}>
-          {message.content}
-        </Text>
-      </View>
-    </Animated.View>
-  );
+        {message.role === 'assistant' && (
+          <View style={[
+            styles.avatarContainer,
+            isAction && (message.actionSuccess ? styles.avatarSuccess : styles.avatarWarning),
+          ]}>
+            <Ionicons 
+              name={isAction ? (message.actionSuccess ? 'checkmark' : 'alert') : 'sparkles'} 
+              size={16} 
+              color={isAction ? (message.actionSuccess ? '#00FF88' : '#FFB800') : '#00FF88'} 
+            />
+          </View>
+        )}
+        <View
+          style={[
+            styles.messageContent,
+            message.role === 'user' ? styles.userContent : styles.assistantContent,
+            isSystem && styles.systemContent,
+            isAction && styles.actionContent,
+          ]}
+        >
+          {isAction && message.actionType && (
+            <View style={styles.actionBadge}>
+              <Text style={styles.actionBadgeText}>
+                {message.actionType}
+              </Text>
+            </View>
+          )}
+          <Text style={[
+            styles.messageText,
+            message.role === 'user' && styles.userMessageText,
+            isSystem && styles.systemMessageText,
+          ]}>
+            {message.content}
+          </Text>
+        </View>
+      </Animated.View>
+    );
+  };
 
   const renderTypingIndicator = () => (
     <View style={[styles.messageBubble, styles.assistantBubble]}>
@@ -279,19 +503,24 @@ Try these commands:
     </View>
   );
 
-  // Quick action buttons
+  // Quick action buttons with actions
   const QuickActions = () => (
     <View style={styles.quickActions}>
-      {['Summarize', 'Find prices', 'Extract links'].map((action) => (
+      {[
+        { label: 'Scroll down', icon: 'arrow-down' },
+        { label: 'Read page', icon: 'document-text' },
+        { label: 'Summarize', icon: 'list' },
+      ].map((action) => (
         <TouchableOpacity
-          key={action}
+          key={action.label}
           style={styles.quickActionButton}
           onPress={() => {
-            setInput(action + ' on this page');
+            setInput(action.label);
             inputRef.current?.focus();
           }}
         >
-          <Text style={styles.quickActionText}>{action}</Text>
+          <Ionicons name={action.icon as any} size={14} color="#888" />
+          <Text style={styles.quickActionText}>{action.label}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -311,15 +540,23 @@ Try these commands:
           </View>
           <View>
             <Text style={styles.headerTitle}>AI Agent</Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {activeTab ? (() => {
-                try {
-                  return new URL(activeTab.url).hostname;
-                } catch {
-                  return 'Current page';
-                }
-              })() : 'No page loaded'}
-            </Text>
+            <View style={styles.headerSubtitleRow}>
+              <Text style={styles.headerSubtitle} numberOfLines={1}>
+                {activeTab ? (() => {
+                  try {
+                    return new URL(activeTab.url).hostname;
+                  } catch {
+                    return 'Current page';
+                  }
+                })() : 'No page loaded'}
+              </Text>
+              {pageIsLoading && (
+                <View style={styles.loadingBadge}>
+                  <ActivityIndicator size={10} color="#FFB800" />
+                  <Text style={styles.loadingBadgeText}>Loading</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
@@ -344,13 +581,19 @@ Try these commands:
 
       {/* Input */}
       <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 8 }]}>
+        {isWaitingForPage && (
+          <View style={styles.waitingBanner}>
+            <ActivityIndicator size="small" color="#FFB800" />
+            <Text style={styles.waitingText}>Waiting for page to load...</Text>
+          </View>
+        )}
         <View style={styles.inputWrapper}>
           <TextInput
             ref={inputRef}
             style={styles.input}
             value={input}
             onChangeText={setInput}
-            placeholder="Ask me anything about this page..."
+            placeholder="Try 'Scroll down' or 'Click the login button'..."
             placeholderTextColor="#666"
             multiline
             maxLength={500}
@@ -411,11 +654,30 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
   },
+  headerSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   headerSubtitle: {
     fontSize: 12,
     color: '#888',
-    marginTop: 2,
-    maxWidth: 200,
+    maxWidth: 150,
+  },
+  loadingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 184, 0, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+    gap: 4,
+  },
+  loadingBadgeText: {
+    fontSize: 10,
+    color: '#FFB800',
+    fontWeight: '600',
   },
   closeButton: {
     width: 40,
@@ -441,6 +703,9 @@ const styles = StyleSheet.create({
   assistantBubble: {
     justifyContent: 'flex-start',
   },
+  systemBubble: {
+    justifyContent: 'center',
+  },
   avatarContainer: {
     width: 28,
     height: 28,
@@ -450,6 +715,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 8,
     marginTop: 4,
+  },
+  avatarSuccess: {
+    backgroundColor: '#1A2A1A',
+  },
+  avatarWarning: {
+    backgroundColor: '#2A2A1A',
   },
   messageContent: {
     maxWidth: '80%',
@@ -465,6 +736,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     borderBottomLeftRadius: 4,
   },
+  systemContent: {
+    backgroundColor: 'transparent',
+    maxWidth: '100%',
+    alignSelf: 'center',
+  },
+  actionContent: {
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  actionBadge: {
+    backgroundColor: '#2A2A2A',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  actionBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#00FF88',
+    letterSpacing: 0.5,
+  },
   messageText: {
     fontSize: 15,
     lineHeight: 22,
@@ -472,6 +766,12 @@ const styles = StyleSheet.create({
   },
   userMessageText: {
     color: '#0D0D0D',
+  },
+  systemMessageText: {
+    color: '#888',
+    textAlign: 'center',
+    fontSize: 13,
+    fontStyle: 'italic',
   },
   typingContent: {
     flexDirection: 'row',
@@ -493,12 +793,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   quickActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: '#1A1A1A',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#333',
+    gap: 6,
   },
   quickActionText: {
     fontSize: 12,
@@ -509,6 +812,20 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#1A1A1A',
+  },
+  waitingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 184, 0, 0.1)',
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderRadius: 8,
+    gap: 8,
+  },
+  waitingText: {
+    fontSize: 12,
+    color: '#FFB800',
   },
   inputWrapper: {
     flexDirection: 'row',
