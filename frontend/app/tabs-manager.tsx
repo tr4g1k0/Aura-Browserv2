@@ -106,31 +106,45 @@ const createMockTabs = (): Tab[] => [
 export default function TabsManagerScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { tabs: storeTabs, addTab, removeTab, setActiveTab } = useBrowserStore();
+  const { 
+    tabs: storeTabs, 
+    ghostTabs,
+    isGhostMode,
+    addTab, 
+    removeTab, 
+    setActiveTab,
+    toggleGhostMode,
+  } = useBrowserStore();
 
   // Local state for displayed tabs (handles both mock and real tabs)
   const [displayedTabs, setDisplayedTabs] = useState<Tab[]>([]);
   const [usingMockTabs, setUsingMockTabs] = useState(false);
 
+  // Get the correct tabs based on Ghost Mode
+  const currentTabs = isGhostMode ? ghostTabs : storeTabs;
+
   // Initialize tabs on mount
   useEffect(() => {
-    if (storeTabs.length > 1) {
+    if (currentTabs.length > 1) {
       // Use real tabs from store
-      setDisplayedTabs(storeTabs);
+      setDisplayedTabs(currentTabs);
+      setUsingMockTabs(false);
+    } else if (currentTabs.length === 1) {
+      setDisplayedTabs(currentTabs);
       setUsingMockTabs(false);
     } else {
       // Use mock tabs for demo
       setDisplayedTabs(createMockTabs());
       setUsingMockTabs(true);
     }
-  }, []);
+  }, [isGhostMode]);
 
   // Sync with store when using real tabs
   useEffect(() => {
-    if (!usingMockTabs && storeTabs.length > 0) {
-      setDisplayedTabs(storeTabs);
+    if (!usingMockTabs && currentTabs.length > 0) {
+      setDisplayedTabs(currentTabs);
     }
-  }, [storeTabs, usingMockTabs]);
+  }, [currentTabs, usingMockTabs]);
 
   const [isGrouped, setIsGrouped] = useState(false);
   const [isGrouping, setIsGrouping] = useState(false);
@@ -493,15 +507,81 @@ export default function TabsManagerScreen() {
     </View>
   );
 
+  // Ghost Mode color theme
+  const ghostModeColors = {
+    background: isGhostMode ? '#1A0A1A' : '#0D0D0D',
+    headerBorder: isGhostMode ? '#2D1A2D' : '#1A1A1A',
+    accent: isGhostMode ? '#9B59B6' : '#00FF88',
+    accentDark: isGhostMode ? '#2D1A2D' : '#1A1A1A',
+    tabBackground: isGhostMode ? 'rgba(155, 89, 182, 0.1)' : 'rgba(255, 255, 255, 0.03)',
+    tabBorder: isGhostMode ? 'rgba(155, 89, 182, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+  };
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
+    <View style={[
+      styles.container, 
+      { paddingTop: insets.top, backgroundColor: ghostModeColors.background }
+    ]}>
+      {/* Ghost Mode Toggle - Prominent at top */}
+      <TouchableOpacity
+        style={[
+          styles.ghostModeToggle,
+          isGhostMode && styles.ghostModeToggleActive,
+          { borderColor: isGhostMode ? '#9B59B6' : '#333' }
+        ]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          toggleGhostMode();
+        }}
+        activeOpacity={0.8}
+      >
+        <View style={[
+          styles.ghostModeIcon,
+          isGhostMode && styles.ghostModeIconActive
+        ]}>
+          <Ionicons 
+            name={isGhostMode ? "eye-off" : "eye-off-outline"} 
+            size={20} 
+            color={isGhostMode ? '#9B59B6' : '#888'} 
+          />
+        </View>
+        <View style={styles.ghostModeTextContainer}>
+          <Text style={[
+            styles.ghostModeTitle,
+            isGhostMode && { color: '#9B59B6' }
+          ]}>
+            Ghost Mode
+          </Text>
+          <Text style={styles.ghostModeSubtitle}>
+            {isGhostMode ? 'Active • No history saved' : 'Browse without leaving traces'}
+          </Text>
+        </View>
+        <View style={[
+          styles.ghostModeSwitch,
+          isGhostMode && styles.ghostModeSwitchActive
+        ]}>
+          <View style={[
+            styles.ghostModeSwitchKnob,
+            isGhostMode && styles.ghostModeSwitchKnobActive
+          ]} />
+        </View>
+      </TouchableOpacity>
+
+      <View style={[styles.header, { borderBottomColor: ghostModeColors.headerBorder }]}>
         <View>
-          <Text style={styles.title}>Tabs</Text>
+          <Text style={styles.title}>
+            {isGhostMode ? '👻 Ghost Tabs' : 'Tabs'}
+          </Text>
           <Text style={styles.subtitle}>{displayedTabs.length} open</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddTab}>
+          <TouchableOpacity 
+            style={[
+              styles.addButton,
+              { backgroundColor: ghostModeColors.accent }
+            ]} 
+            onPress={handleAddTab}
+          >
             <Ionicons name="add" size={24} color="#0D0D0D" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
@@ -569,6 +649,69 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0D0D0D',
+  },
+  // Ghost Mode Toggle Styles
+  ghostModeToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#333',
+  },
+  ghostModeToggleActive: {
+    backgroundColor: 'rgba(155, 89, 182, 0.15)',
+  },
+  ghostModeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ghostModeIconActive: {
+    backgroundColor: 'rgba(155, 89, 182, 0.2)',
+  },
+  ghostModeTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  ghostModeTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  ghostModeSubtitle: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  ghostModeSwitch: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#333',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  ghostModeSwitchActive: {
+    backgroundColor: '#9B59B6',
+  },
+  ghostModeSwitchKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#666',
+  },
+  ghostModeSwitchKnobActive: {
+    backgroundColor: '#FFF',
+    marginLeft: 'auto',
   },
   header: {
     flexDirection: 'row',

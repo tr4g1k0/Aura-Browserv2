@@ -57,7 +57,9 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { 
-    tabs, 
+    tabs,
+    ghostTabs,
+    isGhostMode, 
     isLoading, 
     settings: browserSettings, 
     toggleAdblock,
@@ -67,6 +69,18 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   } = useBrowserStore();
   const { settings } = useSettings();
   const { isConnected: vpnConnected, isConnecting, state: vpnState } = useVPNConnection();
+
+  // Get current tabs based on Ghost Mode
+  const currentTabs = isGhostMode ? ghostTabs : tabs;
+  const tabCount = currentTabs.length;
+
+  // Ghost Mode color theme
+  const colors = {
+    accent: isGhostMode ? '#9B59B6' : '#00FF88',
+    accentSecondary: isGhostMode ? '#8E44AD' : '#00E5FF',
+    searchBackground: isGhostMode ? '#2D1A2D' : '#1A1A1A',
+    borderColor: isGhostMode ? 'rgba(155, 89, 182, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+  };
   
   const [inputValue, setInputValue] = useState(currentUrl);
   const [isFocused, setIsFocused] = useState(false);
@@ -145,11 +159,8 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   };
 
   // Determine shield state - shows privacy/adblock status
-  const isProtected = browserSettings.adblockEnabled || vpnConnected;
-  const shieldColor = vpnConnected ? '#00E5FF' : browserSettings.adblockEnabled ? '#00FF88' : '#555';
-
-  // Tab count
-  const tabCount = tabs.length;
+  const isProtected = browserSettings.adblockEnabled || vpnConnected || isGhostMode;
+  const shieldColor = isGhostMode ? '#9B59B6' : vpnConnected ? '#00E5FF' : browserSettings.adblockEnabled ? '#00FF88' : '#555';
 
   const isWeb = Platform.OS === 'web';
 
@@ -177,14 +188,18 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
 
         {/* URL/Search Input - Takes all available space */}
         <View style={styles.searchContainer}>
-          <View style={[styles.searchBar, isFocused && styles.searchBarFocused]}>
+          <View style={[
+            styles.searchBar, 
+            { backgroundColor: colors.searchBackground },
+            isFocused && [styles.searchBarFocused, { borderColor: colors.accent }]
+          ]}>
             {isLoading ? (
-              <ActivityIndicator size="small" color="#00FF88" style={styles.searchIcon} />
+              <ActivityIndicator size="small" color={colors.accent} style={styles.searchIcon} />
             ) : (
               <Ionicons 
-                name="search" 
+                name={isGhostMode ? "eye-off-outline" : "search"} 
                 size={16} 
-                color={isFocused ? '#00FF88' : '#666'} 
+                color={isFocused ? colors.accent : '#666'} 
                 style={styles.searchIcon} 
               />
             )}

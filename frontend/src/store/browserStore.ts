@@ -76,6 +76,7 @@ export interface Bookmark {
 
 interface BrowserState {
   tabs: Tab[];
+  ghostTabs: Tab[];  // Separate tabs for Ghost Mode
   activeTabId: string | null;
   settings: BrowserSettings;
   cachedPages: CachedPage[];
@@ -85,6 +86,7 @@ interface BrowserState {
   searchQuery: string;
   ambientAlerts: string[];
   liveCaptions: string[];
+  isGhostMode: boolean;  // Ghost Mode (Incognito) flag
   
   // Actions
   addTab: (url?: string) => void;
@@ -112,6 +114,9 @@ interface BrowserState {
   removeBookmark: (url: string) => void;
   isBookmarked: (url: string) => boolean;
   toggleBookmark: (url: string, title: string, favicon?: string) => void;
+  // Ghost Mode actions
+  toggleGhostMode: () => void;
+  setGhostMode: (enabled: boolean) => void;
   loadPersistedState: () => Promise<void>;
   persistState: () => Promise<void>;
 }
@@ -146,6 +151,8 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
   searchQuery: '',
   ambientAlerts: [],
   liveCaptions: [],
+  isGhostMode: false,
+  ghostTabs: [],
 
   addTab: (url = DEFAULT_URL) => {
     const newTab: Tab = {
@@ -156,49 +163,103 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
       canGoBack: false,
       canGoForward: false,
     };
-    set((state) => ({
-      tabs: state.tabs.map((t) => ({ ...t, isActive: false })).concat(newTab),
-      activeTabId: newTab.id,
-    }));
-    get().persistState();
+    
+    const state = get();
+    
+    if (state.isGhostMode) {
+      // In Ghost Mode, add to ghostTabs instead
+      set((state) => ({
+        ghostTabs: state.ghostTabs.map((t) => ({ ...t, isActive: false })).concat(newTab),
+        activeTabId: newTab.id,
+      }));
+    } else {
+      set((state) => ({
+        tabs: state.tabs.map((t) => ({ ...t, isActive: false })).concat(newTab),
+        activeTabId: newTab.id,
+      }));
+      get().persistState();
+    }
   },
 
   removeTab: (id) => {
-    set((state) => {
-      const newTabs = state.tabs.filter((t) => t.id !== id);
-      if (newTabs.length === 0) {
-        const newTab: Tab = {
-          id: generateId(),
-          url: DEFAULT_URL,
-          title: 'New Tab',
-          isActive: true,
-          canGoBack: false,
-          canGoForward: false,
-        };
-        return { tabs: [newTab], activeTabId: newTab.id };
-      }
-      const wasActive = state.tabs.find((t) => t.id === id)?.isActive;
-      if (wasActive && newTabs.length > 0) {
-        newTabs[newTabs.length - 1].isActive = true;
-        return { tabs: newTabs, activeTabId: newTabs[newTabs.length - 1].id };
-      }
-      return { tabs: newTabs };
-    });
-    get().persistState();
+    const state = get();
+    
+    if (state.isGhostMode) {
+      // In Ghost Mode, remove from ghostTabs
+      set((state) => {
+        const newTabs = state.ghostTabs.filter((t) => t.id !== id);
+        if (newTabs.length === 0) {
+          const newTab: Tab = {
+            id: generateId(),
+            url: DEFAULT_URL,
+            title: 'New Tab',
+            isActive: true,
+            canGoBack: false,
+            canGoForward: false,
+          };
+          return { ghostTabs: [newTab], activeTabId: newTab.id };
+        }
+        const wasActive = state.ghostTabs.find((t) => t.id === id)?.isActive;
+        if (wasActive && newTabs.length > 0) {
+          newTabs[newTabs.length - 1].isActive = true;
+          return { ghostTabs: newTabs, activeTabId: newTabs[newTabs.length - 1].id };
+        }
+        return { ghostTabs: newTabs };
+      });
+    } else {
+      set((state) => {
+        const newTabs = state.tabs.filter((t) => t.id !== id);
+        if (newTabs.length === 0) {
+          const newTab: Tab = {
+            id: generateId(),
+            url: DEFAULT_URL,
+            title: 'New Tab',
+            isActive: true,
+            canGoBack: false,
+            canGoForward: false,
+          };
+          return { tabs: [newTab], activeTabId: newTab.id };
+        }
+        const wasActive = state.tabs.find((t) => t.id === id)?.isActive;
+        if (wasActive && newTabs.length > 0) {
+          newTabs[newTabs.length - 1].isActive = true;
+          return { tabs: newTabs, activeTabId: newTabs[newTabs.length - 1].id };
+        }
+        return { tabs: newTabs };
+      });
+      get().persistState();
+    }
   },
 
   setActiveTab: (id) => {
-    set((state) => ({
-      tabs: state.tabs.map((t) => ({ ...t, isActive: t.id === id })),
-      activeTabId: id,
-    }));
-    get().persistState();
+    const state = get();
+    
+    if (state.isGhostMode) {
+      set((state) => ({
+        ghostTabs: state.ghostTabs.map((t) => ({ ...t, isActive: t.id === id })),
+        activeTabId: id,
+      }));
+    } else {
+      set((state) => ({
+        tabs: state.tabs.map((t) => ({ ...t, isActive: t.id === id })),
+        activeTabId: id,
+      }));
+      get().persistState();
+    }
   },
 
   updateTab: (id, updates) => {
-    set((state) => ({
-      tabs: state.tabs.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-    }));
+    const state = get();
+    
+    if (state.isGhostMode) {
+      set((state) => ({
+        ghostTabs: state.ghostTabs.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+      }));
+    } else {
+      set((state) => ({
+        tabs: state.tabs.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+      }));
+    }
   },
 
   toggleAdblock: () => {
@@ -266,6 +327,12 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
 
   // History actions
   addToHistory: (url: string, title: string, favicon?: string) => {
+    // DATA BLACKOUT: Skip history logging in Ghost Mode
+    if (get().isGhostMode) {
+      console.log('[Ghost Mode] History logging bypassed');
+      return;
+    }
+    
     // Skip internal pages and empty URLs
     if (!url || url === 'about:blank' || url === 'about:newtab') {
       return;
@@ -344,6 +411,47 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
       state.removeBookmark(url);
     } else {
       state.addBookmark(url, title, favicon);
+    }
+  },
+
+  // Ghost Mode actions
+  toggleGhostMode: () => {
+    const state = get();
+    const newGhostMode = !state.isGhostMode;
+    
+    if (newGhostMode) {
+      // Entering Ghost Mode - create a fresh ghost tab
+      const ghostTab: Tab = {
+        id: generateId(),
+        url: DEFAULT_URL,
+        title: 'Ghost Tab',
+        isActive: true,
+        canGoBack: false,
+        canGoForward: false,
+      };
+      set({
+        isGhostMode: true,
+        ghostTabs: [ghostTab],
+        activeTabId: ghostTab.id,
+      });
+      console.log('[Ghost Mode] Enabled - all browsing data will NOT be saved');
+    } else {
+      // Exiting Ghost Mode - destroy all ghost tabs and switch back to regular tabs
+      const regularTabs = state.tabs;
+      const activeRegularTab = regularTabs.find((t) => t.isActive) || regularTabs[0];
+      
+      set({
+        isGhostMode: false,
+        ghostTabs: [], // Destroy all ghost tabs
+        activeTabId: activeRegularTab?.id || null,
+      });
+      console.log('[Ghost Mode] Disabled - ghost tabs destroyed');
+    }
+  },
+
+  setGhostMode: (enabled: boolean) => {
+    if (enabled !== get().isGhostMode) {
+      get().toggleGhostMode();
     }
   },
 

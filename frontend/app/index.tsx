@@ -53,6 +53,8 @@ export default function BrowserScreen() {
   const webViewRef = useRef<WebView>(null);
   const {
     tabs,
+    ghostTabs,
+    isGhostMode,
     settings,
     updateTab,
     setLoading,
@@ -63,6 +65,9 @@ export default function BrowserScreen() {
 
   // Access user settings for search engine preference
   const { settings: userSettings } = useSettings();
+
+  // Get active tabs based on Ghost Mode
+  const currentTabs = isGhostMode ? ghostTabs : tabs;
 
   const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
   const [liveCaptionsVisible, setLiveCaptionsVisible] = useState(false);
@@ -83,7 +88,7 @@ export default function BrowserScreen() {
   const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
   const [isCacheHit, setIsCacheHit] = useState(false);
 
-  const activeTab = tabs.find((t) => t.isActive) || tabs[0];
+  const activeTab = currentTabs.find((t) => t.isActive) || currentTabs[0];
 
   // Check if we should show the New Tab Page
   const isNewTabPage = !activeTab?.url || 
@@ -487,8 +492,8 @@ export default function BrowserScreen() {
                 setBuiltInZoomControls={false}   // Hide Android zoom controls
                 setDisplayZoomControls={false}   // Ensure zoom controls are hidden
                 scalesPageToFit={true}
-                cacheEnabled
-                incognito={settings.vpnEnabled} // Enhanced privacy when VPN is on
+                cacheEnabled={!isGhostMode}      // Disable caching in Ghost Mode
+                incognito={isGhostMode || settings.vpnEnabled} // Ghost Mode = no cookies/local data
               />
             </ScrollView>
           </SwipeNavigationWrapper>
