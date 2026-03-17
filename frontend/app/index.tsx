@@ -54,6 +54,9 @@ if (Platform.OS !== 'web') {
 
 const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
+// Desktop User Agent for requesting desktop sites
+const DESKTOP_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
 export default function BrowserScreen() {
   const router = useRouter();
   const webViewRef = useRef<WebView>(null);
@@ -69,6 +72,8 @@ export default function BrowserScreen() {
     addToHistory,
     saveTabScrollPosition,
     ttsRate,
+    toggleDesktopMode,
+    getActiveTabDesktopMode,
   } = useBrowserStore();
 
   // Access user settings for search engine preference
@@ -621,8 +626,16 @@ export default function BrowserScreen() {
         onToggleGhostMode={() => {
           useBrowserStore.getState().toggleGhostMode();
         }}
+        onToggleDesktopMode={() => {
+          toggleDesktopMode();
+          // Reload page to fetch with new user agent
+          setTimeout(() => {
+            webViewRef.current?.reload();
+          }, 100);
+        }}
         isReading={isReading}
         isGhostMode={isGhostMode}
+        isDesktopMode={activeTab?.isDesktopMode ?? false}
       />
 
       <View style={styles.webviewContainer}>
@@ -695,6 +708,8 @@ export default function BrowserScreen() {
                 scalesPageToFit={true}
                 cacheEnabled={!isGhostMode}      // Disable caching in Ghost Mode
                 incognito={isGhostMode || settings.vpnEnabled} // Ghost Mode = no cookies/local data
+                // Desktop Mode: Use desktop user agent if enabled
+                userAgent={activeTab?.isDesktopMode ? DESKTOP_USER_AGENT : undefined}
                 // HARDWARE ACCELERATION & SMOOTH SCROLLING
                 // Android: Enable GPU rendering for smooth scrolling
                 androidHardwareAccelerationDisabled={false}

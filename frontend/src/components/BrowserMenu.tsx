@@ -25,8 +25,10 @@ interface BrowserMenuProps {
   onNewTab: () => void;
   onShare: () => void;
   onToggleGhostMode: () => void;
+  onToggleDesktopMode: () => void;
   isReading: boolean;
   isGhostMode: boolean;
+  isDesktopMode: boolean;
 }
 
 interface MenuItemProps {
@@ -95,8 +97,10 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onNewTab,
   onShare,
   onToggleGhostMode,
+  onToggleDesktopMode,
   isReading,
   isGhostMode,
+  isDesktopMode,
 }) => {
   const insets = useSafeAreaInsets();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -239,6 +243,19 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               color="#888"
             />
 
+            {/* Desktop Mode Toggle */}
+            <MenuItem
+              icon={isDesktopMode ? "phone-portrait-outline" : "desktop-outline"}
+              label={isDesktopMode ? "Request Mobile Site" : "Request Desktop Site"}
+              onPress={() => {
+                onToggleDesktopMode();
+                handleClose();
+              }}
+              isActive={isDesktopMode}
+              activeColor="#00E5FF"
+              color="#888"
+            />
+
             <View style={styles.divider} />
 
             {/* Settings */}
@@ -325,6 +342,19 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
                 onShare();
                 handleClose();
               }}
+              color="#888"
+            />
+
+            {/* Desktop Mode Toggle */}
+            <MenuItem
+              icon={isDesktopMode ? "phone-portrait-outline" : "desktop-outline"}
+              label={isDesktopMode ? "Request Mobile Site" : "Request Desktop Site"}
+              onPress={() => {
+                onToggleDesktopMode();
+                handleClose();
+              }}
+              isActive={isDesktopMode}
+              activeColor="#00E5FF"
               color="#888"
             />
 

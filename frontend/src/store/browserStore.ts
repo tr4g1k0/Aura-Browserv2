@@ -47,6 +47,8 @@ export interface Tab {
   // Tab Virtualization: State preservation
   scrollY: number;           // Saved scroll position
   lastActiveTime: number;    // When tab was last active
+  // Desktop Mode: Per-tab setting
+  isDesktopMode: boolean;    // Request desktop site for this tab
 }
 
 export interface BrowserSettings {
@@ -148,6 +150,9 @@ interface BrowserState {
   addQuickLink: (title: string, url: string) => void;
   removeQuickLink: (id: string) => void;
   updateQuickLink: (id: string, updates: Partial<QuickLink>) => void;
+  // Desktop Mode actions
+  toggleDesktopMode: () => void;
+  getActiveTabDesktopMode: () => boolean;
   loadPersistedState: () => Promise<void>;
   persistState: () => Promise<void>;
 }
@@ -167,6 +172,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
       canGoForward: false,
       scrollY: 0,
       lastActiveTime: Date.now(),
+      isDesktopMode: false,
     },
   ],
   activeTabId: null,
@@ -200,6 +206,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
       canGoForward: false,
       scrollY: 0,
       lastActiveTime: Date.now(),
+      isDesktopMode: false,
     };
     
     const state = get();
@@ -246,6 +253,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
             canGoForward: false,
             scrollY: 0,
             lastActiveTime: Date.now(),
+            isDesktopMode: false,
           };
           return { ghostTabs: [newTab], activeTabId: newTab.id };
         }
@@ -270,6 +278,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
             canGoForward: false,
             scrollY: 0,
             lastActiveTime: Date.now(),
+            isDesktopMode: false,
           };
           return { tabs: [newTab], activeTabId: newTab.id };
         }
@@ -526,6 +535,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
         canGoForward: false,
         scrollY: 0,
         lastActiveTime: Date.now(),
+        isDesktopMode: false,
       };
       set({
         isGhostMode: true,
@@ -609,6 +619,39 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
     
     // Persist the change
     get().persistState();
+  },
+
+  // Desktop Mode Actions
+  toggleDesktopMode: () => {
+    const state = get();
+    const currentTabs = state.isGhostMode ? state.ghostTabs : state.tabs;
+    const activeTab = currentTabs.find((t) => t.isActive);
+    
+    if (!activeTab) return;
+    
+    const newDesktopMode = !activeTab.isDesktopMode;
+    console.log(`[Desktop Mode] Toggled: ${newDesktopMode ? 'ON' : 'OFF'} for tab ${activeTab.id}`);
+    
+    if (state.isGhostMode) {
+      set((state) => ({
+        ghostTabs: state.ghostTabs.map((t) =>
+          t.id === activeTab.id ? { ...t, isDesktopMode: newDesktopMode } : t
+        ),
+      }));
+    } else {
+      set((state) => ({
+        tabs: state.tabs.map((t) =>
+          t.id === activeTab.id ? { ...t, isDesktopMode: newDesktopMode } : t
+        ),
+      }));
+    }
+  },
+
+  getActiveTabDesktopMode: () => {
+    const state = get();
+    const currentTabs = state.isGhostMode ? state.ghostTabs : state.tabs;
+    const activeTab = currentTabs.find((t) => t.isActive);
+    return activeTab?.isDesktopMode ?? false;
   },
 
   loadPersistedState: async () => {
