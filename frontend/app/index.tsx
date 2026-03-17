@@ -12,6 +12,7 @@ import { useBrowserStore } from '../src/store/browserStore';
 import { useSettings } from '../src/context/SettingsContext';
 import { BrowserStatusBar } from '../src/components/StatusBar';
 import { ChromeNavigationBar } from '../src/components/ChromeNavigationBar';
+import { NewTabPage } from '../src/components/NewTabPage';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
@@ -67,6 +68,13 @@ export default function BrowserScreen() {
   const [isCacheHit, setIsCacheHit] = useState(false);
 
   const activeTab = tabs.find((t) => t.isActive) || tabs[0];
+
+  // Check if we should show the New Tab Page
+  const isNewTabPage = !activeTab?.url || 
+                       activeTab.url === 'about:blank' || 
+                       activeTab.url === 'about:newtab' ||
+                       activeTab.url === '' ||
+                       activeTab.url === 'https://www.google.com';
 
   // Load persisted state on mount
   useEffect(() => {
@@ -321,47 +329,17 @@ export default function BrowserScreen() {
 
       <View style={styles.webviewContainer}>
         {Platform.OS === 'web' ? (
-          // Web platform: Show iframe or fallback message
-          <View style={styles.webFallback}>
-            <View style={styles.webFallbackContent}>
-              <Ionicons name="phone-portrait-outline" size={64} color="#00FF88" />
-              <Text style={styles.webFallbackTitle}>ACCESS Browser</Text>
-              <Text style={styles.webFallbackText}>
-                For the full browsing experience, please open this app on your mobile device using Expo Go.
-              </Text>
-              <Text style={styles.webFallbackSubtext}>
-                The WebView component is only available on iOS and Android.
-              </Text>
-              
-              {/* Demo UI elements for web */}
-              <View style={styles.featureList}>
-                <View style={styles.featureItem}>
-                  <View style={styles.featureIcon}>
-                    <Ionicons name="shield-checkmark" size={22} color="#00FF88" />
-                  </View>
-                  <Text style={styles.featureText}>Ad Blocking & Privacy</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <View style={styles.featureIcon}>
-                    <Ionicons name="globe" size={22} color="#00AAFF" />
-                  </View>
-                  <Text style={styles.featureText}>VPN Protection</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <View style={styles.featureIcon}>
-                    <Ionicons name="text" size={22} color="#FFB800" />
-                  </View>
-                  <Text style={styles.featureText}>Live Captioning</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <View style={styles.featureIcon}>
-                    <Ionicons name="sparkles" size={22} color="#A78BFA" />
-                  </View>
-                  <Text style={styles.featureText}>AI Agent Assistant</Text>
-                </View>
-              </View>
-            </View>
-          </View>
+          // Web platform: Show New Tab Page
+          <NewTabPage
+            onNavigate={handleNavigate}
+            onSearch={handleNavigate}
+          />
+        ) : isNewTabPage ? (
+          // Native: Show New Tab Page for blank/new tabs
+          <NewTabPage
+            onNavigate={handleNavigate}
+            onSearch={handleNavigate}
+          />
         ) : activeTab && WebView ? (
           <WebView
             ref={webViewRef}
@@ -448,109 +426,6 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: '#0D0D0D',
-  },
-  webFallback: {
-    flex: 1,
-    backgroundColor: '#0D0D0D',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  webFallbackContent: {
-    alignItems: 'center',
-    maxWidth: 400,
-  },
-  webFallbackTitle: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#FFF',
-    marginTop: 20,
-    marginBottom: 12,
-    letterSpacing: 1,
-    ...Platform.select({
-      ios: {
-        fontFamily: 'System',
-      },
-      android: {
-        fontFamily: 'Roboto',
-      },
-      web: {
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      },
-    }),
-  },
-  webFallbackText: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#AAA',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 8,
-    ...Platform.select({
-      ios: {
-        fontFamily: 'System',
-      },
-      android: {
-        fontFamily: 'Roboto',
-      },
-      web: {
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      },
-    }),
-  },
-  webFallbackSubtext: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 36,
-    ...Platform.select({
-      ios: {
-        fontFamily: 'System',
-      },
-      android: {
-        fontFamily: 'Roboto',
-      },
-      web: {
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      },
-    }),
-  },
-  featureList: {
-    width: '100%',
-    gap: 14,
-    paddingHorizontal: 8,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-  },
-  featureIcon: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#FFF',
-    marginLeft: 14,
-    ...Platform.select({
-      ios: {
-        fontFamily: 'System',
-      },
-      android: {
-        fontFamily: 'Roboto',
-      },
-      web: {
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      },
-    }),
   },
   // Zero-Load Cache Hit Indicator
   cacheHitIndicator: {
