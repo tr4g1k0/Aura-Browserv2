@@ -15,9 +15,11 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../src/context/SettingsContext';
 import { SearchEngine, CaptioningLanguage } from '../src/hooks/useBrowserSettings';
 import { useBrowserStore } from '../src/store/browserStore';
+import { PrivacyShredder } from '../src/components/PrivacyShredder';
 import * as Haptics from 'expo-haptics';
 
 const SEARCH_ENGINES: { value: SearchEngine; label: string; icon: string }[] = [
@@ -171,6 +173,7 @@ export default function SettingsScreen() {
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [showClearedToast, setShowClearedToast] = useState(false);
+  const [showPrivacyShredder, setShowPrivacyShredder] = useState(false);
 
   const handleClose = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -178,7 +181,15 @@ export default function SettingsScreen() {
   };
 
   // ============================================================================
-  // CLEAR BROWSING DATA - Fully Wired
+  // PRIVACY SHREDDER - Premium data deletion
+  // ============================================================================
+  const handleOpenPrivacyShredder = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setShowPrivacyShredder(true);
+  };
+
+  // ============================================================================
+  // CLEAR BROWSING DATA - Legacy (kept for backwards compatibility)
   // ============================================================================
   const handleClearData = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -493,20 +504,25 @@ export default function SettingsScreen() {
         {/* ================================================================== */}
         <SectionHeader title="DANGER ZONE" />
 
+        {/* Privacy Shredder - Premium data deletion */}
         <TouchableOpacity 
-          style={styles.dangerButton} 
-          onPress={handleClearData}
-          disabled={isClearing}
-          activeOpacity={0.7}
+          style={styles.privacyShredderButton} 
+          onPress={handleOpenPrivacyShredder}
+          activeOpacity={0.8}
         >
-          {isClearing ? (
-            <ActivityIndicator size="small" color="#FFF" />
-          ) : (
-            <>
-              <Ionicons name="trash-outline" size={20} color="#FF4444" />
-              <Text style={styles.dangerButtonText}>Clear All Browsing Data</Text>
-            </>
-          )}
+          <LinearGradient
+            colors={['#FF6B35', '#FF3D00']}
+            style={styles.privacyShredderIcon}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons name="flame" size={22} color="#FFF" />
+          </LinearGradient>
+          <View style={styles.privacyShredderContent}>
+            <Text style={styles.privacyShredderTitle}>Privacy Shredder</Text>
+            <Text style={styles.privacyShredderSubtitle}>Secure data destruction</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#FF6B35" />
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -538,6 +554,14 @@ export default function SettingsScreen() {
         <Text style={styles.versionText}>ACCESS Browser v1.0</Text>
         <Text style={styles.versionSubtext}>Local AI Enabled</Text>
       </ScrollView>
+
+      {/* ================================================================== */}
+      {/* PRIVACY SHREDDER MODAL */}
+      {/* ================================================================== */}
+      <PrivacyShredder
+        visible={showPrivacyShredder}
+        onClose={() => setShowPrivacyShredder(false)}
+      />
 
       {/* ================================================================== */}
       {/* SEARCH ENGINE MODAL */}
@@ -773,6 +797,44 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 68, 68, 0.3)',
+  },
+  // Privacy Shredder Button
+  privacyShredderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+  },
+  privacyShredderIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  privacyShredderContent: {
+    flex: 1,
+  },
+  privacyShredderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  privacyShredderSubtitle: {
+    fontSize: 12,
+    color: '#FF6B35',
+    marginTop: 2,
   },
   dangerButtonText: {
     fontSize: 15,
