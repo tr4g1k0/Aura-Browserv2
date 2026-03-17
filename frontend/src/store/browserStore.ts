@@ -60,11 +60,27 @@ export interface CachedPage {
   timestamp: number;
 }
 
+export interface HistoryEntry {
+  url: string;
+  title: string;
+  timestamp: number;
+  favicon?: string;
+}
+
+export interface Bookmark {
+  url: string;
+  title: string;
+  favicon?: string;
+  addedAt: number;
+}
+
 interface BrowserState {
   tabs: Tab[];
   activeTabId: string | null;
   settings: BrowserSettings;
   cachedPages: CachedPage[];
+  history: HistoryEntry[];
+  bookmarks: Bookmark[];
   isLoading: boolean;
   searchQuery: string;
   ambientAlerts: string[];
@@ -87,6 +103,15 @@ interface BrowserState {
   clearAmbientAlerts: () => void;
   addLiveCaption: (caption: string) => void;
   clearLiveCaptions: () => void;
+  // History actions
+  addToHistory: (url: string, title: string, favicon?: string) => void;
+  clearHistory: () => void;
+  removeFromHistory: (timestamp: number) => void;
+  // Bookmark actions
+  addBookmark: (url: string, title: string, favicon?: string) => void;
+  removeBookmark: (url: string) => void;
+  isBookmarked: (url: string) => boolean;
+  toggleBookmark: (url: string, title: string, favicon?: string) => void;
   loadPersistedState: () => Promise<void>;
   persistState: () => Promise<void>;
 }
@@ -115,6 +140,8 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
     predictiveCachingEnabled: true,
   },
   cachedPages: [],
+  history: [],
+  bookmarks: [],
   isLoading: false,
   searchQuery: '',
   ambientAlerts: [],
@@ -237,6 +264,89 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
 
   clearLiveCaptions: () => set({ liveCaptions: [] }),
 
+  // History actions
+  addToHistory: (url: string, title: string, favicon?: string) => {
+    // Skip internal pages and empty URLs
+    if (!url || url === 'about:blank' || url === 'about:newtab') {
+      return;
+    }
+    
+    set((state) => {
+      const now = Date.now();
+      // Avoid duplicate entries within 5 seconds for the same URL
+      const recentMatch = state.history.find(
+        (h) => h.url === url && now - h.timestamp < 5000
+      );
+      if (recentMatch) {
+        return state;
+      }
+      
+      const newEntry: HistoryEntry = {
+        url,
+        title: title || url,
+        timestamp: now,
+        favicon,
+      };
+      
+      // Keep only the 500 most recent entries
+      const updatedHistory = [newEntry, ...state.history].slice(0, 500);
+      return { history: updatedHistory };
+    });
+    get().persistState();
+  },
+
+  clearHistory: () => {
+    set({ history: [] });
+    get().persistState();
+  },
+
+  removeFromHistory: (timestamp: number) => {
+    set((state) => ({
+      history: state.history.filter((h) => h.timestamp !== timestamp),
+    }));
+    get().persistState();
+  },
+
+  // Bookmark actions
+  addBookmark: (url: string, title: string, favicon?: string) => {
+    set((state) => {
+      // Don't add duplicates
+      if (state.bookmarks.some((b) => b.url === url)) {
+        return state;
+      }
+      
+      const newBookmark: Bookmark = {
+        url,
+        title: title || url,
+        favicon,
+        addedAt: Date.now(),
+      };
+      
+      return { bookmarks: [newBookmark, ...state.bookmarks] };
+    });
+    get().persistState();
+  },
+
+  removeBookmark: (url: string) => {
+    set((state) => ({
+      bookmarks: state.bookmarks.filter((b) => b.url !== url),
+    }));
+    get().persistState();
+  },
+
+  isBookmarked: (url: string) => {
+    return get().bookmarks.some((b) => b.url === url);
+  },
+
+  toggleBookmark: (url: string, title: string, favicon?: string) => {
+    const state = get();
+    if (state.bookmarks.some((b) => b.url === url)) {
+      state.removeBookmark(url);
+    } else {
+      state.addBookmark(url, title, favicon);
+    }
+  },
+
   loadPersistedState: async () => {
     try {
       const saved = await safeGetItem('browser-state');
@@ -246,6 +356,8 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
           tabs: parsed.tabs || state.tabs,
           settings: { ...state.settings, ...parsed.settings },
           activeTabId: parsed.activeTabId || state.tabs[0]?.id,
+          history: parsed.history || state.history,
+          bookmarks: parsed.bookmarks || state.bookmarks,
         }));
       }
     } catch (e) {
@@ -263,6 +375,8 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
           tabs: state.tabs,
           settings: state.settings,
           activeTabId: state.activeTabId,
+          history: state.history,
+          bookmarks: state.bookmarks,
         })
       );
     } catch (e) {

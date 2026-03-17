@@ -16,6 +16,7 @@ import { UnifiedTopBar } from '../src/components/UnifiedTopBar';
 import { NewTabPage } from '../src/components/NewTabPage';
 import { SwipeNavigationWrapper } from '../src/components/SwipeNavigationWrapper';
 import { DownloadToast, DownloadStatus } from '../src/components/DownloadToast';
+import { LibraryScreen } from './library';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
@@ -57,6 +58,7 @@ export default function BrowserScreen() {
     setLoading,
     loadPersistedState,
     addCachedPage,
+    addToHistory,
   } = useBrowserStore();
 
   // Access user settings for search engine preference
@@ -73,6 +75,9 @@ export default function BrowserScreen() {
   const [downloadStatus, setDownloadStatus] = useState<DownloadStatus>(null);
   const [downloadFilename, setDownloadFilename] = useState('');
   const [downloadProgress, setDownloadProgress] = useState(0);
+  
+  // Library (History & Bookmarks) modal state
+  const [libraryVisible, setLibraryVisible] = useState(false);
   
   // Zero-Load Predictive Caching state
   const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
@@ -169,9 +174,14 @@ export default function BrowserScreen() {
         canGoBack: navState.canGoBack,
         canGoForward: navState.canGoForward,
       });
+      
+      // Auto-log to history when navigation completes (not loading)
+      if (!navState.loading && navState.url && navState.title) {
+        addToHistory(navState.url, navState.title);
+      }
     }
     setLoading(navState.loading || false);
-  }, [activeTab, updateTab, setLoading]);
+  }, [activeTab, updateTab, setLoading, addToHistory]);
 
   /**
    * Check if URL should trigger a download (for Android interception)
@@ -404,7 +414,9 @@ export default function BrowserScreen() {
         onTabsPress={openTabsManager}
         onSettingsPress={openSettings}
         onAccessibilityPress={() => setAccessibilityModalVisible(true)}
+        onLibraryPress={() => setLibraryVisible(true)}
         currentUrl={activeTab?.url || ''}
+        currentTitle={activeTab?.title || ''}
       />
 
       <View style={styles.webviewContainer}>
@@ -511,6 +523,16 @@ export default function BrowserScreen() {
       <AccessibilityModal
         visible={accessibilityModalVisible}
         onClose={() => setAccessibilityModalVisible(false)}
+      />
+
+      {/* Library Screen (Bookmarks & History) */}
+      <LibraryScreen
+        visible={libraryVisible}
+        onClose={() => setLibraryVisible(false)}
+        onNavigate={(url) => {
+          setLibraryVisible(false);
+          handleNavigate(url);
+        }}
       />
     </View>
   );

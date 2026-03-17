@@ -24,7 +24,9 @@ interface UnifiedTopBarProps {
   onTabsPress: () => void;
   onSettingsPress: () => void;
   onAccessibilityPress: () => void;
+  onLibraryPress: () => void;
   currentUrl: string;
+  currentTitle: string;
 }
 
 /**
@@ -33,9 +35,10 @@ interface UnifiedTopBarProps {
  * Layout (left to right):
  * 1. Shield Icon (Adblock/Privacy status)
  * 2. URL/Search Input (flex: 1, fills available space)
- * 3. Tab Counter Button
- * 4. Accessibility Icon
- * 5. 3-Dot Menu
+ * 3. Bookmark Star Icon (Electric Cyan when bookmarked)
+ * 4. Tab Counter Button
+ * 5. Library Icon (Bookmarks & History)
+ * 6. 3-Dot Menu
  * 
  * Features:
  * - Minimal vertical footprint
@@ -48,10 +51,20 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   onTabsPress,
   onSettingsPress,
   onAccessibilityPress,
+  onLibraryPress,
   currentUrl,
+  currentTitle,
 }) => {
   const insets = useSafeAreaInsets();
-  const { tabs, isLoading, settings: browserSettings, toggleAdblock } = useBrowserStore();
+  const { 
+    tabs, 
+    isLoading, 
+    settings: browserSettings, 
+    toggleAdblock,
+    isBookmarked,
+    toggleBookmark,
+    addToHistory,
+  } = useBrowserStore();
   const { settings } = useSettings();
   const { isConnected: vpnConnected, isConnecting, state: vpnState } = useVPNConnection();
   
@@ -207,6 +220,25 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
           </View>
         </View>
 
+        {/* Bookmark Star Icon - Electric Cyan when bookmarked */}
+        <TouchableOpacity
+          style={[
+            styles.iconButton,
+            isBookmarked(currentUrl) && styles.bookmarkActive,
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            toggleBookmark(currentUrl, currentTitle);
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons 
+            name={isBookmarked(currentUrl) ? "star" : "star-outline"} 
+            size={20} 
+            color={isBookmarked(currentUrl) ? "#00E5FF" : "#888"} 
+          />
+        </TouchableOpacity>
+
         {/* Tab Counter Button */}
         <TouchableOpacity
           style={styles.iconButton}
@@ -221,16 +253,16 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* Accessibility Icon */}
+        {/* Library Icon (Bookmarks & History) */}
         <TouchableOpacity
           style={styles.iconButton}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onAccessibilityPress();
+            onLibraryPress();
           }}
           activeOpacity={0.7}
         >
-          <Ionicons name="accessibility" size={20} color="#888" />
+          <Ionicons name="library-outline" size={20} color="#888" />
         </TouchableOpacity>
 
         {/* 3-Dot Menu */}
@@ -299,6 +331,9 @@ const styles = StyleSheet.create({
   },
   iconButtonActive: {
     backgroundColor: 'rgba(0, 255, 136, 0.1)',
+  },
+  bookmarkActive: {
+    backgroundColor: 'rgba(0, 229, 255, 0.15)',
   },
   statusDot: {
     position: 'absolute',
