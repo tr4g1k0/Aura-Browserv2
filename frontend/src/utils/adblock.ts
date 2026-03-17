@@ -439,6 +439,73 @@ export const adBusterScript = createAdBusterScript();
 // ============================================================================
 
 /**
+ * CRITICAL: Aggressive GPU Layer Squashing Script
+ * This MUST run FIRST before any other scripts to force GPU compositing
+ * Moves ALL video rendering off CPU onto Graphics Chip
+ */
+export const gpuLayerSquashingScript = `
+(function(){
+  'use strict';
+  
+  /* LAYER SQUASHING v1.0 - Force GPU Compositor Layers */
+  /* This script MUST execute immediately for max performance */
+  
+  var style = document.createElement('style');
+  style.id = 'gpu-layer-squashing';
+  style.innerHTML = [
+    /* Disable tap highlight and enable font smoothing globally */
+    '* { -webkit-tap-highlight-color: rgba(0,0,0,0); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }',
+    
+    /* CRITICAL: Force ALL video elements into own Compositor Layer */
+    /* This moves heavy lifting entirely off CPU onto Graphics Chip */
+    'video, .video-stream, .player-container, .html5-video-player, ytd-player {',
+    '  transform: translate3d(0,0,0) !important;',
+    '  will-change: transform;',
+    '  backface-visibility: hidden !important;',
+    '  -webkit-backface-visibility: hidden !important;',
+    '  perspective: 1000px;',
+    '  -webkit-perspective: 1000px;',
+    '}',
+    
+    /* YouTube Shorts specific - force GPU layers */
+    'ytd-shorts, ytd-reel-video-renderer, .reel-video-container, #shorts-player {',
+    '  transform: translate3d(0,0,0) !important;',
+    '  will-change: transform, opacity;',
+    '  backface-visibility: hidden !important;',
+    '  contain: layout style paint;',
+    '}',
+    
+    /* Shorts swipe container needs GPU acceleration */
+    '#shorts-container, .ytd-shorts, ytd-reel-shelf-renderer {',
+    '  transform: translateZ(0);',
+    '  -webkit-overflow-scrolling: touch;',
+    '}',
+    
+    /* Disable overscroll glow effect that causes frame drops */
+    'html, body {',
+    '  overscroll-behavior: none;',
+    '  -webkit-overflow-scrolling: touch;',
+    '}',
+    
+    /* TikTok/Instagram Reels support */
+    '[class*="video-card"], [class*="VideoPlayer"], [class*="reels"] {',
+    '  transform: translate3d(0,0,0) !important;',
+    '  will-change: transform;',
+    '}'
+  ].join('\\n');
+  
+  /* Inject at document start for immediate effect */
+  if (document.head) {
+    document.head.insertBefore(style, document.head.firstChild);
+  } else {
+    document.documentElement.appendChild(style);
+  }
+  
+  console.log('[GPU Layer Squashing] Compositor layers forced for video elements');
+})();
+true;`;
+
+/**
  * Aggressive DOM Stripping Script
  * Optimizes network and rendering payload by:
  * 1. Lazy loading all images and iframes
@@ -451,7 +518,7 @@ export const performanceOptimizationScript = `
 (function(){
   'use strict';
   
-  /* Smart Shield Performance Optimizer v2.0 */
+  /* Smart Shield Performance Optimizer v2.1 */
   /* Layer 3: Aggressive DOM Stripping + GPU Compositing for video feeds */
   
   /**

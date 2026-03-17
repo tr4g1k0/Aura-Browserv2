@@ -29,6 +29,7 @@ import {
   isAdOrTracker, 
   adBusterScript, 
   createAdBusterScript,
+  gpuLayerSquashingScript,
   performanceOptimizationScript,
   createFullOptimizationScript,
   recordBlockedRequest,
@@ -580,19 +581,20 @@ export default function BrowserScreen() {
 
   /**
    * Combined injection script for WebView
-   * Includes Smart Shield ad-buster (Layer 2), VPN indicator, and Performance Optimization (Layer 3)
+   * CRITICAL ORDER: GPU Layer Squashing MUST run first!
    * 
-   * ARCHITECTURE NOTE: This is the injection pipeline that will be extended
-   * when ONNX Vision VLM is integrated. The Vision model will dynamically
-   * identify coordinates of sponsored content and add custom selectors here.
-   * 
-   * Performance Optimization includes:
-   * - Lazy loading all images and iframes
-   * - Killing auto-play on all videos
-   * - MutationObserver for dynamically loaded content
+   * Includes:
+   * 1. GPU Layer Squashing (runs immediately for video perf)
+   * 2. Smart Shield ad-buster (Layer 2)
+   * 3. Performance Optimization (Layer 3)
+   * 4. VPN indicator
    */
   const getInjectedScript = useCallback(() => {
     let scripts = '';
+    
+    // FIRST: GPU Layer Squashing - MUST run before anything else
+    // Forces video elements into Compositor Layers for GPU rendering
+    scripts += gpuLayerSquashingScript;
     
     // Add Smart Shield ad-buster script if enabled
     if (userSettings.aggressiveAdBlocking) {
