@@ -21,6 +21,13 @@ import {
   formatSitemapForDisplay,
   PageSitemap,
 } from '../src/services/AIAgentExecutionService';
+import { PrivacyManifestModal } from '../src/components/PrivacyManifestModal';
+import { AIAnalyzingIndicator } from '../src/components/AIAnalyzingIndicator';
+import {
+  initAgentMemory,
+  addPageToContext,
+  recordAgentAction,
+} from '../src/services/PrivacyService';
 import * as Haptics from 'expo-haptics';
 
 interface Message {
@@ -168,7 +175,17 @@ What would you like me to do?`,
   const [isTyping, setIsTyping] = useState(false);
   const [isWaitingForPage, setIsWaitingForPage] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [isAnalyzingPage, setIsAnalyzingPage] = useState(false);
   const typingDots = useRef(new Animated.Value(0)).current;
+
+  // Initialize agent memory on mount
+  useEffect(() => {
+    initAgentMemory();
+    if (activeTab?.url) {
+      addPageToContext(activeTab.url, activeTab.title);
+    }
+  }, []);
 
   // Track action queue for safety guardrail
   const actionQueueRef = useRef<Array<{ command: string; timestamp: number }>>([]);
@@ -281,6 +298,14 @@ What would you like me to do?`,
       // This is an actionable command
       const { action, selector, value, direction } = parsedCommand;
 
+      // Record action for privacy tracking
+      recordAgentAction();
+
+      // Show analyzing indicator for READ actions
+      if (action === 'READ') {
+        setIsAnalyzingPage(true);
+      }
+
       // Send action to parent (browser) via global event
       // In production, this would use a proper communication channel
       const actionEvent = {
@@ -298,11 +323,12 @@ What would you like me to do?`,
           const response = responseGenerator(result, ctx);
           addActionMessage(action, result.success || false, response);
           setIsTyping(false);
+          setIsAnalyzingPage(false);
         };
       }
 
       // Simulate the action execution
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, action === 'READ' ? 1500 : 800));
 
       // Generate mock response based on action type
       const mockResult: ActionResult = {
@@ -351,6 +377,9 @@ What would you like me to do?`,
       const response = responseGenerator(mockResult, ctx);
       addActionMessage(action, mockResult.success || false, response);
       
+      // Hide analyzing indicator
+      setIsAnalyzingPage(false);
+      
       Haptics.notificationAsync(
         mockResult.success 
           ? Haptics.NotificationFeedbackType.Success 
@@ -373,6 +402,7 @@ What would you like me to do?`,
     }
 
     setIsTyping(false);
+    setIsAnalyzingPage(false);
   }, [getContext, getMockResponse, activeTab]);
 
   const sendMessage = async () => {
@@ -532,6 +562,9 @@ What would you like me to do?`,
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
+      {/* AI Analyzing Indicator */}
+      <AIAnalyzingIndicator visible={isAnalyzingPage} />
+
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerLeft}>
@@ -559,9 +592,21 @@ What would you like me to do?`,
             </View>
           </View>
         </View>
-        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-          <Ionicons name="close" size={24} color="#FFF" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {/* Privacy Info Button */}
+          <TouchableOpacity 
+            style={styles.privacyButton} 
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setPrivacyModalVisible(true);
+            }}
+          >
+            <Ionicons name="shield-checkmark-outline" size={20} color="#8B5CF6" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+            <Ionicons name="close" size={24} color="#FFF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Messages */}
@@ -617,6 +662,12 @@ What would you like me to do?`,
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Privacy Manifest Modal */}
+      <PrivacyManifestModal
+        visible={privacyModalVisible}
+        onClose={() => setPrivacyModalVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -678,6 +729,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#FFB800',
     fontWeight: '600',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  privacyButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#8B5CF615',
+    borderWidth: 1,
+    borderColor: '#8B5CF640',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   closeButton: {
     width: 40,
