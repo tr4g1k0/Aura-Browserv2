@@ -28,6 +28,8 @@ import {
   isAdOrTracker, 
   adBusterScript, 
   createAdBusterScript,
+  performanceOptimizationScript,
+  createFullOptimizationScript,
   recordBlockedRequest,
   getBlockStats,
   visionAIScannerPlaceholder 
@@ -552,11 +554,16 @@ export default function BrowserScreen() {
 
   /**
    * Combined injection script for WebView
-   * Includes Smart Shield ad-buster (Layer 2) and VPN indicator
+   * Includes Smart Shield ad-buster (Layer 2), VPN indicator, and Performance Optimization (Layer 3)
    * 
    * ARCHITECTURE NOTE: This is the injection pipeline that will be extended
    * when ONNX Vision VLM is integrated. The Vision model will dynamically
    * identify coordinates of sponsored content and add custom selectors here.
+   * 
+   * Performance Optimization includes:
+   * - Lazy loading all images and iframes
+   * - Killing auto-play on all videos
+   * - MutationObserver for dynamically loaded content
    */
   const getInjectedScript = useCallback(() => {
     let scripts = '';
@@ -567,6 +574,10 @@ export default function BrowserScreen() {
         ? createAdBusterScript(visionAISelectors)
         : adBusterScript;
     }
+    
+    // Always add performance optimization script (lazy loading, auto-play killing)
+    // This is beneficial for all users regardless of ad blocking setting
+    scripts += performanceOptimizationScript;
     
     // Add VPN indicator script
     scripts += vpnScript;
@@ -674,6 +685,19 @@ export default function BrowserScreen() {
                 scalesPageToFit={true}
                 cacheEnabled={!isGhostMode}      // Disable caching in Ghost Mode
                 incognito={isGhostMode || settings.vpnEnabled} // Ghost Mode = no cookies/local data
+                // HARDWARE ACCELERATION & SMOOTH SCROLLING
+                // Android: Enable GPU rendering for smooth scrolling
+                androidHardwareAccelerationDisabled={false}
+                // Android: Force hardware acceleration for better performance
+                androidLayerType="hardware"
+                // iOS: Native smooth scrolling deceleration
+                decelerationRate="normal"
+                // iOS: Bounces at scroll edges for native feel
+                bounces={true}
+                // Optimize rendering performance
+                renderToHardwareTextureAndroid={true}
+                // Reduce memory usage by removing offscreen views
+                removeClippedSubviews={true}
               />
             </ScrollView>
           </SwipeNavigationWrapper>

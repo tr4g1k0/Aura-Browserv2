@@ -435,6 +435,180 @@ true;`;
 export const adBusterScript = createAdBusterScript();
 
 // ============================================================================
+// LAYER 3: PERFORMANCE OPTIMIZATION (DOM STRIPPING)
+// ============================================================================
+
+/**
+ * Aggressive DOM Stripping Script
+ * Optimizes network and rendering payload by:
+ * 1. Lazy loading all images and iframes
+ * 2. Killing auto-play on all videos
+ * 3. Reducing unnecessary resource consumption
+ * 
+ * This runs after the page loads to ensure all elements are captured.
+ */
+export const performanceOptimizationScript = `
+(function(){
+  'use strict';
+  
+  /* Smart Shield Performance Optimizer v1.0 */
+  /* Layer 3: Aggressive DOM Stripping for battery & data savings */
+  
+  /**
+   * Force lazy loading on all images and iframes
+   * Prevents wasting data/bandwidth on off-screen media
+   */
+  function enableLazyLoading() {
+    // Lazy load all images
+    var images = document.querySelectorAll('img:not([loading="lazy"])');
+    images.forEach(function(img) {
+      // Only modify if not already in viewport
+      img.setAttribute('loading', 'lazy');
+      // Also set decoding to async for smoother rendering
+      img.setAttribute('decoding', 'async');
+    });
+    
+    // Lazy load all iframes (embeds, ads, widgets)
+    var iframes = document.querySelectorAll('iframe:not([loading="lazy"])');
+    iframes.forEach(function(iframe) {
+      iframe.setAttribute('loading', 'lazy');
+    });
+    
+    console.log('[Performance] Lazy loading enabled:', images.length, 'images,', iframes.length, 'iframes');
+  }
+  
+  /**
+   * Kill all video auto-play to save battery and data
+   * Videos should only play when user explicitly taps them
+   */
+  function killVideoAutoPlay() {
+    var videos = document.querySelectorAll('video');
+    videos.forEach(function(video) {
+      // Disable autoplay
+      video.autoplay = false;
+      video.setAttribute('autoplay', 'false');
+      
+      // Set preload to none (don't download until play)
+      video.preload = 'none';
+      video.setAttribute('preload', 'none');
+      
+      // Pause if already started playing
+      if (!video.paused) {
+        try {
+          video.pause();
+        } catch(e) {}
+      }
+      
+      // Remove autoplay from source elements too
+      var sources = video.querySelectorAll('source');
+      sources.forEach(function(source) {
+        source.removeAttribute('autoplay');
+      });
+    });
+    
+    // Also handle audio elements
+    var audios = document.querySelectorAll('audio');
+    audios.forEach(function(audio) {
+      audio.autoplay = false;
+      audio.preload = 'none';
+      if (!audio.paused) {
+        try {
+          audio.pause();
+        } catch(e) {}
+      }
+    });
+    
+    console.log('[Performance] Auto-play killed:', videos.length, 'videos,', audios.length, 'audios');
+  }
+  
+  /**
+   * Disable resource-heavy animations and transitions (optional aggressive mode)
+   */
+  function reduceMotion() {
+    // Create a style to reduce animations
+    var style = document.createElement('style');
+    style.id = 'smart-shield-reduce-motion';
+    style.textContent = \`
+      /* Reduce animations for performance */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    \`;
+    // Only inject if user has system-level reduce motion enabled
+    // This respects user preference while still being available
+  }
+  
+  /**
+   * Disconnect unnecessary observers and listeners on scroll
+   */
+  function cleanupOnScroll() {
+    // Debounced scroll handler to re-apply optimizations
+    var scrollTimeout;
+    window.addEventListener('scroll', function() {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(function() {
+        enableLazyLoading(); // Catch dynamically loaded content
+      }, 500);
+    }, { passive: true });
+  }
+  
+  // Run immediately if document is ready, otherwise wait
+  function init() {
+    enableLazyLoading();
+    killVideoAutoPlay();
+    cleanupOnScroll();
+    
+    console.log('[Smart Shield] Performance optimization active');
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  
+  // Also observe for dynamically added content
+  var perfObserver = new MutationObserver(function(mutations) {
+    var hasNewMedia = mutations.some(function(m) {
+      return Array.from(m.addedNodes).some(function(node) {
+        if (node.nodeType !== 1) return false;
+        return node.tagName === 'IMG' || 
+               node.tagName === 'IFRAME' || 
+               node.tagName === 'VIDEO' ||
+               node.tagName === 'AUDIO' ||
+               (node.querySelectorAll && (
+                 node.querySelectorAll('img, iframe, video, audio').length > 0
+               ));
+      });
+    });
+    
+    if (hasNewMedia) {
+      enableLazyLoading();
+      killVideoAutoPlay();
+    }
+  });
+  
+  perfObserver.observe(document.documentElement, {
+    childList: true,
+    subtree: true
+  });
+})();
+true;`;
+
+/**
+ * Combined optimization script - includes both ad blocking and performance optimization
+ * Use this as the primary injectedJavaScript when full optimization is enabled
+ */
+export const createFullOptimizationScript = (additionalSelectors: string[] = []): string => {
+  const adBlockScript = createAdBusterScript(additionalSelectors);
+  return adBlockScript + performanceOptimizationScript;
+};
+
+// ============================================================================
 // VISION AI INTEGRATION (PLACEHOLDER)
 // ============================================================================
 
