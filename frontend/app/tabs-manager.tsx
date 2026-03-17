@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Animated,
   ActivityIndicator,
   Platform,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,10 +24,21 @@ import {
 } from '../src/services/AITabAgent';
 import * as Haptics from 'expo-haptics';
 
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// Helper to generate unique IDs
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
+// Default URL for new tabs
+const DEFAULT_URL = 'https://www.google.com';
+
 // Mock dummy tabs for demonstration
-const MOCK_TABS: Tab[] = [
+const createMockTabs = (): Tab[] => [
   {
-    id: 'tab-1',
+    id: generateId(),
     url: 'https://www.amazon.com/dp/B0BSHF7WHW',
     title: 'Apple AirPods Pro (2nd Gen) - Amazon',
     isActive: false,
@@ -33,7 +46,7 @@ const MOCK_TABS: Tab[] = [
     canGoForward: false,
   },
   {
-    id: 'tab-2',
+    id: generateId(),
     url: 'https://en.wikipedia.org/wiki/Artificial_intelligence',
     title: 'Artificial intelligence - Wikipedia',
     isActive: false,
@@ -41,7 +54,7 @@ const MOCK_TABS: Tab[] = [
     canGoForward: false,
   },
   {
-    id: 'tab-3',
+    id: generateId(),
     url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     title: 'Never Gonna Give You Up - YouTube',
     isActive: false,
@@ -49,7 +62,7 @@ const MOCK_TABS: Tab[] = [
     canGoForward: false,
   },
   {
-    id: 'tab-4',
+    id: generateId(),
     url: 'https://www.amazon.com/Sony-WH-1000XM5',
     title: 'Sony WH-1000XM5 Headphones - Amazon',
     isActive: false,
@@ -57,7 +70,7 @@ const MOCK_TABS: Tab[] = [
     canGoForward: false,
   },
   {
-    id: 'tab-5',
+    id: generateId(),
     url: 'https://en.wikipedia.org/wiki/Machine_learning',
     title: 'Machine learning - Wikipedia',
     isActive: true,
@@ -65,7 +78,7 @@ const MOCK_TABS: Tab[] = [
     canGoForward: false,
   },
   {
-    id: 'tab-6',
+    id: generateId(),
     url: 'https://www.youtube.com/watch?v=abc123',
     title: 'How to Code in React Native - YouTube',
     isActive: false,
@@ -73,7 +86,7 @@ const MOCK_TABS: Tab[] = [
     canGoForward: false,
   },
   {
-    id: 'tab-7',
+    id: generateId(),
     url: 'https://news.ycombinator.com',
     title: 'Hacker News',
     isActive: false,
@@ -81,7 +94,7 @@ const MOCK_TABS: Tab[] = [
     canGoForward: false,
   },
   {
-    id: 'tab-8',
+    id: generateId(),
     url: 'https://github.com/facebook/react-native',
     title: 'React Native - GitHub',
     isActive: false,
@@ -95,8 +108,29 @@ export default function TabsManagerScreen() {
   const insets = useSafeAreaInsets();
   const { tabs: storeTabs, addTab, removeTab, setActiveTab } = useBrowserStore();
 
-  // Use mock tabs for demo, or real tabs if available
-  const allTabs = storeTabs.length > 1 ? storeTabs : MOCK_TABS;
+  // Local state for displayed tabs (handles both mock and real tabs)
+  const [displayedTabs, setDisplayedTabs] = useState<Tab[]>([]);
+  const [usingMockTabs, setUsingMockTabs] = useState(false);
+
+  // Initialize tabs on mount
+  useEffect(() => {
+    if (storeTabs.length > 1) {
+      // Use real tabs from store
+      setDisplayedTabs(storeTabs);
+      setUsingMockTabs(false);
+    } else {
+      // Use mock tabs for demo
+      setDisplayedTabs(createMockTabs());
+      setUsingMockTabs(true);
+    }
+  }, []);
+
+  // Sync with store when using real tabs
+  useEffect(() => {
+    if (!usingMockTabs && storeTabs.length > 0) {
+      setDisplayedTabs(storeTabs);
+    }
+  }, [storeTabs, usingMockTabs]);
 
   const [isGrouped, setIsGrouped] = useState(false);
   const [isGrouping, setIsGrouping] = useState(false);
@@ -107,18 +141,107 @@ export default function TabsManagerScreen() {
 
   const handleSelectTab = (tab: Tab) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setActiveTab(tab.id);
+    
+    if (usingMockTabs) {
+      // Update local state for mock tabs
+      setDisplayedTabs(prev => 
+        prev.map(t => ({ ...t, isActive: t.id === tab.id }))
+      );
+    } else {
+      // Use store for real tabs
+      setActiveTab(tab.id);
+    }
+    
     router.back();
   };
 
-  const handleRemoveTab = (id: string) => {
+  /**
+   * Close a tab with smooth animation
+   * Handles both mock tabs (local state) and real tabs (store)
+   */
+  const handleCloseTab = useCallback((id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    removeTab(id);
-  };
+    
+    // Animate the removal
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
+    if (usingMockTabs) {
+      // Handle mock tabs locally
+      setDisplayedTabs(prev => {
+        const newTabs = prev.filter(t => t.id !== id);
+        
+        // If no tabs left, create a new empty tab
+        if (newTabs.length === 0) {
+          const newTab: Tab = {
+            id: generateId(),
+            url: DEFAULT_URL,
+            title: 'New Tab',
+            isActive: true,
+            canGoBack: false,
+            canGoForward: false,
+          };
+          return [newTab];
+        }
+        
+        // If closed tab was active, activate the last tab
+        const closedTab = prev.find(t => t.id === id);
+        if (closedTab?.isActive && newTabs.length > 0) {
+          newTabs[newTabs.length - 1].isActive = true;
+        }
+        
+        return newTabs;
+      });
+      
+      // Also update grouped view if active
+      if (isGrouped) {
+        setTabGroups(prev => 
+          prev.map(group => ({
+            ...group,
+            tabs: group.tabs.filter(t => t.id !== id),
+          })).filter(group => group.tabs.length > 0)
+        );
+      }
+    } else {
+      // Use store for real tabs
+      removeTab(id);
+      
+      // Update grouped view
+      if (isGrouped) {
+        setTabGroups(prev => 
+          prev.map(group => ({
+            ...group,
+            tabs: group.tabs.filter(t => t.id !== id),
+          })).filter(group => group.tabs.length > 0)
+        );
+      }
+    }
+  }, [usingMockTabs, removeTab, isGrouped]);
 
   const handleAddTab = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    addTab();
+    
+    // Animate the addition
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
+    if (usingMockTabs) {
+      // Add to local mock tabs
+      const newTab: Tab = {
+        id: generateId(),
+        url: DEFAULT_URL,
+        title: 'New Tab',
+        isActive: true,
+        canGoBack: false,
+        canGoForward: false,
+      };
+      setDisplayedTabs(prev => [
+        ...prev.map(t => ({ ...t, isActive: false })),
+        newTab,
+      ]);
+    } else {
+      // Use store for real tabs
+      addTab();
+    }
+    
     router.back();
   };
 
@@ -126,6 +249,7 @@ export default function TabsManagerScreen() {
   const handleGroupByIntent = useCallback(async () => {
     if (isGrouped) {
       // Ungroup - reset to flat list
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setIsGrouped(false);
       setTabGroups([]);
       Animated.timing(groupAnimation, {
@@ -141,8 +265,9 @@ export default function TabsManagerScreen() {
 
     try {
       // Use AITabAgent service for grouping
-      const result = await groupTabsByIntent(allTabs);
+      const result = await groupTabsByIntent(displayedTabs);
       
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setTabGroups(result.groups);
       setIsGrouped(true);
 
@@ -159,7 +284,7 @@ export default function TabsManagerScreen() {
     } finally {
       setIsGrouping(false);
     }
-  }, [isGrouped, allTabs, groupAnimation]);
+  }, [isGrouped, displayedTabs, groupAnimation]);
 
   // Generate summary for a group
   const handleGenerateSummary = useCallback(async (groupId: string) => {
@@ -206,6 +331,7 @@ export default function TabsManagerScreen() {
 
   const toggleGroupExpansion = (groupId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setTabGroups(prev =>
       prev.map(g =>
         g.id === groupId ? { ...g, isExpanded: !g.isExpanded } : g
@@ -214,39 +340,43 @@ export default function TabsManagerScreen() {
   };
 
   const renderTabCard = (tab: Tab) => (
-    <TouchableOpacity
-      key={tab.id}
-      style={[styles.tabCard, tab.isActive && styles.activeTabCard]}
-      onPress={() => handleSelectTab(tab)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.tabContent}>
-        <View style={styles.tabFavicon}>
-          <Ionicons name="globe-outline" size={16} color="#888" />
-        </View>
-        <View style={styles.tabInfo}>
-          <Text style={styles.tabTitle} numberOfLines={1}>
-            {tab.title || 'New Tab'}
-          </Text>
-          <Text style={styles.tabUrl} numberOfLines={1}>
-            {(() => {
-              try {
-                return new URL(tab.url).hostname;
-              } catch {
-                return tab.url;
-              }
-            })()}
-          </Text>
-        </View>
-      </View>
+    <Animated.View key={tab.id}>
       <TouchableOpacity
-        style={styles.closeTabButton}
-        onPress={() => handleRemoveTab(tab.id)}
-        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+        style={[styles.tabCard, tab.isActive && styles.activeTabCard]}
+        onPress={() => handleSelectTab(tab)}
+        activeOpacity={0.7}
       >
-        <Ionicons name="close" size={18} color="#666" />
+        <View style={styles.tabContent}>
+          <View style={styles.tabFavicon}>
+            <Ionicons name="globe-outline" size={16} color="#888" />
+          </View>
+          <View style={styles.tabInfo}>
+            <Text style={styles.tabTitle} numberOfLines={1}>
+              {tab.title || 'New Tab'}
+            </Text>
+            <Text style={styles.tabUrl} numberOfLines={1}>
+              {(() => {
+                try {
+                  return new URL(tab.url).hostname;
+                } catch {
+                  return tab.url;
+                }
+              })()}
+            </Text>
+          </View>
+        </View>
+        
+        {/* Close Tab Button - Now properly wired */}
+        <TouchableOpacity
+          style={styles.closeTabButton}
+          onPress={() => handleCloseTab(tab.id)}
+          hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="close" size={18} color="#888" />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
+    </Animated.View>
   );
 
   // Render summary card with glassmorphism effect
@@ -359,7 +489,7 @@ export default function TabsManagerScreen() {
 
   const renderFlatView = () => (
     <View>
-      {allTabs.map(tab => renderTabCard(tab))}
+      {displayedTabs.map(tab => renderTabCard(tab))}
     </View>
   );
 
@@ -368,7 +498,7 @@ export default function TabsManagerScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Tabs</Text>
-          <Text style={styles.subtitle}>{allTabs.length} open</Text>
+          <Text style={styles.subtitle}>{displayedTabs.length} open</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.addButton} onPress={handleAddTab}>
@@ -741,11 +871,12 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   closeTabButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#2A2A2A',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
   },
 });
