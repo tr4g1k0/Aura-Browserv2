@@ -520,19 +520,29 @@ export default function BrowserScreen() {
   }, []);
 
   /**
-   * Share current page
+   * Share current page - Native share sheet with haptic feedback
    */
   const handleShare = useCallback(async () => {
     if (!activeTab?.url) return;
     
     try {
-      await Share.share({
+      const result = await Share.share({
         message: `${activeTab.title}\n${activeTab.url}`,
         url: activeTab.url,
         title: activeTab.title,
       });
+      
+      // Haptic feedback on successful share sheet open
+      if (result.action === Share.sharedAction) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        console.log('[Share] Content shared successfully');
+      } else if (result.action === Share.dismissedAction) {
+        // Share sheet was dismissed
+        console.log('[Share] Share sheet dismissed');
+      }
     } catch (error) {
       console.error('[Share] Error:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   }, [activeTab]);
 
@@ -614,6 +624,7 @@ export default function BrowserScreen() {
         onSettingsPress={() => setMenuVisible(true)}
         onAccessibilityPress={() => setAccessibilityModalVisible(true)}
         onLibraryPress={() => setLibraryVisible(true)}
+        onShare={handleShare}
         currentUrl={activeTab?.url || ''}
         currentTitle={activeTab?.title || ''}
       />

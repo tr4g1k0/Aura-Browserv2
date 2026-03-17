@@ -46,6 +46,7 @@ export interface ToolbarShortcuts {
   showAIAgent: boolean;
   showVPNToggle: boolean;
   showAdBlockStatus: boolean;
+  showShare: boolean;
 }
 
 export interface BrowserSettings {
@@ -78,6 +79,7 @@ export const DEFAULT_TOOLBAR_SHORTCUTS: ToolbarShortcuts = {
   showAIAgent: false,
   showVPNToggle: false,
   showAdBlockStatus: false,
+  showShare: false,
 };
 
 export const DEFAULT_BROWSER_SETTINGS: BrowserSettings = {

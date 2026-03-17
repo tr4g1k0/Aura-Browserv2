@@ -25,6 +25,7 @@ interface UnifiedTopBarProps {
   onSettingsPress: () => void;
   onAccessibilityPress: () => void;
   onLibraryPress: () => void;
+  onShare?: () => void;
   currentUrl: string;
   currentTitle: string;
 }
@@ -52,6 +53,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   onSettingsPress,
   onAccessibilityPress,
   onLibraryPress,
+  onShare,
   currentUrl,
   currentTitle,
 }) => {
@@ -304,6 +306,24 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
           <View style={styles.iconButton}>
             <Ionicons name="ban" size={16} color={browserSettings.adblockEnabled ? "#FF6B6B" : "#555"} />
           </View>
+        )}
+
+        {/* Share Shortcut - Platform-specific icon */}
+        {settings.toolbarShortcuts?.showShare && onShare && (
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onShare();
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={Platform.OS === 'ios' ? "share-outline" : "share-social-outline"} 
+              size={18} 
+              color="#00E5FF" 
+            />
+          </TouchableOpacity>
         )}
 
         {/* Tab Counter Button */}

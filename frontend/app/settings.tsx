@@ -465,6 +465,16 @@ export default function SettingsScreen() {
           isHeavyToggle
         />
 
+        <SettingsRow
+          icon={Platform.OS === 'ios' ? "share-outline" : "share-social-outline"}
+          iconColor="#00E5FF"
+          title="Share Button"
+          subtitle="Quick share current page"
+          value={settings.toolbarShortcuts.showShare}
+          onToggle={(v) => handleToolbarShortcutToggle('showShare', v)}
+          isHeavyToggle
+        />
+
         {/* ================================================================== */}
         {/* DANGER ZONE */}
         {/* ================================================================== */}
