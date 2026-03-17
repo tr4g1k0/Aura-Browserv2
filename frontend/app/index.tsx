@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrowserStore, Tab } from '../src/store/browserStore';
 import { useSettings } from '../src/context/SettingsContext';
 import { UnifiedTopBar } from '../src/components/UnifiedTopBar';
@@ -66,6 +67,10 @@ const DESKTOP_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKi
 export default function BrowserScreen() {
   const router = useRouter();
   const webViewRef = useRef<WebView>(null);
+  
+  // Safe Area Insets - ensures buttons don't overlap with system UI (status bar, home indicator)
+  const insets = useSafeAreaInsets();
+  
   const {
     tabs,
     ghostTabs,
@@ -739,11 +744,19 @@ export default function BrowserScreen() {
     return scripts || 'true;';
   }, [userSettings.aggressiveAdBlocking, visionAISelectors, vpnScript]);
 
+  // Calculate bottom padding for home indicator
+  // When address bar is at bottom, we need more space for the navigation bar
+  const bottomPadding = userSettings.addressBarPosition === 'bottom' 
+    ? insets.bottom 
+    : Math.max(insets.bottom, 8);
+
   return (
     <View style={[
       styles.container, 
       // Address Bar Position: Use column-reverse when position is 'bottom'
-      userSettings.addressBarPosition === 'bottom' && styles.containerBottomBar
+      userSettings.addressBarPosition === 'bottom' && styles.containerBottomBar,
+      // Apply bottom safe area padding to avoid home indicator overlap
+      { paddingBottom: bottomPadding }
     ]}>
       {/* Unified Top Bar - Single sleek row with all controls */}
       <UnifiedTopBar

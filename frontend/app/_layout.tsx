@@ -13,7 +13,8 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <SettingsProvider>
           <AIProvider>
-            <StatusBar style="light" />
+            {/* StatusBar Control: Light style for True Black theme, translucent for edge-to-edge */}
+            <StatusBar style="light" translucent={true} backgroundColor="transparent" />
             <Stack
               screenOptions={{
                 headerShown: false,
