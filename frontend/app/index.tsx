@@ -706,10 +706,19 @@ export default function BrowserScreen() {
                 startInLoadingState
                 allowsBackForwardNavigationGestures
                 allowsInlineMediaPlayback
-                mediaPlaybackRequiresUserAction={false}
+                // MEDIA PLAYBACK POLICY: Require user action to prevent background video preloading
+                // This stops the browser from "thinking" about multiple videos at once
+                mediaPlaybackRequiresUserAction={true}
                 // iOS File Download Handler
                 onFileDownload={({ nativeEvent: { downloadUrl } }) => {
                   handleFileDownload(downloadUrl);
+                }}
+                // MEMORY LEAK PROTECTION: Auto-reload if content process crashes
+                // Clears "sludge" from heavy video feeds like YouTube Shorts
+                onContentProcessDidTerminate={(syntheticEvent) => {
+                  const { nativeEvent } = syntheticEvent;
+                  console.warn('[WebView] Content process terminated, reloading...', nativeEvent);
+                  webViewRef.current?.reload();
                 }}
                 // Clean UI settings
                 setBuiltInZoomControls={false}   // Hide Android zoom controls
@@ -720,12 +729,11 @@ export default function BrowserScreen() {
                 incognito={isGhostMode || userSettings.alwaysOnVPN}
                 // Desktop Mode: Use desktop user agent if enabled (per-tab or global default)
                 userAgent={activeTab?.isDesktopMode || userSettings.requestDesktopSite ? DESKTOP_USER_AGENT : undefined}
-                // HARDWARE ACCELERATION & SMOOTH SCROLLING
-                // Android: Enable GPU rendering for smooth scrolling
+                // HARDWARE ACCELERATION - Force GPU rendering for video frames
+                // Critical for smooth YouTube Shorts / TikTok-style scrolling
                 androidHardwareAccelerationDisabled={false}
-                // Android: Force hardware acceleration for better performance
                 androidLayerType="hardware"
-                // iOS: Native smooth scrolling deceleration (Platform-specific)
+                // iOS: Native smooth scrolling deceleration
                 decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.998}
                 // iOS: Bounces at scroll edges for native feel
                 bounces={true}
@@ -733,6 +741,12 @@ export default function BrowserScreen() {
                 renderToHardwareTextureAndroid={true}
                 // Reduce memory usage by removing offscreen views
                 removeClippedSubviews={true}
+                // Allow mixed content for better compatibility
+                mixedContentMode="compatibility"
+                // Reduce memory footprint
+                cacheMode="LOAD_DEFAULT"
+                // Ensure smooth scrolling
+                overScrollMode="never"
               />
             </ScrollView>
           </SwipeNavigationWrapper>

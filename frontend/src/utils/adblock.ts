@@ -451,8 +451,62 @@ export const performanceOptimizationScript = `
 (function(){
   'use strict';
   
-  /* Smart Shield Performance Optimizer v1.0 */
-  /* Layer 3: Aggressive DOM Stripping for battery & data savings */
+  /* Smart Shield Performance Optimizer v2.0 */
+  /* Layer 3: Aggressive DOM Stripping + GPU Compositing for video feeds */
+  
+  /**
+   * CRITICAL: Inject GPU Compositing styles for smoother video rendering
+   * Forces hardware acceleration on video elements (especially YouTube Shorts)
+   */
+  function injectGPUCompositing() {
+    var style = document.createElement('style');
+    style.id = 'smart-shield-gpu-compositing';
+    style.innerHTML = \`
+      /* GPU Compositing for video elements - smoother Shorts/Reels transitions */
+      video {
+        transform: translateZ(0);
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        perspective: 1000px;
+        will-change: transform;
+      }
+      
+      /* Native-feeling scroll physics */
+      * {
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      /* Optimize scroll containers */
+      [class*="scroll"], [class*="feed"], [class*="list"], [class*="shorts"] {
+        -webkit-overflow-scrolling: touch;
+        overflow-scrolling: touch;
+        transform: translateZ(0);
+      }
+      
+      /* YouTube Shorts specific optimizations */
+      ytd-shorts, ytd-reel-video-renderer, .reel-video-container {
+        transform: translateZ(0);
+        backface-visibility: hidden;
+        will-change: transform, opacity;
+      }
+      
+      /* TikTok-style video containers */
+      [class*="video-card"], [class*="video-player"] {
+        transform: translateZ(0);
+        will-change: transform;
+      }
+      
+      /* Reduce paint complexity on feed items */
+      [class*="feed-item"], [class*="content-item"] {
+        contain: layout style paint;
+      }
+    \`;
+    
+    if (!document.getElementById('smart-shield-gpu-compositing')) {
+      document.head.appendChild(style);
+      console.log('[Performance] GPU compositing styles injected');
+    }
+  }
   
   /**
    * Force lazy loading on all images and iframes
@@ -480,89 +534,81 @@ export const performanceOptimizationScript = `
   /**
    * Kill all video auto-play to save battery and data
    * Videos should only play when user explicitly taps them
+   * NOTE: This is now controlled by mediaPlaybackRequiresUserAction prop
    */
   function killVideoAutoPlay() {
     var videos = document.querySelectorAll('video');
     videos.forEach(function(video) {
-      // Disable autoplay
-      video.autoplay = false;
-      video.setAttribute('autoplay', 'false');
+      // Apply GPU compositing to each video
+      video.style.transform = 'translateZ(0)';
+      video.style.backfaceVisibility = 'hidden';
       
-      // Set preload to none (don't download until play)
-      video.preload = 'none';
-      video.setAttribute('preload', 'none');
-      
-      // Pause if already started playing
-      if (!video.paused) {
-        try {
-          video.pause();
-        } catch(e) {}
-      }
-      
-      // Remove autoplay from source elements too
-      var sources = video.querySelectorAll('source');
-      sources.forEach(function(source) {
-        source.removeAttribute('autoplay');
-      });
+      // Don't force pause - let mediaPlaybackRequiresUserAction handle it
+      // Just optimize the rendering
     });
     
-    // Also handle audio elements
-    var audios = document.querySelectorAll('audio');
-    audios.forEach(function(audio) {
-      audio.autoplay = false;
-      audio.preload = 'none';
-      if (!audio.paused) {
-        try {
-          audio.pause();
-        } catch(e) {}
-      }
-    });
-    
-    console.log('[Performance] Auto-play killed:', videos.length, 'videos,', audios.length, 'audios');
+    console.log('[Performance] Video GPU optimization applied to', videos.length, 'videos');
   }
   
   /**
-   * Disable resource-heavy animations and transitions (optional aggressive mode)
+   * Optimize scroll performance with passive listeners
    */
-  function reduceMotion() {
-    // Create a style to reduce animations
-    var style = document.createElement('style');
-    style.id = 'smart-shield-reduce-motion';
-    style.textContent = \`
-      /* Reduce animations for performance */
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          transition-duration: 0.01ms !important;
-        }
-      }
-    \`;
-    // Only inject if user has system-level reduce motion enabled
-    // This respects user preference while still being available
-  }
-  
-  /**
-   * Disconnect unnecessary observers and listeners on scroll
-   */
-  function cleanupOnScroll() {
+  function optimizeScrollPerformance() {
     // Debounced scroll handler to re-apply optimizations
     var scrollTimeout;
+    var lastScrollY = 0;
+    
     window.addEventListener('scroll', function() {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(function() {
-        enableLazyLoading(); // Catch dynamically loaded content
-      }, 500);
+      // Use requestAnimationFrame for smoother scroll handling
+      if (!scrollTimeout) {
+        scrollTimeout = requestAnimationFrame(function() {
+          var currentScrollY = window.scrollY;
+          
+          // Only re-optimize if scrolled significantly
+          if (Math.abs(currentScrollY - lastScrollY) > 500) {
+            enableLazyLoading();
+            killVideoAutoPlay();
+            lastScrollY = currentScrollY;
+          }
+          
+          scrollTimeout = null;
+        });
+      }
     }, { passive: true });
+  }
+  
+  /**
+   * Memory cleanup - remove off-screen heavy elements
+   */
+  function memoryCleanup() {
+    // Find videos that are way off-screen and pause them
+    var videos = document.querySelectorAll('video');
+    var viewportHeight = window.innerHeight;
+    
+    videos.forEach(function(video) {
+      var rect = video.getBoundingClientRect();
+      var isOffScreen = rect.bottom < -viewportHeight || rect.top > viewportHeight * 2;
+      
+      if (isOffScreen && !video.paused) {
+        try {
+          video.pause();
+          console.log('[Performance] Paused off-screen video');
+        } catch(e) {}
+      }
+    });
   }
   
   // Run immediately if document is ready, otherwise wait
   function init() {
+    injectGPUCompositing();
     enableLazyLoading();
     killVideoAutoPlay();
-    cleanupOnScroll();
+    optimizeScrollPerformance();
     
-    console.log('[Smart Shield] Performance optimization active');
+    // Run memory cleanup periodically
+    setInterval(memoryCleanup, 5000);
+    
+    console.log('[Smart Shield] Performance optimization v2.0 active');
   }
   
   if (document.readyState === 'loading') {
