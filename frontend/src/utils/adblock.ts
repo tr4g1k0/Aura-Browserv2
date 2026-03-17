@@ -442,13 +442,19 @@ export const adBusterScript = createAdBusterScript();
  * CRITICAL: Aggressive GPU Layer Squashing Script
  * This MUST run FIRST before any other scripts to force GPU compositing
  * Moves ALL video rendering off CPU onto Graphics Chip
+ * 
+ * v1.2 - Fixed blank screen issue:
+ * - Changed contain: strict to contain: content (allows size pre-calculation)
+ * - Removed overflow: hidden (was clipping next video)
+ * - Added content-visibility: auto for viewport pre-rendering
+ * - Limited translate3d to active video only (prevents Layer Explosion)
  */
 export const gpuLayerSquashingScript = `
 (function(){
   'use strict';
   
-  /* LAYER SQUASHING v1.1 - Force GPU Compositor Layers + DOM Isolation */
-  /* This script MUST execute immediately for max performance */
+  /* LAYER SQUASHING v1.2 - GPU Layers + Balanced DOM Isolation */
+  /* Fixed: Blank screen on YouTube feeds */
   
   var style = document.createElement('style');
   style.id = 'gpu-layer-squashing';
@@ -456,28 +462,29 @@ export const gpuLayerSquashingScript = `
     /* Disable tap highlight and enable font smoothing globally */
     '* { -webkit-tap-highlight-color: rgba(0,0,0,0); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }',
     
-    /* CRITICAL: Force ALL video elements into own Compositor Layer */
-    /* This moves heavy lifting entirely off CPU onto Graphics Chip */
-    'video, .video-stream, .player-container, .html5-video-player, ytd-player {',
-    '  transform: translate3d(0,0,0) !important;',
+    /* GPU Layer for ACTIVE video elements only (not all elements) */
+    /* Prevents "Layer Explosion" which causes white/blank screens */
+    'video:not([paused]), video.playing, .html5-main-video {',
+    '  transform: translate3d(0,0,0);',
     '  will-change: transform;',
-    '  backface-visibility: hidden !important;',
-    '  -webkit-backface-visibility: hidden !important;',
-    '  perspective: 1000px;',
-    '  -webkit-perspective: 1000px;',
+    '  backface-visibility: hidden;',
+    '  -webkit-backface-visibility: hidden;',
     '}',
     
-    /* YouTube Shorts specific - force GPU layers */
-    'ytd-shorts, ytd-reel-video-renderer, .reel-video-container, #shorts-player {',
-    '  transform: translate3d(0,0,0) !important;',
+    /* YouTube player containers - lighter GPU hints */
+    '.html5-video-player, ytd-player, #player-container {',
+    '  will-change: contents;',
+    '  backface-visibility: hidden;',
+    '}',
+    
+    /* YouTube Shorts - GPU layer only for visible item */
+    'ytd-reel-video-renderer[is-active] {',
+    '  transform: translate3d(0,0,0);',
     '  will-change: transform, opacity;',
-    '  backface-visibility: hidden !important;',
-    '  contain: layout style paint;',
     '}',
     
-    /* Shorts swipe container needs GPU acceleration */
-    '#shorts-container, .ytd-shorts, ytd-reel-shelf-renderer {',
-    '  transform: translateZ(0);',
+    /* Shorts container needs smooth scrolling */
+    '#shorts-container, .ytd-shorts {',
     '  -webkit-overflow-scrolling: touch;',
     '}',
     
@@ -487,9 +494,9 @@ export const gpuLayerSquashingScript = `
     '  -webkit-overflow-scrolling: touch;',
     '}',
     
-    /* TikTok/Instagram Reels support */
-    '[class*="video-card"], [class*="VideoPlayer"], [class*="reels"] {',
-    '  transform: translate3d(0,0,0) !important;',
+    /* TikTok/Instagram - only active video gets GPU layer */
+    '[class*="video-card"].active, [class*="VideoPlayer"].playing {',
+    '  transform: translate3d(0,0,0);',
     '  will-change: transform;',
     '}'
   ].join('\\n');
@@ -501,40 +508,60 @@ export const gpuLayerSquashingScript = `
     document.documentElement.appendChild(style);
   }
   
-  console.log('[GPU Layer Squashing] Compositor layers forced for video elements');
+  console.log('[GPU Layer Squashing] v1.2 - Active video GPU layers only');
   
   /* ================================================================== */
-  /* STRICT DOM ISOLATION - Skip Layout/Paint for surrounding UI       */
+  /* DOM ISOLATION - Use "content" instead of "strict"                  */
+  /* "content" allows size pre-calculation for upcoming videos          */
   /* ================================================================== */
   
   var isolationStyle = document.createElement('style');
   isolationStyle.id = 'dom-isolation';
   isolationStyle.innerHTML = [
-    /* contain: strict tells WebView these elements have fixed size */
-    /* Browser skips Layout/Paint calculations for surrounding UI */
-    /* Saves MASSIVE CPU cycles during video feed scrolls */
+    /* contain: content allows browser to pre-calculate layout */
+    /* NO overflow: hidden - was clipping next video before render */
     'ytd-shorts, ytd-reel-video-renderer, .video-stream, #player-container, #shorts-player {',
-    '  contain: strict !important;',
-    '  overflow: hidden;',
+    '  contain: content !important;',
     '}',
     
-    /* Isolate the entire shorts feed container */
-    '#shorts-inner-container, ytd-reel-shelf-renderer, ytd-shorts-player-container {',
-    '  contain: strict !important;',
-    '  overflow: hidden;',
+    /* Isolate the shorts feed container */
+    '#shorts-inner-container, ytd-reel-shelf-renderer {',
+    '  contain: content !important;',
     '}',
     
-    /* Isolate individual reel items */
+    /* Individual reel items - content containment only */
     'ytd-reel-video-renderer, .reel-video-in-sequence {',
-    '  contain: strict !important;',
-    '  overflow: hidden;',
+    '  contain: content !important;',
     '  isolation: isolate;',
     '}',
     
-    /* TikTok/Instagram isolation */
+    /* ================================================================== */
+    /* VIEWPORT PRE-RENDER - Placeholder for off-screen videos           */
+    /* content-visibility: auto = only fully render when near viewport   */
+    /* contain-intrinsic-size = placeholder size for layout calculation  */
+    /* ================================================================== */
+    'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer {',
+    '  content-visibility: auto;',
+    '  contain-intrinsic-size: 1px 300px;',
+    '}',
+    
+    /* YouTube Shorts items - taller placeholder */
+    'ytd-reel-video-renderer:not([is-active]) {',
+    '  content-visibility: auto;',
+    '  contain-intrinsic-size: 1px 600px;',
+    '}',
+    
+    /* YouTube feed items */
+    'ytd-grid-video-renderer, ytd-playlist-video-renderer {',
+    '  content-visibility: auto;',
+    '  contain-intrinsic-size: 1px 250px;',
+    '}',
+    
+    /* TikTok/Instagram feed items */
     '[class*="video-feed-item"], [class*="reel-item"], [class*="short-video"] {',
-    '  contain: strict !important;',
-    '  overflow: hidden;',
+    '  contain: content !important;',
+    '  content-visibility: auto;',
+    '  contain-intrinsic-size: 1px 500px;',
     '}'
   ].join('\\n');
   
@@ -544,7 +571,7 @@ export const gpuLayerSquashingScript = `
     document.documentElement.appendChild(isolationStyle);
   }
   
-  console.log('[DOM Isolation] contain:strict applied - Layout/Paint skipped for surrounding UI');
+  console.log('[DOM Isolation] v1.2 - contain:content + viewport pre-render');
 })();
 true;`;
 
