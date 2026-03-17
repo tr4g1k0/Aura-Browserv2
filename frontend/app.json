@@ -42,10 +42,21 @@
           "resizeMode": "contain",
           "backgroundColor": "#000"
         }
+      ],
+      "onnxruntime-react-native",
+      [
+        "expo-file-system",
+        {
+          "supportsOpeningDocumentsInPlace": true,
+          "enableFileSharing": true
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "onnxruntimeExtensionsEnabled": "true"
     }
   }
 }

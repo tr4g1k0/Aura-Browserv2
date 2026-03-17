@@ -1,5 +1,38 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+
+// Safely import AsyncStorage with fallback for Expo Go
+let AsyncStorage: any = null;
+try {
+  AsyncStorage = require('@react-native-async-storage/async-storage').default;
+} catch (e) {
+  console.log('AsyncStorage not available');
+}
+
+// In-memory fallback storage for platforms without AsyncStorage
+const memoryStorage: Record<string, string> = {};
+
+const safeGetItem = async (key: string): Promise<string | null> => {
+  try {
+    if (AsyncStorage) {
+      return await AsyncStorage.getItem(key);
+    }
+    return memoryStorage[key] || null;
+  } catch (e) {
+    return memoryStorage[key] || null;
+  }
+};
+
+const safeSetItem = async (key: string, value: string): Promise<void> => {
+  try {
+    if (AsyncStorage) {
+      await AsyncStorage.setItem(key, value);
+    }
+    memoryStorage[key] = value;
+  } catch (e) {
+    memoryStorage[key] = value;
+  }
+};
 
 export interface Tab {
   id: string;
@@ -206,7 +239,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
 
   loadPersistedState: async () => {
     try {
-      const saved = await AsyncStorage.getItem('browser-state');
+      const saved = await safeGetItem('browser-state');
       if (saved) {
         const parsed = JSON.parse(saved);
         set((state) => ({
@@ -216,14 +249,15 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
         }));
       }
     } catch (e) {
-      console.error('Failed to load persisted state', e);
+      // AsyncStorage may not be available on all platforms (e.g., Expo Go on Android)
+      console.log('Storage not available, using default state');
     }
   },
 
   persistState: async () => {
     try {
       const state = get();
-      await AsyncStorage.setItem(
+      await safeSetItem(
         'browser-state',
         JSON.stringify({
           tabs: state.tabs,
@@ -232,7 +266,8 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
         })
       );
     } catch (e) {
-      console.error('Failed to persist state', e);
+      // Storage may not be available on all platforms
+      console.log('Unable to persist state');
     }
   },
 }));
