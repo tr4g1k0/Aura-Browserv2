@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useBrowserStore } from '../src/store/browserStore';
+import { useBrowserStore, Tab } from '../src/store/browserStore';
 import { useSettings } from '../src/context/SettingsContext';
 import { UnifiedTopBar } from '../src/components/UnifiedTopBar';
 import { NewTabPage } from '../src/components/NewTabPage';
@@ -64,6 +64,7 @@ export default function BrowserScreen() {
     loadPersistedState,
     addCachedPage,
     addToHistory,
+    saveTabScrollPosition,
   } = useBrowserStore();
 
   // Access user settings for search engine preference
@@ -96,6 +97,10 @@ export default function BrowserScreen() {
   // Zero-Load Predictive Caching state
   const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
   const [isCacheHit, setIsCacheHit] = useState(false);
+  
+  // Tab Virtualization: Track current scroll position and previous tab
+  const currentScrollYRef = useRef<number>(0);
+  const previousTabIdRef = useRef<string | null>(null);
 
   const activeTab = currentTabs.find((t) => t.isActive) || currentTabs[0];
 
@@ -105,6 +110,19 @@ export default function BrowserScreen() {
                        activeTab.url === 'about:newtab' ||
                        activeTab.url === '' ||
                        activeTab.url === 'https://www.google.com';
+
+  // Tab Virtualization: Save scroll position when switching tabs
+  useEffect(() => {
+    if (activeTab?.id && previousTabIdRef.current && previousTabIdRef.current !== activeTab.id) {
+      // Tab has changed - save the previous tab's scroll position
+      console.log(`[Tab Virtualization] Switching from ${previousTabIdRef.current} to ${activeTab.id}`);
+      console.log(`[Tab Virtualization] Saving scroll position ${currentScrollYRef.current} for tab ${previousTabIdRef.current}`);
+      saveTabScrollPosition(previousTabIdRef.current, currentScrollYRef.current);
+      // Reset scroll ref for the new tab
+      currentScrollYRef.current = activeTab.scrollY || 0;
+    }
+    previousTabIdRef.current = activeTab?.id || null;
+  }, [activeTab?.id, saveTabScrollPosition]);
 
   // Load persisted state on mount
   useEffect(() => {
@@ -297,7 +315,7 @@ export default function BrowserScreen() {
   /**
    * Layer 2: DOM Injection
    * Injects the adBusterScript to hide ad elements via CSS
-   * Also handles predictive caching and link extraction
+   * Also handles predictive caching, link extraction, and scroll restoration
    */
   const handleLoadEnd = useCallback(() => {
     setLoading(false);
@@ -319,6 +337,48 @@ export default function BrowserScreen() {
       webViewRef.current?.injectJavaScript(script);
     }
 
+    // Tab Virtualization: Inject scroll tracking script
+    const scrollTrackingScript = `
+      (function() {
+        // Report scroll position on scroll events (debounced)
+        let scrollTimeout;
+        const reportScroll = () => {
+          clearTimeout(scrollTimeout);
+          scrollTimeout = setTimeout(() => {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'SCROLL_POSITION',
+              scrollY: window.scrollY || window.pageYOffset || 0
+            }));
+          }, 100);
+        };
+        
+        // Listen for scroll events
+        window.addEventListener('scroll', reportScroll, { passive: true });
+        
+        // Report initial scroll position
+        reportScroll();
+      })();
+      true;
+    `;
+    webViewRef.current?.injectJavaScript(scrollTrackingScript);
+
+    // Tab Virtualization: Restore scroll position for this tab
+    const savedScrollY = activeTab?.scrollY || 0;
+    if (savedScrollY > 0) {
+      console.log('[Tab Virtualization] Restoring scroll position:', savedScrollY);
+      const scrollRestoreScript = `
+        (function() {
+          // Wait for content to be ready, then scroll
+          setTimeout(() => {
+            window.scrollTo(0, ${savedScrollY});
+            console.log('[Tab Virtualization] Scrolled to:', ${savedScrollY});
+          }, 100);
+        })();
+        true;
+      `;
+      webViewRef.current?.injectJavaScript(scrollRestoreScript);
+    }
+
     // Extract page content for predictive caching and prefetch prominent links
     if (settings.predictiveCachingEnabled) {
       // Cache current page content
@@ -336,11 +396,17 @@ export default function BrowserScreen() {
       // Extract prominent links for predictive prefetching
       webViewRef.current?.injectJavaScript(linkExtractionScript);
     }
-  }, [userSettings.aggressiveAdBlocking, settings.predictiveCachingEnabled, visionAISelectors, cachedPageSource]);
+  }, [userSettings.aggressiveAdBlocking, settings.predictiveCachingEnabled, visionAISelectors, cachedPageSource, activeTab?.scrollY]);
 
   const handleMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+      
+      // Tab Virtualization: Track scroll position
+      if (data.type === 'SCROLL_POSITION') {
+        currentScrollYRef.current = data.scrollY || 0;
+        return;
+      }
       
       if (data.type === 'PAGE_CONTENT') {
         // Store in browser store for legacy caching

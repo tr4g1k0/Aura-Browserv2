@@ -44,6 +44,9 @@ export interface Tab {
   canGoForward: boolean;
   metaDescription?: string;
   aiCategory?: string;
+  // Tab Virtualization: State preservation
+  scrollY: number;           // Saved scroll position
+  lastActiveTime: number;    // When tab was last active
 }
 
 export interface BrowserSettings {
@@ -93,6 +96,8 @@ interface BrowserState {
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTab: (id: string, updates: Partial<Tab>) => void;
+  saveTabScrollPosition: (id: string, scrollY: number) => void;
+  switchToTab: (id: string, currentScrollY?: number) => void;
   toggleAdblock: () => void;
   toggleVPN: () => void;
   toggleLiveCaptioning: () => void;
@@ -134,6 +139,8 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
       isActive: true,
       canGoBack: false,
       canGoForward: false,
+      scrollY: 0,
+      lastActiveTime: Date.now(),
     },
   ],
   activeTabId: null,
@@ -162,19 +169,31 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
       isActive: true,
       canGoBack: false,
       canGoForward: false,
+      scrollY: 0,
+      lastActiveTime: Date.now(),
     };
     
     const state = get();
     
     if (state.isGhostMode) {
       // In Ghost Mode, add to ghostTabs instead
+      // Save current tab's state before switching
       set((state) => ({
-        ghostTabs: state.ghostTabs.map((t) => ({ ...t, isActive: false })).concat(newTab),
+        ghostTabs: state.ghostTabs.map((t) => ({ 
+          ...t, 
+          isActive: false,
+          lastActiveTime: t.isActive ? Date.now() : t.lastActiveTime,
+        })).concat(newTab),
         activeTabId: newTab.id,
       }));
     } else {
+      // Save current tab's state before switching
       set((state) => ({
-        tabs: state.tabs.map((t) => ({ ...t, isActive: false })).concat(newTab),
+        tabs: state.tabs.map((t) => ({ 
+          ...t, 
+          isActive: false,
+          lastActiveTime: t.isActive ? Date.now() : t.lastActiveTime,
+        })).concat(newTab),
         activeTabId: newTab.id,
       }));
       get().persistState();
@@ -196,12 +215,15 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
             isActive: true,
             canGoBack: false,
             canGoForward: false,
+            scrollY: 0,
+            lastActiveTime: Date.now(),
           };
           return { ghostTabs: [newTab], activeTabId: newTab.id };
         }
         const wasActive = state.ghostTabs.find((t) => t.id === id)?.isActive;
         if (wasActive && newTabs.length > 0) {
           newTabs[newTabs.length - 1].isActive = true;
+          newTabs[newTabs.length - 1].lastActiveTime = Date.now();
           return { ghostTabs: newTabs, activeTabId: newTabs[newTabs.length - 1].id };
         }
         return { ghostTabs: newTabs };
@@ -217,12 +239,15 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
             isActive: true,
             canGoBack: false,
             canGoForward: false,
+            scrollY: 0,
+            lastActiveTime: Date.now(),
           };
           return { tabs: [newTab], activeTabId: newTab.id };
         }
         const wasActive = state.tabs.find((t) => t.id === id)?.isActive;
         if (wasActive && newTabs.length > 0) {
           newTabs[newTabs.length - 1].isActive = true;
+          newTabs[newTabs.length - 1].lastActiveTime = Date.now();
           return { tabs: newTabs, activeTabId: newTabs[newTabs.length - 1].id };
         }
         return { tabs: newTabs };
@@ -236,16 +261,58 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
     
     if (state.isGhostMode) {
       set((state) => ({
-        ghostTabs: state.ghostTabs.map((t) => ({ ...t, isActive: t.id === id })),
+        ghostTabs: state.ghostTabs.map((t) => ({ 
+          ...t, 
+          isActive: t.id === id,
+          lastActiveTime: t.id === id ? Date.now() : t.lastActiveTime,
+        })),
         activeTabId: id,
       }));
     } else {
       set((state) => ({
-        tabs: state.tabs.map((t) => ({ ...t, isActive: t.id === id })),
+        tabs: state.tabs.map((t) => ({ 
+          ...t, 
+          isActive: t.id === id,
+          lastActiveTime: t.id === id ? Date.now() : t.lastActiveTime,
+        })),
         activeTabId: id,
       }));
       get().persistState();
     }
+  },
+
+  // Tab Virtualization: Save scroll position for a specific tab
+  saveTabScrollPosition: (id, scrollY) => {
+    const state = get();
+    
+    if (state.isGhostMode) {
+      set((state) => ({
+        ghostTabs: state.ghostTabs.map((t) => 
+          t.id === id ? { ...t, scrollY } : t
+        ),
+      }));
+    } else {
+      set((state) => ({
+        tabs: state.tabs.map((t) => 
+          t.id === id ? { ...t, scrollY } : t
+        ),
+      }));
+    }
+  },
+
+  // Tab Virtualization: Switch tab with scroll position preservation
+  switchToTab: (id, currentScrollY) => {
+    const state = get();
+    const currentTabs = state.isGhostMode ? state.ghostTabs : state.tabs;
+    const activeTab = currentTabs.find((t) => t.isActive);
+    
+    // Save current tab's scroll position before switching
+    if (activeTab && currentScrollY !== undefined) {
+      get().saveTabScrollPosition(activeTab.id, currentScrollY);
+    }
+    
+    // Now switch to the new tab
+    get().setActiveTab(id);
   },
 
   updateTab: (id, updates) => {
@@ -428,6 +495,8 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
         isActive: true,
         canGoBack: false,
         canGoForward: false,
+        scrollY: 0,
+        lastActiveTime: Date.now(),
       };
       set({
         isGhostMode: true,
