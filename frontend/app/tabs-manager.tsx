@@ -507,12 +507,12 @@ export default function TabsManagerScreen() {
     </View>
   );
 
-  // Ghost Mode color theme
+  // Ghost Mode color theme - Deep Crimson (#2A0000) for visual feedback
   const ghostModeColors = {
-    background: isGhostMode ? '#1A0A1A' : '#0D0D0D',
-    headerBorder: isGhostMode ? '#2D1A2D' : '#1A1A1A',
+    background: isGhostMode ? '#2A0000' : '#0D0D0D',
+    headerBorder: isGhostMode ? '#3D0000' : '#1A1A1A',
     accent: isGhostMode ? '#9B59B6' : '#00FF88',
-    accentDark: isGhostMode ? '#2D1A2D' : '#1A1A1A',
+    accentDark: isGhostMode ? '#2A0000' : '#1A1A1A',
     tabBackground: isGhostMode ? 'rgba(155, 89, 182, 0.1)' : 'rgba(255, 255, 255, 0.03)',
     tabBorder: isGhostMode ? 'rgba(155, 89, 182, 0.2)' : 'rgba(255, 255, 255, 0.05)',
   };
@@ -575,6 +575,20 @@ export default function TabsManagerScreen() {
           <Text style={styles.subtitle}>{displayedTabs.length} open</Text>
         </View>
         <View style={styles.headerActions}>
+          {/* New Ghost Tab Button - Always visible for quick access */}
+          {!isGhostMode && (
+            <TouchableOpacity 
+              style={[
+                styles.ghostTabButton,
+              ]} 
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                toggleGhostMode(); // Enter Ghost Mode first
+              }}
+            >
+              <Ionicons name="eye-off" size={18} color="#9B59B6" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             style={[
               styles.addButton,
@@ -742,6 +756,16 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#00FF88',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ghostTabButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(155, 89, 182, 0.15)',
+    borderWidth: 1,
+    borderColor: '#9B59B6',
     alignItems: 'center',
     justifyContent: 'center',
   },

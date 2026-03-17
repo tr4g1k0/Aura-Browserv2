@@ -74,12 +74,13 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   const currentTabs = isGhostMode ? ghostTabs : tabs;
   const tabCount = currentTabs.length;
 
-  // Ghost Mode color theme
+  // Ghost Mode color theme - Deep Crimson (#2A0000) for visual feedback
   const colors = {
     accent: isGhostMode ? '#9B59B6' : '#00FF88',
     accentSecondary: isGhostMode ? '#8E44AD' : '#00E5FF',
-    searchBackground: isGhostMode ? '#2D1A2D' : '#1A1A1A',
+    searchBackground: isGhostMode ? '#2A0000' : '#1A1A1A',
     borderColor: isGhostMode ? 'rgba(155, 89, 182, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+    barBackground: isGhostMode ? 'rgba(42, 0, 0, 0.95)' : 'rgba(13, 13, 13, 0.95)',
   };
   
   const [inputValue, setInputValue] = useState(currentUrl);
@@ -298,7 +299,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   // Web fallback - no BlurView
   if (isWeb) {
     return (
-      <View style={styles.webContainer}>
+      <View style={[styles.webContainer, { backgroundColor: colors.barBackground }]}>
         {renderContent()}
       </View>
     );
@@ -306,7 +307,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
 
   // Native - use BlurView for glassmorphism
   return (
-    <BlurView tint="dark" intensity={80} style={styles.blurContainer}>
+    <BlurView tint={isGhostMode ? "default" : "dark"} intensity={80} style={[styles.blurContainer, isGhostMode && styles.blurContainerGhost]}>
       {renderContent()}
     </BlurView>
   );
@@ -318,6 +319,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  blurContainerGhost: {
+    backgroundColor: 'rgba(42, 0, 0, 0.5)',
+    borderBottomColor: 'rgba(155, 89, 182, 0.3)',
   },
   webContainer: {
     backgroundColor: 'rgba(13, 13, 13, 0.95)',

@@ -611,6 +611,9 @@ export default function BrowserScreen() {
           setMenuVisible(false);
         }}
         onShare={handleShare}
+        onToggleGhostMode={() => {
+          useBrowserStore.getState().toggleGhostMode();
+        }}
         isReading={isReading}
         isGhostMode={isGhostMode}
       />

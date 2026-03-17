@@ -24,6 +24,7 @@ interface BrowserMenuProps {
   onRefresh: () => void;
   onNewTab: () => void;
   onShare: () => void;
+  onToggleGhostMode: () => void;
   isReading: boolean;
   isGhostMode: boolean;
 }
@@ -93,6 +94,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onRefresh,
   onNewTab,
   onShare,
+  onToggleGhostMode,
   isReading,
   isGhostMode,
 }) => {
@@ -163,6 +165,21 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
       >
         {isWeb ? (
           <View style={[styles.menuContent, isGhostMode && styles.menuContentGhost]}>
+            {/* Ghost Mode Toggle - Prominent at top */}
+            <MenuItem
+              icon={isGhostMode ? "eye-off" : "eye-off-outline"}
+              label={isGhostMode ? "Exit Ghost Mode" : "Enter Ghost Mode"}
+              onPress={() => {
+                onToggleGhostMode();
+                handleClose();
+              }}
+              isActive={isGhostMode}
+              activeColor="#9B59B6"
+              color="#9B59B6"
+            />
+
+            <View style={styles.divider} />
+
             {/* TTS Read Aloud / Stop Reading */}
             {isReading ? (
               <MenuItem
@@ -237,6 +254,21 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
           </View>
         ) : (
           <BlurView tint="dark" intensity={80} style={[styles.menuContent, isGhostMode && styles.menuContentGhost]}>
+            {/* Ghost Mode Toggle - Prominent at top */}
+            <MenuItem
+              icon={isGhostMode ? "eye-off" : "eye-off-outline"}
+              label={isGhostMode ? "Exit Ghost Mode" : "Enter Ghost Mode"}
+              onPress={() => {
+                onToggleGhostMode();
+                handleClose();
+              }}
+              isActive={isGhostMode}
+              activeColor="#9B59B6"
+              color="#9B59B6"
+            />
+
+            <View style={styles.divider} />
+
             {/* TTS Read Aloud / Stop Reading */}
             {isReading ? (
               <MenuItem
@@ -351,8 +383,8 @@ const styles = StyleSheet.create({
     }),
   },
   menuContentGhost: {
-    backgroundColor: 'rgba(45, 26, 45, 0.95)',
-    borderColor: 'rgba(155, 89, 182, 0.2)',
+    backgroundColor: 'rgba(42, 0, 0, 0.95)',
+    borderColor: 'rgba(155, 89, 182, 0.3)',
   },
   menuItem: {
     flexDirection: 'row',
