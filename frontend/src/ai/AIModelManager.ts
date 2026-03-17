@@ -1,5 +1,11 @@
 // AIModelManager - Core ONNX Runtime Manager
 // Handles model loading, session management, and inference execution
+// 
+// OPTIMIZATION: This manager is designed to NEVER block the React Native UI thread:
+// - Uses optimized ONNX session options (xnnpack, limited threads)
+// - Yields to event loop before heavy inference operations
+// - Implements concurrency lock with drop policy for real-time tasks
+// - Provides throttled callbacks to prevent rapid re-renders
 
 import { Platform } from 'react-native';
 import {
@@ -16,6 +22,49 @@ import { getModelById, DEFAULT_MODELS } from './models.config';
 type OrtInferenceSession = any;
 type OrtTensor = any;
 
+// Throttle utility for UI callbacks
+type ThrottledCallback<T> = (data: T) => void;
+
+/**
+ * Creates a throttled version of a callback that only fires at most once per interval
+ * @param callback The function to throttle
+ * @param intervalMs Maximum frequency of calls in milliseconds
+ * @returns Throttled function
+ */
+function createThrottledCallback<T>(
+  callback: (data: T) => void,
+  intervalMs: number = 100
+): ThrottledCallback<T> {
+  let lastCall = 0;
+  let pendingData: T | null = null;
+  let timeoutId: NodeJS.Timeout | null = null;
+
+  return (data: T) => {
+    const now = Date.now();
+    const timeSinceLast = now - lastCall;
+
+    if (timeSinceLast >= intervalMs) {
+      // Enough time has passed, call immediately
+      lastCall = now;
+      callback(data);
+    } else {
+      // Store pending data and schedule a call
+      pendingData = data;
+      
+      if (!timeoutId) {
+        timeoutId = setTimeout(() => {
+          if (pendingData !== null) {
+            lastCall = Date.now();
+            callback(pendingData);
+            pendingData = null;
+          }
+          timeoutId = null;
+        }, intervalMs - timeSinceLast);
+      }
+    }
+  };
+}
+
 class AIModelManager {
   private sessions: Map<string, OrtInferenceSession> = new Map();
   private settings: AISettings = DEFAULT_AI_SETTINGS;
@@ -23,6 +72,13 @@ class AIModelManager {
   private isNativePlatform: boolean;
   private memoryUsage: number = 0;
   private maxMemory: number = 512 * 1024 * 1024; // 512MB default
+  
+  // Concurrency lock for real-time inference (drop policy)
+  private isProcessing: boolean = false;
+  private droppedChunks: number = 0;
+  
+  // Throttled callbacks registry
+  private throttledCallbacks: Map<string, ThrottledCallback<any>> = new Map();
 
   constructor() {
     this.isNativePlatform = Platform.OS !== 'web';
@@ -92,14 +148,20 @@ class AIModelManager {
 
   /**
    * Configure session options based on device capabilities
+   * 
+   * OPTIMIZATION: These options are tuned to prevent UI thread blocking:
+   * - intraOpNumThreads: 2 - prevents maxing out CPU cores
+   * - executionProviders: ['xnnpack', 'cpu'] - mobile-optimized math operations
    */
   private getSessionOptions(provider: ExecutionProvider): any {
     const options: any = {
-      executionProviders: [provider],
       graphOptimizationLevel: 'all',
+      // Limit thread usage to prevent UI freezing
+      intraOpNumThreads: 2,
+      interOpNumThreads: 1,
     };
 
-    // Add provider-specific options
+    // Add provider-specific options with xnnpack optimization
     if (provider === 'coreml') {
       options.executionProviders = [
         {
@@ -107,6 +169,7 @@ class AIModelManager {
           useCPUOnly: false,
           enableOnSubgraph: true,
         },
+        'xnnpack', // Mobile-optimized SIMD operations
         'cpu', // Fallback
       ];
     } else if (provider === 'nnapi') {
@@ -116,10 +179,12 @@ class AIModelManager {
           useFP16: true,
           useNCHW: false,
         },
+        'xnnpack', // Mobile-optimized SIMD operations
         'cpu', // Fallback
       ];
     } else {
-      options.executionProviders = ['cpu'];
+      // CPU-only mode - prioritize xnnpack for mobile optimization
+      options.executionProviders = ['xnnpack', 'cpu'];
     }
 
     return options;
@@ -223,13 +288,25 @@ class AIModelManager {
 
   /**
    * Run inference on a loaded model
+   * 
+   * OPTIMIZATION: Non-blocking inference with:
+   * - Event loop yielding before heavy operations
+   * - Concurrency lock with drop policy for real-time tasks
+   * 
+   * @param modelId - The model to run inference on
+   * @param inputData - Input tensor data
+   * @param inputShapes - Input tensor shapes
+   * @param options - Optional inference options
+   * @param options.realTime - If true, drops chunk when already processing (for STT)
    */
   async runInference(
     modelId: string,
     inputData: Record<string, Float32Array | Int32Array | BigInt64Array>,
-    inputShapes: Record<string, number[]>
+    inputShapes: Record<string, number[]>,
+    options?: { realTime?: boolean }
   ): Promise<InferenceResult> {
     const startTime = Date.now();
+    const isRealTime = options?.realTime ?? false;
 
     // Check if running on web
     if (!this.isNativePlatform || !this.ort) {
@@ -240,6 +317,20 @@ class AIModelManager {
         provider: 'cpu',
         error: 'ONNX Runtime not available on web platform',
       };
+    }
+
+    // CONCURRENCY LOCK: For real-time tasks, drop if already processing
+    if (isRealTime && this.isProcessing) {
+      this.droppedChunks++;
+      console.log(`[AIModelManager] Dropping chunk (drop policy). Total dropped: ${this.droppedChunks}`);
+      return {
+        success: false,
+        output: null,
+        executionTimeMs: Date.now() - startTime,
+        provider: 'cpu',
+        error: 'Processing in progress - chunk dropped (real-time mode)',
+        dropped: true,
+      } as InferenceResult & { dropped: boolean };
     }
 
     // Check if model is loaded
@@ -259,6 +350,9 @@ class AIModelManager {
       session = this.sessions.get(modelId);
     }
 
+    // Set processing lock
+    this.isProcessing = true;
+
     try {
       // Create input tensors
       const feeds: Record<string, OrtTensor> = {};
@@ -266,6 +360,10 @@ class AIModelManager {
         const shape = inputShapes[name];
         feeds[name] = new this.ort.Tensor(data, shape);
       }
+
+      // EVENT LOOP YIELDING: Allow UI to paint before heavy inference
+      // This prevents the JS bridge from locking up during the native call
+      await new Promise(resolve => setTimeout(resolve, 0));
 
       // Run inference
       const results = await session.run(feeds);
@@ -292,6 +390,9 @@ class AIModelManager {
         provider: 'cpu',
         error: error.message || 'Inference failed',
       };
+    } finally {
+      // Always release the processing lock
+      this.isProcessing = false;
     }
   }
 
@@ -327,6 +428,51 @@ class AIModelManager {
    */
   getLoadedModels(): string[] {
     return Array.from(this.sessions.keys());
+  }
+
+  /**
+   * Get or create a throttled callback for UI updates
+   * 
+   * OPTIMIZATION: Prevents React Native from re-rendering too rapidly
+   * by limiting callback frequency to max 1 call per intervalMs
+   * 
+   * @param key - Unique identifier for the callback
+   * @param callback - The callback function to throttle
+   * @param intervalMs - Minimum interval between calls (default: 100ms)
+   */
+  getThrottledCallback<T>(
+    key: string,
+    callback: (data: T) => void,
+    intervalMs: number = 100
+  ): ThrottledCallback<T> {
+    if (!this.throttledCallbacks.has(key)) {
+      this.throttledCallbacks.set(key, createThrottledCallback(callback, intervalMs));
+    }
+    return this.throttledCallbacks.get(key) as ThrottledCallback<T>;
+  }
+
+  /**
+   * Remove a throttled callback
+   */
+  removeThrottledCallback(key: string): void {
+    this.throttledCallbacks.delete(key);
+  }
+
+  /**
+   * Get processing statistics
+   */
+  getProcessingStats(): { isProcessing: boolean; droppedChunks: number } {
+    return {
+      isProcessing: this.isProcessing,
+      droppedChunks: this.droppedChunks,
+    };
+  }
+
+  /**
+   * Reset dropped chunks counter
+   */
+  resetDroppedChunks(): void {
+    this.droppedChunks = 0;
   }
 }
 

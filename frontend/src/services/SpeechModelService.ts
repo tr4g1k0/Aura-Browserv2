@@ -8,8 +8,13 @@
  * Architecture:
  * 1. Receives raw audio chunks from useAudioStream hook
  * 2. Preprocesses audio into Float32 tensor format (16kHz, mono)
- * 3. Runs ONNX inference using AIModelManager
- * 4. Returns transcribed text to useLiveCaptions
+ * 3. Runs ONNX inference using AIModelManager (with drop policy for real-time)
+ * 4. Returns transcribed text to useLiveCaptions (throttled to prevent UI jank)
+ * 
+ * OPTIMIZATION: This service implements:
+ * - Real-time mode with drop policy (drops chunks when processing is busy)
+ * - 100ms throttled callbacks to prevent rapid UI re-renders
+ * - Event loop yielding via AIModelManager for smooth animations
  */
 
 import { Platform } from 'react-native';
@@ -90,6 +95,10 @@ let mockPhraseIndex = 0;
 let mockWordIndex = 0;
 let lastTranscriptionTime = 0;
 let transcriptionListeners: ((result: TranscriptionResult) => void)[] = [];
+
+// Throttled notification function - will be set up on first listener registration
+let throttledNotify: ((result: TranscriptionResult) => void) | null = null;
+const THROTTLE_INTERVAL_MS = 100; // Max 10 updates per second
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -261,7 +270,7 @@ export const processAudioChunk = async (chunk: AudioChunk): Promise<Transcriptio
     return result;
   }
   
-  // NATIVE MODE: Run ONNX inference
+  // NATIVE MODE: Run ONNX inference with real-time drop policy
   try {
     // Preprocess audio
     let audioData = chunk.buffer;
@@ -274,12 +283,25 @@ export const processAudioChunk = async (chunk: AudioChunk): Promise<Transcriptio
     // Normalize
     audioData = normalizeAudio(audioData);
     
-    // Run inference
+    // Run inference with real-time mode (drops chunk if busy processing)
     const inferenceResult = await aiModelManager.runInference(
       config.modelId,
       { audio_input: audioData },
-      { audio_input: [1, audioData.length] }
+      { audio_input: [1, audioData.length] },
+      { realTime: true } // Enable drop policy for real-time STT
     );
+    
+    // Check if chunk was dropped
+    if ((inferenceResult as any).dropped) {
+      console.log('[SpeechModelService] Audio chunk dropped (processing busy)');
+      return {
+        text: '',
+        confidence: 0,
+        isFinal: false,
+        timestamp: Date.now(),
+        processingTimeMs: inferenceResult.executionTimeMs,
+      };
+    }
     
     if (inferenceResult.success && inferenceResult.output) {
       // Decode output tokens to text (model-specific)
@@ -330,10 +352,26 @@ const decodeModelOutput = (output: Record<string, any>): string => {
 };
 
 /**
- * Notify all listeners of a transcription result
+ * Notify all listeners of a transcription result (THROTTLED)
+ * 
+ * OPTIMIZATION: Uses AIModelManager's throttled callback to prevent
+ * React Native from trying to re-render the text component too rapidly.
+ * Max 1 update per THROTTLE_INTERVAL_MS (100ms = 10 updates/second)
  */
 const notifyListeners = (result: TranscriptionResult) => {
-  transcriptionListeners.forEach(listener => listener(result));
+  // Create throttled notifier if not exists
+  if (!throttledNotify) {
+    throttledNotify = aiModelManager.getThrottledCallback(
+      'speech-transcription-notify',
+      (data: TranscriptionResult) => {
+        transcriptionListeners.forEach(listener => listener(data));
+      },
+      THROTTLE_INTERVAL_MS
+    );
+  }
+  
+  // Use throttled notification
+  throttledNotify(result);
 };
 
 /**
@@ -381,6 +419,13 @@ export const release = async (): Promise<void> => {
     await aiModelManager.unloadModel(config.modelId);
     isModelLoaded = false;
   }
+  
+  // Clean up throttled callback
+  if (throttledNotify) {
+    aiModelManager.removeThrottledCallback('speech-transcription-notify');
+    throttledNotify = null;
+  }
+  
   transcriptionListeners = [];
   resetMockState();
 };

@@ -10,6 +10,9 @@
  * - Volume-based activity detection
  * - Rolling text buffer with word animations
  * - Mock mode fallback when ONNX is unavailable
+ * 
+ * OPTIMIZATION: State updates are throttled to prevent rapid re-renders
+ * when AI fires transcript tokens at high frequency.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -64,6 +67,45 @@ export interface UseLiveCaptionsReturn {
 
 const MAX_BUFFER_CHARS = 200;
 const MAX_WORDS = 30; // Keep for animation
+const STATE_UPDATE_THROTTLE_MS = 100; // Max 10 state updates per second
+
+// ============================================================================
+// THROTTLE UTILITY
+// ============================================================================
+
+/**
+ * Creates a throttled function that only calls the callback at most once per interval
+ */
+function createThrottledUpdater<T>(
+  setter: React.Dispatch<React.SetStateAction<T>>,
+  intervalMs: number
+): (value: T | ((prev: T) => T)) => void {
+  let lastUpdate = 0;
+  let pendingValue: T | ((prev: T) => T) | null = null;
+  let timeoutId: NodeJS.Timeout | null = null;
+
+  return (value: T | ((prev: T) => T)) => {
+    const now = Date.now();
+    
+    if (now - lastUpdate >= intervalMs) {
+      lastUpdate = now;
+      setter(value);
+    } else {
+      pendingValue = value;
+      
+      if (!timeoutId) {
+        timeoutId = setTimeout(() => {
+          if (pendingValue !== null) {
+            lastUpdate = Date.now();
+            setter(pendingValue);
+            pendingValue = null;
+          }
+          timeoutId = null;
+        }, intervalMs - (now - lastUpdate));
+      }
+    }
+  };
+}
 
 // ============================================================================
 // HOOK
@@ -81,6 +123,15 @@ export const useLiveCaptions = (): UseLiveCaptionsReturn => {
   // Buffer ref for managing rolling text
   const bufferRef = useRef<string[]>([]);
   
+  // OPTIMIZATION: Create throttled state updaters to prevent rapid re-renders
+  // These are stored in refs to maintain stable references
+  const throttledSetCaptionText = useRef(
+    createThrottledUpdater(setCaptionText, STATE_UPDATE_THROTTLE_MS)
+  ).current;
+  const throttledSetWords = useRef(
+    createThrottledUpdater(setWords, STATE_UPDATE_THROTTLE_MS)
+  ).current;
+  
   // Use the audio stream hook
   const audioStream = useAudioStream({
     sampleRate: 16000,
@@ -89,7 +140,7 @@ export const useLiveCaptions = (): UseLiveCaptionsReturn => {
   });
   
   /**
-   * Add a word to the rolling buffer
+   * Add a word to the rolling buffer (uses throttled state updates)
    */
   const addWordToBuffer = useCallback((word: string, wordConfidence: number = 0.9) => {
     if (!word.trim()) return;
@@ -106,8 +157,8 @@ export const useLiveCaptions = (): UseLiveCaptionsReturn => {
       fullText = bufferRef.current.join(' ');
     }
     
-    // Update caption text
-    setCaptionText(fullText);
+    // Update caption text (THROTTLED - max 10 updates/second)
+    throttledSetCaptionText(fullText);
     
     // Create animated word entry
     const newWord: CaptionWord = {
@@ -116,9 +167,10 @@ export const useLiveCaptions = (): UseLiveCaptionsReturn => {
       id: `word-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     };
     
-    setWords(prev => [...prev.slice(-MAX_WORDS), newWord]);
+    // Update words array (THROTTLED - max 10 updates/second)
+    throttledSetWords(prev => [...prev.slice(-MAX_WORDS), newWord]);
     
-    // Update confidence with the word's confidence
+    // Update confidence with the word's confidence (not throttled - infrequent)
     setConfidence(wordConfidence);
     
     // Brief "processing" flash
@@ -128,7 +180,7 @@ export const useLiveCaptions = (): UseLiveCaptionsReturn => {
         setStatus('listening');
       }
     }, 100);
-  }, [audioStream.isPaused]);
+  }, [audioStream.isPaused, throttledSetCaptionText, throttledSetWords]);
   
   /**
    * Handle transcription results from SpeechModelService
