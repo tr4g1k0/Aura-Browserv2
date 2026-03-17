@@ -255,6 +255,57 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
           />
         </TouchableOpacity>
 
+        {/* Toolbar Shortcuts - Conditionally rendered based on settings */}
+        {settings.toolbarShortcuts?.showLiveCaptioning && (
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              onAccessibilityPress();
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="mic" size={18} color="#00FF88" />
+          </TouchableOpacity>
+        )}
+
+        {settings.toolbarShortcuts?.showAIAgent && (
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              // AI Agent action
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="sparkles" size={18} color="#FFD700" />
+          </TouchableOpacity>
+        )}
+
+        {settings.toolbarShortcuts?.showVPNToggle && (
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              // VPN toggle action - toggle via store
+              useVPNStore.getState().toggle();
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={vpnConnected ? "shield" : "shield-outline"} 
+              size={18} 
+              color={vpnConnected ? "#00E5FF" : "#888"} 
+            />
+          </TouchableOpacity>
+        )}
+
+        {settings.toolbarShortcuts?.showAdBlockStatus && (
+          <View style={styles.iconButton}>
+            <Ionicons name="ban" size={16} color={browserSettings.adblockEnabled ? "#FF6B6B" : "#555"} />
+          </View>
+        )}
+
         {/* Tab Counter Button */}
         <TouchableOpacity
           style={styles.iconButton}
