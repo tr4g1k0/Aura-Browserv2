@@ -76,7 +76,7 @@ export default function BrowserScreen() {
     getActiveTabDesktopMode,
   } = useBrowserStore();
 
-  // Access user settings for search engine preference
+  // Access user settings for search engine preference and other settings
   const { settings: userSettings } = useSettings();
 
   // Get active tabs based on Ghost Mode
@@ -112,6 +112,10 @@ export default function BrowserScreen() {
   const previousTabIdRef = useRef<string | null>(null);
 
   const activeTab = currentTabs.find((t) => t.isActive) || currentTabs[0];
+
+  // Generate a unique key for the WebView to force remount when critical settings change
+  // This ensures incognito mode and desktop mode take effect immediately
+  const webViewKey = `webview-${activeTab?.id || 'none'}-${activeTab?.isDesktopMode ? 'desktop' : 'mobile'}-${isGhostMode ? 'ghost' : 'normal'}-${userSettings.doNotTrack ? 'dnt' : 'nodnt'}`;
 
   // Check if we should show the New Tab Page
   const isNewTabPage = !activeTab?.url || 
@@ -598,7 +602,11 @@ export default function BrowserScreen() {
   }, [userSettings.aggressiveAdBlocking, visionAISelectors, vpnScript]);
 
   return (
-    <View style={styles.container}>
+    <View style={[
+      styles.container, 
+      // Address Bar Position: Use column-reverse when position is 'bottom'
+      userSettings.addressBarPosition === 'bottom' && styles.containerBottomBar
+    ]}>
       {/* Unified Top Bar - Single sleek row with all controls */}
       <UnifiedTopBar
         onNavigate={handleNavigate}
@@ -675,6 +683,7 @@ export default function BrowserScreen() {
               }
             >
               <WebView
+                key={webViewKey}
                 ref={webViewRef}
                 source={
                   // Zero-Load: Use cached HTML if available, otherwise use URI
@@ -706,10 +715,11 @@ export default function BrowserScreen() {
                 setBuiltInZoomControls={false}   // Hide Android zoom controls
                 setDisplayZoomControls={false}   // Ensure zoom controls are hidden
                 scalesPageToFit={true}
-                cacheEnabled={!isGhostMode}      // Disable caching in Ghost Mode
-                incognito={isGhostMode || settings.vpnEnabled} // Ghost Mode = no cookies/local data
-                // Desktop Mode: Use desktop user agent if enabled
-                userAgent={activeTab?.isDesktopMode ? DESKTOP_USER_AGENT : undefined}
+                // SETTINGS-DRIVEN PROPS (observed from global settings)
+                cacheEnabled={!isGhostMode && !userSettings.doNotTrack}
+                incognito={isGhostMode || userSettings.alwaysOnVPN}
+                // Desktop Mode: Use desktop user agent if enabled (per-tab or global default)
+                userAgent={activeTab?.isDesktopMode || userSettings.requestDesktopSite ? DESKTOP_USER_AGENT : undefined}
                 // HARDWARE ACCELERATION & SMOOTH SCROLLING
                 // Android: Enable GPU rendering for smooth scrolling
                 androidHardwareAccelerationDisabled={false}
@@ -783,6 +793,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0D0D0D',
+    flexDirection: 'column',
+  },
+  containerBottomBar: {
+    flexDirection: 'column-reverse',
   },
   webviewContainer: {
     flex: 1,
