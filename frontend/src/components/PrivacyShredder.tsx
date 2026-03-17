@@ -43,6 +43,7 @@ interface PrivacyShredderProps {
   visible: boolean;
   onClose: () => void;
   webViewRef?: React.RefObject<any>;
+  onShredComplete?: () => void; // Callback to reset browser to home and show toast
 }
 
 /**
@@ -53,6 +54,7 @@ interface PrivacyShredderProps {
  * - Targeted shredding toggles (History, Cookies, Cache)
  * - "INCINERATE ALL" panic button with long-press
  * - Fire/pixelate animation on deletion
+ * - Auto-navigation to Home Screen after deletion (like Chrome)
  * 
  * This is faster and more intuitive than Chrome or Firefox.
  */
@@ -60,9 +62,10 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
   visible,
   onClose,
   webViewRef,
+  onShredComplete,
 }) => {
   const insets = useSafeAreaInsets();
-  const { clearHistory, clearBookmarks, clearCachedPages } = useBrowserStore();
+  const { clearHistory } = useBrowserStore();
 
   // State
   const [timelineIndex, setTimelineIndex] = useState(4); // Default: Beginning of Time
@@ -237,12 +240,21 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
       useNativeDriver: true,
     }).start();
     
+    // Final long haptic vibration - signals "Nuclear" wipe is complete
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     setTimeout(() => {
       setShowSuccess(false);
       successAnim.setValue(0);
+      
+      // Close the modal
       onClose();
+      
+      // Trigger navigation reset and toast callback
+      // This navigates back to Home Screen like Chrome does
+      if (onShredComplete) {
+        onShredComplete();
+      }
     }, 1500);
   };
 
@@ -259,9 +271,6 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
         if (selectedTimeline.minutes === Infinity) {
           clearHistory();
         } else {
-          // Partial clear based on timeline
-          const state = useBrowserStore.getState();
-          const newHistory = state.history.filter(h => h.timestamp < cutoffTime);
           // For now, clear all (partial clear would need store update)
           clearHistory();
         }
@@ -284,7 +293,8 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
 
       // Clear Cache
       if (targets.find(t => t.id === 'cache')?.enabled) {
-        clearCachedPages();
+        // Call clearCachedPages via getState()
+        useBrowserStore.getState().clearCachedPages();
         
         // Clear WebView cache
         if (webViewRef?.current && Platform.OS !== 'web') {
@@ -298,6 +308,12 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
           await AsyncStorage.multiRemove(cacheKeys);
         }
         console.log('[Privacy Shredder] Cache cleared');
+      }
+
+      // Stop current page processes immediately
+      if (webViewRef?.current) {
+        webViewRef.current.injectJavaScript('window.location.href = "about:blank"; true;');
+        console.log('[Privacy Shredder] WebView reset to about:blank');
       }
 
       return true;

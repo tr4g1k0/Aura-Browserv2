@@ -188,6 +188,29 @@ export default function SettingsScreen() {
     setShowPrivacyShredder(true);
   };
 
+  /**
+   * Handle Privacy Shredder completion
+   * Navigates back to Home Screen (like Chrome) and shows a toast
+   */
+  const handleShredComplete = () => {
+    // Show success toast
+    useBrowserStore.getState().showToast('Privacy Shredded. You are on a clean slate.');
+    
+    // Close settings and navigate to home
+    router.replace('/');
+    
+    // Reset the active tab to New Tab page
+    const tabs = useBrowserStore.getState().tabs;
+    if (tabs.length > 0) {
+      useBrowserStore.getState().updateTab(tabs[0].id, { 
+        url: 'about:newtab', 
+        title: 'New Tab' 
+      });
+    }
+    
+    console.log('[Privacy Shredder] Navigation reset complete');
+  };
+
   // ============================================================================
   // CLEAR BROWSING DATA - Legacy (kept for backwards compatibility)
   // ============================================================================
@@ -561,6 +584,7 @@ export default function SettingsScreen() {
       <PrivacyShredder
         visible={showPrivacyShredder}
         onClose={() => setShowPrivacyShredder(false)}
+        onShredComplete={handleShredComplete}
       />
 
       {/* ================================================================== */}

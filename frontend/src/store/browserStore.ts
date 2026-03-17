@@ -117,6 +117,10 @@ interface BrowserState {
   isGhostMode: boolean;  // Ghost Mode (Incognito) flag
   // TTS (Text-to-Speech) state
   ttsRate: number;       // Speech rate (0.8, 1.0, 1.25, 1.5, 2.0)
+  // Toast message state (for Privacy Shredder confirmation)
+  toastMessage: string | null;
+  showToast: (message: string) => void;
+  hideToast: () => void;
   
   // Actions
   addTab: (url?: string) => void;
@@ -147,6 +151,8 @@ interface BrowserState {
   removeBookmark: (url: string) => void;
   isBookmarked: (url: string) => boolean;
   toggleBookmark: (url: string, title: string, favicon?: string) => void;
+  // Cache actions
+  clearCachedPages: () => void;
   // Ghost Mode actions
   toggleGhostMode: () => void;
   setGhostMode: (enabled: boolean) => void;
@@ -202,6 +208,21 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
   ttsRate: 1.0,  // Default speech rate
   isGhostMode: false,
   ghostTabs: [],
+  // Toast state (for Privacy Shredder confirmation)
+  toastMessage: null,
+
+  // Toast actions
+  showToast: (message: string) => {
+    set({ toastMessage: message });
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+      set({ toastMessage: null });
+    }, 3000);
+  },
+
+  hideToast: () => {
+    set({ toastMessage: null });
+  },
 
   addTab: (url = DEFAULT_URL) => {
     const newTab: Tab = {
@@ -419,6 +440,13 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
       return cached;
     }
     return undefined;
+  },
+
+  // Clear all cached pages (used by Privacy Shredder)
+  clearCachedPages: () => {
+    set({ cachedPages: [] });
+    get().persistState();
+    console.log('[BrowserStore] Cached pages cleared');
   },
 
   addAmbientAlert: (alert) => {
