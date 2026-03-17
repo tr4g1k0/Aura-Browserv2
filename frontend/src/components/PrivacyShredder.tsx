@@ -258,8 +258,12 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
     }, 1500);
   };
 
+  // HOME URL constant for navigation reset
+  const HOME_URL = 'about:newtab';
+
   // Actual deletion logic - Safe WebView-based approach
   // NO external cookie libraries - uses native WebView methods only
+  // Includes HARD navigation reset to Home Screen
   const performDeletion = async () => {
     try {
       const selectedTimeline = TIMELINE_OPTIONS[timelineIndex];
@@ -268,7 +272,19 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
       if (targets.find(t => t.id === 'history')?.enabled) {
         try {
           clearHistory();
-          console.log('[Privacy Shredder] History cleared');
+          
+          // Also reset the current tab's navigation history in the store
+          const tabs = useBrowserStore.getState().tabs;
+          if (tabs.length > 0) {
+            // Clear the tab's history by resetting to home
+            useBrowserStore.getState().updateTab(tabs[0].id, {
+              url: HOME_URL,
+              title: 'New Tab',
+              canGoBack: false,
+              canGoForward: false,
+            });
+          }
+          console.log('[Privacy Shredder] History cleared + Tab history reset');
         } catch (e) {
           console.warn('[Privacy Shredder] History clear warning:', e);
         }
@@ -319,7 +335,7 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
             // clearCache(true) clears both disk and memory cache
             webViewRef.current.clearCache?.(true);
             
-            // clearHistory() clears navigation history
+            // clearHistory() clears WebView navigation history
             webViewRef.current.clearHistory?.();
           }
           
@@ -339,13 +355,51 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
         }
       }
 
-      // Final: Reset WebView to blank page
+      // ================================================================
+      // HARD NAVIGATION RESET - Force redirect to Home Screen
+      // ================================================================
+      
+      // Step 1: "Nuclear" about:blank - breaks any 'unload' listeners
+      // the previous website might be using to stay alive
       if (webViewRef?.current) {
         try {
           webViewRef.current.injectJavaScript('window.location.href = "about:blank"; true;');
-          console.log('[Privacy Shredder] WebView reset to about:blank');
+          console.log('[Privacy Shredder] Step 1: WebView reset to about:blank');
         } catch (e) {
-          console.warn('[Privacy Shredder] WebView reset warning:', e);
+          console.warn('[Privacy Shredder] about:blank warning:', e);
+        }
+      }
+
+      // Step 2: Wait 100ms for about:blank to load, then redirect to Home
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Step 3: Direct state update - set browser URL to HOME
+      try {
+        const tabs = useBrowserStore.getState().tabs;
+        if (tabs.length > 0) {
+          useBrowserStore.getState().updateTab(tabs[0].id, {
+            url: HOME_URL,
+            title: 'New Tab',
+            canGoBack: false,
+            canGoForward: false,
+          });
+        }
+        console.log('[Privacy Shredder] Step 2: Browser state updated to HOME_URL');
+      } catch (e) {
+        console.warn('[Privacy Shredder] State update warning:', e);
+      }
+
+      // Step 4: Force WebView to load home page (belt and suspenders)
+      if (webViewRef?.current) {
+        try {
+          // Give about:blank a moment to settle
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          // Force navigation to home
+          webViewRef.current.injectJavaScript(`window.location.href = "${HOME_URL}"; true;`);
+          console.log('[Privacy Shredder] Step 3: WebView force navigated to HOME_URL');
+        } catch (e) {
+          console.warn('[Privacy Shredder] WebView navigate warning:', e);
         }
       }
 
