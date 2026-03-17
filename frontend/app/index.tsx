@@ -12,6 +12,7 @@ import { useBrowserStore } from '../src/store/browserStore';
 import { useSettings } from '../src/context/SettingsContext';
 import { UnifiedTopBar } from '../src/components/UnifiedTopBar';
 import { NewTabPage } from '../src/components/NewTabPage';
+import { SwipeNavigationWrapper } from '../src/components/SwipeNavigationWrapper';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
@@ -323,31 +324,39 @@ export default function BrowserScreen() {
             onSearch={handleNavigate}
           />
         ) : activeTab && WebView ? (
-          <WebView
-            ref={webViewRef}
-            source={
-              // Zero-Load: Use cached HTML if available, otherwise use URI
-              cachedPageSource && isCacheHit
-                ? { html: cachedPageSource.html, baseUrl: cachedPageSource.baseUrl }
-                : { uri: activeTab.url }
-            }
-            style={styles.webview}
-            onNavigationStateChange={handleNavigationStateChange}
-            onShouldStartLoadWithRequest={handleShouldStartLoad}
-            onLoadStart={() => setLoading(true)}
-            onLoadEnd={handleLoadEnd}
-            onMessage={handleMessage}
-            injectedJavaScript={getInjectedScript()}
-            javaScriptEnabled
-            domStorageEnabled
-            startInLoadingState
-            allowsBackForwardNavigationGestures
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            pullToRefreshEnabled
-            cacheEnabled
-            incognito={settings.vpnEnabled} // Enhanced privacy when VPN is on
-          />
+          <SwipeNavigationWrapper
+            canGoBack={activeTab?.canGoBack || false}
+            canGoForward={activeTab?.canGoForward || false}
+            onGoBack={() => webViewRef.current?.goBack()}
+            onGoForward={() => webViewRef.current?.goForward()}
+            enabled={Platform.OS === 'android'}
+          >
+            <WebView
+              ref={webViewRef}
+              source={
+                // Zero-Load: Use cached HTML if available, otherwise use URI
+                cachedPageSource && isCacheHit
+                  ? { html: cachedPageSource.html, baseUrl: cachedPageSource.baseUrl }
+                  : { uri: activeTab.url }
+              }
+              style={styles.webview}
+              onNavigationStateChange={handleNavigationStateChange}
+              onShouldStartLoadWithRequest={handleShouldStartLoad}
+              onLoadStart={() => setLoading(true)}
+              onLoadEnd={handleLoadEnd}
+              onMessage={handleMessage}
+              injectedJavaScript={getInjectedScript()}
+              javaScriptEnabled
+              domStorageEnabled
+              startInLoadingState
+              allowsBackForwardNavigationGestures
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              pullToRefreshEnabled
+              cacheEnabled
+              incognito={settings.vpnEnabled} // Enhanced privacy when VPN is on
+            />
+          </SwipeNavigationWrapper>
         ) : null}
 
         {/* Cache Hit Indicator - shows when page loaded from cache */}
