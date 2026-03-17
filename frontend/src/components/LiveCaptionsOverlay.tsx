@@ -1,5 +1,15 @@
-// Live Captions Overlay Component
-// Displays streaming captions with smooth animations
+/**
+ * Live Captions Overlay Component
+ * 
+ * Displays streaming captions with smooth animations, volume indicator,
+ * and real-time feedback for audio capture and ONNX processing.
+ * 
+ * Visual States:
+ * - Idle: Gray indicator, dormant
+ * - Listening: Green pulsing indicator when recording
+ * - Processing: Yellow flash when processing audio chunks
+ * - Paused: Red indicator, mic muted
+ */
 
 import React, { useEffect, useRef } from 'react';
 import {
@@ -9,6 +19,8 @@ import {
   Animated,
   TouchableOpacity,
   ScrollView,
+  Platform,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLiveCaptions, CaptionWord } from '../hooks/useLiveCaptions';
@@ -34,11 +46,21 @@ export const LiveCaptionsOverlay: React.FC<LiveCaptionsOverlayProps> = ({
     clear,
     status,
     confidence,
+    volumeLevel,
+    isMockMode,
+    hasPermission,
+    error,
   } = useLiveCaptions();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Volume indicator animation
+  const volumeAnim = useRef(new Animated.Value(0)).current;
+  
+  // Pulse animation for status dot
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Animate in/out
   useEffect(() => {
@@ -76,6 +98,45 @@ export const LiveCaptionsOverlay: React.FC<LiveCaptionsOverlayProps> = ({
       });
     }
   }, [visible]);
+  
+  // Update volume animation
+  useEffect(() => {
+    Animated.timing(volumeAnim, {
+      toValue: volumeLevel,
+      duration: 100,
+      useNativeDriver: false, // width can't use native driver
+    }).start();
+  }, [volumeLevel]);
+  
+  // Pulse animation for listening state
+  useEffect(() => {
+    if (status === 'listening' && isActive && !isPaused) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.3,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      
+      return () => {
+        pulse.stop();
+        pulseAnim.setValue(1);
+      };
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [status, isActive, isPaused]);
 
   // Auto-scroll to end when new words arrive
   useEffect(() => {
@@ -127,11 +188,14 @@ export const LiveCaptionsOverlay: React.FC<LiveCaptionsOverlayProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.statusContainer}>
+          {/* Animated status dot */}
           <Animated.View
             style={[
               styles.statusDot,
-              { backgroundColor: getStatusColor() },
-              status === 'listening' && styles.pulseDot,
+              { 
+                backgroundColor: getStatusColor(),
+                transform: [{ scale: status === 'listening' ? pulseAnim : 1 }],
+              },
             ]}
           />
           <Text style={[styles.statusText, { color: getStatusColor() }]}>
@@ -141,6 +205,11 @@ export const LiveCaptionsOverlay: React.FC<LiveCaptionsOverlayProps> = ({
             <Text style={styles.confidenceText}>
               {Math.round(confidence * 100)}%
             </Text>
+          )}
+          {isMockMode && (
+            <View style={styles.mockBadge}>
+              <Text style={styles.mockBadgeText}>MOCK</Text>
+            </View>
           )}
         </View>
 
@@ -169,6 +238,33 @@ export const LiveCaptionsOverlay: React.FC<LiveCaptionsOverlayProps> = ({
           </TouchableOpacity>
         </View>
       </View>
+      
+      {/* Volume Indicator Bar */}
+      {isActive && !isPaused && (
+        <View style={styles.volumeContainer}>
+          <Animated.View 
+            style={[
+              styles.volumeBar,
+              {
+                width: volumeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+                backgroundColor: volumeLevel > 0.3 ? '#00FF88' : '#444',
+              },
+            ]}
+          />
+          <View style={styles.volumeThreshold} />
+        </View>
+      )}
+      
+      {/* Error Message */}
+      {error && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning" size={14} color="#FF6B6B" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
 
       {/* Caption Text */}
       <ScrollView
@@ -180,7 +276,12 @@ export const LiveCaptionsOverlay: React.FC<LiveCaptionsOverlayProps> = ({
         <Text style={styles.captionText}>
           {captionText || (
             <Text style={styles.placeholderText}>
-              {isPaused ? 'Mic muted. Tap to resume.' : 'Listening for audio...'}
+              {error 
+                ? 'Grant microphone permission to enable captions'
+                : isPaused 
+                  ? 'Mic muted. Tap to resume.' 
+                  : 'Listening for audio...'
+              }
             </Text>
           )}
           {/* Blinking cursor */}
@@ -196,6 +297,34 @@ export const LiveCaptionsOverlay: React.FC<LiveCaptionsOverlayProps> = ({
           <AnimatedWord word={words[words.length - 1]} />
         </View>
       )}
+      
+      {/* Live indicator */}
+      <View style={styles.footer}>
+        <View style={styles.liveIndicator}>
+          <Animated.View 
+            style={[
+              styles.liveDot,
+              { 
+                opacity: status === 'listening' ? pulseAnim.interpolate({
+                  inputRange: [1, 1.3],
+                  outputRange: [1, 0.5],
+                }) : 0.3,
+              }
+            ]} 
+          />
+          <Text style={[
+            styles.liveText,
+            { color: isActive && !isPaused ? '#00FF88' : '#666' }
+          ]}>
+            {isActive && !isPaused ? 'LIVE' : 'OFFLINE'}
+          </Text>
+        </View>
+        {isMockMode && (
+          <Text style={styles.mockInfoText}>
+            Real STT requires native build
+          </Text>
+        )}
+      </View>
     </Animated.View>
   );
 };
@@ -283,14 +412,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.95)',
     borderRadius: 16,
     padding: 12,
-    maxHeight: 180,
+    maxHeight: 220,
     borderWidth: 1,
     borderColor: '#00FF88',
-    shadowColor: '#00FF88',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#00FF88',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   header: {
     flexDirection: 'row',
@@ -311,9 +446,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: 8,
   },
-  pulseDot: {
-    // Pulse animation handled via Animated
-  },
   statusText: {
     fontSize: 11,
     fontWeight: '600',
@@ -324,6 +456,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#666',
     marginLeft: 8,
+  },
+  mockBadge: {
+    backgroundColor: 'rgba(255, 184, 0, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  mockBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FFB800',
+    letterSpacing: 0.5,
   },
   controls: {
     flexDirection: 'row',
@@ -349,8 +494,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Volume indicator
+  volumeContainer: {
+    height: 4,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 2,
+    marginBottom: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  volumeBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  volumeThreshold: {
+    position: 'absolute',
+    left: '10%',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: '#666',
+  },
+  // Error
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 11,
+    color: '#FF6B6B',
+    marginLeft: 6,
+  },
   captionScroll: {
-    maxHeight: 100,
+    maxHeight: 80,
   },
   captionContent: {
     paddingVertical: 4,
@@ -383,5 +564,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#00FF88',
     fontWeight: '600',
+  },
+  // Footer
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#1A1A1A',
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FF4444',
+    marginRight: 6,
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  mockInfoText: {
+    fontSize: 9,
+    color: '#666',
+    fontStyle: 'italic',
   },
 });

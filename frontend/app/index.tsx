@@ -6,6 +6,8 @@ import {
   Platform,
   BackHandler,
   Text,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,6 +60,9 @@ export default function BrowserScreen() {
   const [visionAISelectors, setVisionAISelectors] = useState<string[]>([]);
   const [adsBlocked, setAdsBlocked] = useState(0);
 
+  // Animation for Live Captions FAB pulse when active
+  const captionsPulseAnim = useRef(new Animated.Value(1)).current;
+
   const activeTab = tabs.find((t) => t.isActive) || tabs[0];
 
   // Load persisted state on mount
@@ -73,6 +78,36 @@ export default function BrowserScreen() {
     const selectors = await visionAIScannerPlaceholder('');
     setVisionAISelectors(selectors);
   };
+
+  // Pulse animation for Live Captions FAB when active
+  useEffect(() => {
+    if (liveCaptionsVisible) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(captionsPulseAnim, {
+            toValue: 1.1,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(captionsPulseAnim, {
+            toValue: 1,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      
+      return () => {
+        pulse.stop();
+        captionsPulseAnim.setValue(1);
+      };
+    } else {
+      captionsPulseAnim.setValue(1);
+    }
+  }, [liveCaptionsVisible]);
 
   // Handle Android back button
   useEffect(() => {
@@ -315,24 +350,29 @@ export default function BrowserScreen() {
           <Ionicons name="sparkles" size={24} color="#0D0D0D" />
         </TouchableOpacity>
 
-        {/* Live Captions Toggle Button */}
-        <TouchableOpacity
+        {/* Live Captions Toggle Button - Pulses when active */}
+        <Animated.View
           style={[
             styles.captionsToggleButton,
             liveCaptionsVisible && styles.captionsToggleActive,
+            { transform: [{ scale: captionsPulseAnim }] },
           ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setLiveCaptionsVisible(!liveCaptionsVisible);
-          }}
-          activeOpacity={0.8}
         >
-          <Ionicons 
-            name="text" 
-            size={20} 
-            color={liveCaptionsVisible ? '#0D0D0D' : '#00FF88'} 
-          />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.captionsToggleInner}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setLiveCaptionsVisible(!liveCaptionsVisible);
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons 
+              name="text" 
+              size={20} 
+              color={liveCaptionsVisible ? '#0D0D0D' : '#00FF88'} 
+            />
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* Accessibility Overlays */}
         <LiveCaptionsOverlay
@@ -511,6 +551,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     borderWidth: 2,
     borderColor: '#00FF88',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captionsToggleInner: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
