@@ -16,7 +16,14 @@ import { NavigationBar } from '../src/components/NavigationBar';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
-import { shouldBlockRequest, getAdBlockCSS, visionAIScannerPlaceholder } from '../src/utils/adblock';
+import { 
+  isAdOrTracker, 
+  adBusterScript, 
+  createAdBusterScript,
+  recordBlockedRequest,
+  getBlockStats,
+  visionAIScannerPlaceholder 
+} from '../src/utils/adblock';
 import { parseUrlInput, getDisplayHostname } from '../src/utils/urlParser';
 import * as Haptics from 'expo-haptics';
 
@@ -48,19 +55,23 @@ export default function BrowserScreen() {
 
   const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
   const [liveCaptionsVisible, setLiveCaptionsVisible] = useState(false);
-  const [adBlockCSS, setAdBlockCSS] = useState('');
+  const [visionAISelectors, setVisionAISelectors] = useState<string[]>([]);
+  const [adsBlocked, setAdsBlocked] = useState(0);
 
   const activeTab = tabs.find((t) => t.isActive) || tabs[0];
 
   // Load persisted state on mount
   useEffect(() => {
     loadPersistedState();
-    initAdBlockCSS();
+    initVisionAISelectors();
   }, []);
 
-  const initAdBlockCSS = async () => {
+  // Initialize Vision AI selectors for future dynamic ad detection
+  const initVisionAISelectors = async () => {
+    // Placeholder for Vision AI integration
+    // When ONNX model is available, this will fetch dynamic selectors
     const selectors = await visionAIScannerPlaceholder('');
-    setAdBlockCSS(getAdBlockCSS(selectors));
+    setVisionAISelectors(selectors);
   };
 
   // Handle Android back button
@@ -105,31 +116,42 @@ export default function BrowserScreen() {
     setLoading(navState.loading || false);
   }, [activeTab, updateTab, setLoading]);
 
+  /**
+   * Layer 1: Network Interception
+   * Blocks ad/tracker requests at the network level before content loads
+   * Respects the 'Aggressive Ad & Tracker Blocking' setting from useBrowserSettings
+   */
   const handleShouldStartLoad = useCallback((event: any): boolean => {
     const { url } = event;
     
-    // Ad blocking
-    if (settings.adblockEnabled && shouldBlockRequest(url)) {
-      console.log('Blocked:', url);
+    // Check if Aggressive Ad Blocking is enabled in user settings
+    if (userSettings.aggressiveAdBlocking && isAdOrTracker(url)) {
+      console.log('[Smart Shield] Blocked:', url);
+      recordBlockedRequest(url);
+      setAdsBlocked(prev => prev + 1);
       return false;
     }
     
     return true;
-  }, [settings.adblockEnabled]);
+  }, [userSettings.aggressiveAdBlocking]);
 
+  /**
+   * Layer 2: DOM Injection
+   * Injects the adBusterScript to hide ad elements via CSS
+   * Also handles predictive caching
+   */
   const handleLoadEnd = useCallback(() => {
     setLoading(false);
     
-    // Inject ad-block CSS if enabled
-    if (settings.adblockEnabled && adBlockCSS) {
-      webViewRef.current?.injectJavaScript(`
-        (function() {
-          var style = document.createElement('style');
-          style.textContent = \`${adBlockCSS}\`;
-          document.head.appendChild(style);
-        })();
-        true;
-      `);
+    // Inject Smart Shield ad-buster script if ad blocking is enabled
+    // This is Layer 2: DOM-based element hiding
+    if (userSettings.aggressiveAdBlocking) {
+      // Generate script with any additional Vision AI selectors
+      const script = visionAISelectors.length > 0 
+        ? createAdBusterScript(visionAISelectors)
+        : adBusterScript;
+      
+      webViewRef.current?.injectJavaScript(script);
     }
 
     // Extract page content for predictive caching
@@ -145,7 +167,7 @@ export default function BrowserScreen() {
         true;
       `);
     }
-  }, [settings.adblockEnabled, settings.predictiveCachingEnabled, adBlockCSS]);
+  }, [userSettings.aggressiveAdBlocking, settings.predictiveCachingEnabled, visionAISelectors]);
 
   const handleMessage = useCallback((event: any) => {
     try {
@@ -187,6 +209,30 @@ export default function BrowserScreen() {
     })();
     true;
   ` : '';
+
+  /**
+   * Combined injection script for WebView
+   * Includes Smart Shield ad-buster (Layer 2) and VPN indicator
+   * 
+   * ARCHITECTURE NOTE: This is the injection pipeline that will be extended
+   * when ONNX Vision VLM is integrated. The Vision model will dynamically
+   * identify coordinates of sponsored content and add custom selectors here.
+   */
+  const getInjectedScript = useCallback(() => {
+    let scripts = '';
+    
+    // Add Smart Shield ad-buster script if enabled
+    if (userSettings.aggressiveAdBlocking) {
+      scripts += visionAISelectors.length > 0 
+        ? createAdBusterScript(visionAISelectors)
+        : adBusterScript;
+    }
+    
+    // Add VPN indicator script
+    scripts += vpnScript;
+    
+    return scripts || 'true;';
+  }, [userSettings.aggressiveAdBlocking, visionAISelectors, vpnScript]);
 
   return (
     <View style={styles.container}>
@@ -247,7 +293,7 @@ export default function BrowserScreen() {
             onLoadStart={() => setLoading(true)}
             onLoadEnd={handleLoadEnd}
             onMessage={handleMessage}
-            injectedJavaScript={vpnScript}
+            injectedJavaScript={getInjectedScript()}
             javaScriptEnabled
             domStorageEnabled
             startInLoadingState
