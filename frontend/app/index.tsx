@@ -15,9 +15,11 @@ import { useSettings } from '../src/context/SettingsContext';
 import { UnifiedTopBar } from '../src/components/UnifiedTopBar';
 import { NewTabPage } from '../src/components/NewTabPage';
 import { SwipeNavigationWrapper } from '../src/components/SwipeNavigationWrapper';
+import { DownloadToast, DownloadStatus } from '../src/components/DownloadToast';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
+import { downloadManager } from '../src/services/FileDownloadManager';
 import { 
   isAdOrTracker, 
   adBusterScript, 
@@ -65,6 +67,12 @@ export default function BrowserScreen() {
   const [visionAISelectors, setVisionAISelectors] = useState<string[]>([]);
   const [adsBlocked, setAdsBlocked] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Download Manager state
+  const [downloadToastVisible, setDownloadToastVisible] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState<DownloadStatus>(null);
+  const [downloadFilename, setDownloadFilename] = useState('');
+  const [downloadProgress, setDownloadProgress] = useState(0);
   
   // Zero-Load Predictive Caching state
   const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
@@ -166,12 +174,90 @@ export default function BrowserScreen() {
   }, [activeTab, updateTab, setLoading]);
 
   /**
+   * Check if URL should trigger a download (for Android interception)
+   */
+  const checkForDownload = useCallback((url: string): boolean => {
+    return downloadManager.isDownloadableUrl(url);
+  }, []);
+
+  /**
+   * File Download Handler
+   * Intercepts download URLs and uses FileDownloadManager to save and share files
+   */
+  const handleFileDownload = useCallback(async (downloadUrl: string) => {
+    console.log('[Browser] Download intercepted:', downloadUrl);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Only proceed on native platforms (file system not available on web)
+    if (Platform.OS === 'web') {
+      console.log('[Browser] Downloads not supported on web');
+      return false;
+    }
+
+    // Show download toast
+    setDownloadToastVisible(true);
+    setDownloadStatus('downloading');
+    setDownloadProgress(0);
+
+    // Download and share the file
+    await downloadManager.downloadAndShare(downloadUrl, (status, progress, filename, error) => {
+      if (filename) {
+        setDownloadFilename(filename);
+      }
+      
+      switch (status) {
+        case 'starting':
+          setDownloadStatus('downloading');
+          setDownloadProgress(0);
+          break;
+        case 'downloading':
+          setDownloadStatus('downloading');
+          setDownloadProgress(progress || 0);
+          break;
+        case 'complete':
+          setDownloadStatus('complete');
+          setDownloadProgress(100);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          break;
+        case 'error':
+          setDownloadStatus('error');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          console.error('[Browser] Download error:', error);
+          break;
+      }
+    });
+
+    return true;
+  }, []);
+
+  /**
+   * Dismiss download toast
+   */
+  const dismissDownloadToast = useCallback(() => {
+    setDownloadToastVisible(false);
+    // Reset state after animation
+    setTimeout(() => {
+      setDownloadStatus(null);
+      setDownloadFilename('');
+      setDownloadProgress(0);
+    }, 300);
+  }, []);
+
+  /**
    * Layer 1: Network Interception
    * Blocks ad/tracker requests at the network level before content loads
    * Respects the 'Aggressive Ad & Tracker Blocking' setting from useBrowserSettings
+   * Also intercepts download URLs on Android
    */
   const handleShouldStartLoad = useCallback((event: any): boolean => {
     const { url } = event;
+    
+    // Check for downloadable files (Android interception)
+    if (Platform.OS === 'android' && checkForDownload(url)) {
+      console.log('[Smart Shield] Download intercepted:', url);
+      handleFileDownload(url);
+      return false; // Prevent WebView from navigating
+    }
     
     // Check if Aggressive Ad Blocking is enabled in user settings
     if (userSettings.aggressiveAdBlocking && isAdOrTracker(url)) {
@@ -182,7 +268,7 @@ export default function BrowserScreen() {
     }
     
     return true;
-  }, [userSettings.aggressiveAdBlocking]);
+  }, [userSettings.aggressiveAdBlocking, checkForDownload, handleFileDownload]);
 
   /**
    * Layer 2: DOM Injection
@@ -381,6 +467,10 @@ export default function BrowserScreen() {
                 allowsBackForwardNavigationGestures
                 allowsInlineMediaPlayback
                 mediaPlaybackRequiresUserAction={false}
+                // iOS File Download Handler
+                onFileDownload={({ nativeEvent: { downloadUrl } }) => {
+                  handleFileDownload(downloadUrl);
+                }}
                 // Clean UI settings
                 setBuiltInZoomControls={false}   // Hide Android zoom controls
                 setDisplayZoomControls={false}   // Ensure zoom controls are hidden
@@ -406,6 +496,15 @@ export default function BrowserScreen() {
           onClose={() => setLiveCaptionsVisible(false)}
         />
         <AmbientAlerts />
+
+        {/* Download Toast Notification */}
+        <DownloadToast
+          visible={downloadToastVisible}
+          status={downloadStatus}
+          filename={downloadFilename}
+          progress={downloadProgress}
+          onDismiss={dismissDownloadToast}
+        />
       </View>
 
       {/* Chrome-style Navigation Bar - position based on settings */}
