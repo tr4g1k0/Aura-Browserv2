@@ -7,6 +7,7 @@ import {
   Text,
   ScrollView,
   RefreshControl,
+  Share,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,11 +17,13 @@ import { UnifiedTopBar } from '../src/components/UnifiedTopBar';
 import { NewTabPage } from '../src/components/NewTabPage';
 import { SwipeNavigationWrapper } from '../src/components/SwipeNavigationWrapper';
 import { DownloadToast, DownloadStatus } from '../src/components/DownloadToast';
+import { BrowserMenu } from '../src/components/BrowserMenu';
 import { LibraryScreen } from './library';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
 import { downloadManager } from '../src/services/FileDownloadManager';
+import { ttsService, contentExtractionScript } from '../src/services/TextToSpeechService';
 import { 
   isAdOrTracker, 
   adBusterScript, 
@@ -83,6 +86,12 @@ export default function BrowserScreen() {
   
   // Library (History & Bookmarks) modal state
   const [libraryVisible, setLibraryVisible] = useState(false);
+  
+  // Browser Menu (3-dot menu) state
+  const [menuVisible, setMenuVisible] = useState(false);
+  
+  // TTS (Text-to-Speech) state
+  const [isReading, setIsReading] = useState(false);
   
   // Zero-Load Predictive Caching state
   const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
@@ -350,10 +359,98 @@ export default function BrowserScreen() {
         console.log('[Zero-Load] Prefetching links:', data.links);
         predictiveCacheService.prefetchMultiple(data.links);
       }
+      
+      // Handle TTS content extraction response
+      if (data.type === 'TTS_CONTENT' && data.content) {
+        console.log(`[TTS] Received content from ${data.source}: ${data.length} chars`);
+        handleTTSContent(data.content);
+      }
+      
+      // Handle TTS extraction error
+      if (data.type === 'TTS_ERROR') {
+        console.error('[TTS] Content extraction error:', data.error);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     } catch (e) {
       // Ignore non-JSON messages
     }
   }, [addCachedPage]);
+
+  /**
+   * Handle TTS content - speak the extracted text
+   */
+  const handleTTSContent = useCallback((content: string) => {
+    if (!content || content.trim().length === 0) {
+      console.log('[TTS] No content to read');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
+    setIsReading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    ttsService.speak(content, {
+      pitch: 1.0,
+      rate: 1.0,
+      onStart: () => {
+        console.log('[TTS] Started reading');
+      },
+      onDone: () => {
+        console.log('[TTS] Finished reading');
+        setIsReading(false);
+      },
+      onStopped: () => {
+        console.log('[TTS] Reading stopped');
+        setIsReading(false);
+      },
+      onError: (error) => {
+        console.error('[TTS] Error:', error);
+        setIsReading(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      },
+    });
+  }, []);
+
+  /**
+   * Trigger Read Page Aloud - inject content extraction script
+   */
+  const handleReadAloud = useCallback(() => {
+    if (isNewTabPage) {
+      console.log('[TTS] Cannot read New Tab page');
+      return;
+    }
+    
+    console.log('[TTS] Injecting content extraction script');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    webViewRef.current?.injectJavaScript(contentExtractionScript);
+  }, [isNewTabPage]);
+
+  /**
+   * Stop TTS reading
+   */
+  const handleStopReading = useCallback(() => {
+    console.log('[TTS] Stopping reading');
+    ttsService.stop();
+    setIsReading(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  /**
+   * Share current page
+   */
+  const handleShare = useCallback(async () => {
+    if (!activeTab?.url) return;
+    
+    try {
+      await Share.share({
+        message: `${activeTab.title}\n${activeTab.url}`,
+        url: activeTab.url,
+        title: activeTab.title,
+      });
+    } catch (error) {
+      console.error('[Share] Error:', error);
+    }
+  }, [activeTab]);
 
   const openTabsManager = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -417,11 +514,28 @@ export default function BrowserScreen() {
       <UnifiedTopBar
         onNavigate={handleNavigate}
         onTabsPress={openTabsManager}
-        onSettingsPress={openSettings}
+        onSettingsPress={() => setMenuVisible(true)}
         onAccessibilityPress={() => setAccessibilityModalVisible(true)}
         onLibraryPress={() => setLibraryVisible(true)}
         currentUrl={activeTab?.url || ''}
         currentTitle={activeTab?.title || ''}
+      />
+
+      {/* Browser Menu (3-dot menu) */}
+      <BrowserMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        onReadAloud={handleReadAloud}
+        onStopReading={handleStopReading}
+        onSettings={openSettings}
+        onRefresh={() => webViewRef.current?.reload()}
+        onNewTab={() => {
+          useBrowserStore.getState().addTab();
+          setMenuVisible(false);
+        }}
+        onShare={handleShare}
+        isReading={isReading}
+        isGhostMode={isGhostMode}
       />
 
       <View style={styles.webviewContainer}>
