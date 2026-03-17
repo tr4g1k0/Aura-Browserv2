@@ -6,11 +6,23 @@ import {
   StyleSheet,
   Keyboard,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrowserStore } from '../store/browserStore';
+import { useVPNStore, useVPNConnection } from '../store/useVPNStore';
 import * as Haptics from 'expo-haptics';
+
+// VPN Status Colors
+const VPN_COLORS = {
+  disconnected: '#666666',
+  connecting: '#FFB800',
+  connected: '#00E5FF', // Electric Cyan as specified
+  disconnecting: '#FFB800',
+  error: '#FF4444',
+};
 
 interface NavigationBarProps {
   onNavigate: (url: string) => void;
@@ -23,6 +35,105 @@ interface NavigationBarProps {
   canGoBack: boolean;
   canGoForward: boolean;
 }
+
+/**
+ * VPN Status Indicator Component
+ * Shows animated globe icon based on VPN connection state
+ */
+const VPNIndicator: React.FC<{ onPress: () => void }> = ({ onPress }) => {
+  const { state, isConnected, isConnecting, isDisconnecting } = useVPNConnection();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  
+  // Initialize VPN store
+  useEffect(() => {
+    useVPNStore.getState().initialize();
+  }, []);
+  
+  // Pulse animation for connecting state
+  useEffect(() => {
+    if (isConnecting || isDisconnecting) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      
+      // Also add subtle rotation during connecting
+      const rotate = Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+      rotate.start();
+      
+      return () => {
+        pulse.stop();
+        rotate.stop();
+        pulseAnim.setValue(1);
+        rotateAnim.setValue(0);
+      };
+    } else {
+      pulseAnim.setValue(1);
+      rotateAnim.setValue(0);
+    }
+  }, [isConnecting, isDisconnecting]);
+  
+  const iconColor = VPN_COLORS[state] || VPN_COLORS.disconnected;
+  
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+  
+  return (
+    <TouchableOpacity
+      style={[
+        styles.vpnButton,
+        isConnected && styles.vpnButtonActive,
+      ]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onPress();
+      }}
+      activeOpacity={0.7}
+    >
+      <Animated.View
+        style={{
+          transform: [
+            { scale: pulseAnim },
+            { rotate: isConnecting ? spin : '0deg' },
+          ],
+        }}
+      >
+        <Ionicons 
+          name={isConnected ? 'shield-checkmark' : 'globe-outline'} 
+          size={20} 
+          color={iconColor} 
+        />
+      </Animated.View>
+      {/* Connection status dot */}
+      {isConnected && (
+        <View style={styles.vpnStatusDot} />
+      )}
+    </TouchableOpacity>
+  );
+};
 
 export const NavigationBar: React.FC<NavigationBarProps> = ({
   onNavigate,
@@ -37,6 +148,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { tabs, isLoading } = useBrowserStore();
+  const { toggle: toggleVPN, state: vpnState } = useVPNConnection();
   const [inputValue, setInputValue] = useState(currentUrl);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -62,6 +174,14 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   const handleButtonPress = (action: () => void) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     action();
+  };
+
+  const handleVPNPress = async () => {
+    try {
+      await toggleVPN();
+    } catch (error) {
+      console.log('[NavigationBar] VPN toggle error:', error);
+    }
   };
 
   const getDisplayUrl = () => {
@@ -129,6 +249,9 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
             </TouchableOpacity>
           )}
         </View>
+
+        {/* VPN Indicator */}
+        <VPNIndicator onPress={handleVPNPress} />
 
         <TouchableOpacity
           style={styles.controlButton}
@@ -207,6 +330,30 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     padding: 4,
+  },
+  // VPN Button styles
+  vpnButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1A1A1A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  vpnButtonActive: {
+    backgroundColor: 'rgba(0, 229, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.3)',
+  },
+  vpnStatusDot: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#00E5FF',
   },
   tabsButton: {
     width: 44,
