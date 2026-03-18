@@ -15,18 +15,15 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../src/context/SettingsContext';
-import { SearchEngine, CaptioningLanguage } from '../src/hooks/useBrowserSettings';
+import { CaptioningLanguage } from '../src/hooks/useBrowserSettings';
 import { useBrowserStore } from '../src/store/browserStore';
 import { PrivacyShredder } from '../src/components/PrivacyShredder';
 import * as Haptics from 'expo-haptics';
 
-const SEARCH_ENGINES: { value: SearchEngine; label: string; icon: string }[] = [
-  { value: 'google', label: 'Google', icon: 'logo-google' },
-  { value: 'duckduckgo', label: 'DuckDuckGo', icon: 'shield-checkmark' },
-  { value: 'bing', label: 'Bing', icon: 'search' },
-];
+// Electric Cyan - unified accent color
+const ELECTRIC_CYAN = '#00FFFF';
+const MUTED_GRAY = '#888888';
 
 const CAPTIONING_LANGUAGES: { value: CaptioningLanguage; label: string }[] = [
   { value: 'english', label: 'English' },
@@ -38,7 +35,7 @@ const CAPTIONING_LANGUAGES: { value: CaptioningLanguage; label: string }[] = [
 ];
 
 // ============================================================================
-// REUSABLE COMPONENTS
+// MINIMALIST COMPONENTS
 // ============================================================================
 
 interface SectionHeaderProps {
@@ -51,45 +48,40 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ title }) => (
 
 interface SettingsRowProps {
   icon: string;
-  iconColor?: string;
   title: string;
   subtitle?: string;
   value?: boolean;
   onToggle?: (value: boolean) => void;
   onPress?: () => void;
   rightElement?: React.ReactNode;
-  isHeavyToggle?: boolean;
 }
 
 const SettingsRow: React.FC<SettingsRowProps> = ({
   icon,
-  iconColor = '#888',
   title,
   subtitle,
   value,
   onToggle,
   onPress,
   rightElement,
-  isHeavyToggle = false,
 }) => {
   const handleToggle = (newValue: boolean) => {
-    if (isHeavyToggle) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    } else {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onToggle?.(newValue);
   };
 
   const content = (
     <View style={styles.row}>
-      <View style={styles.iconContainer}>
-        <Ionicons name={icon as any} size={20} color={iconColor} />
-      </View>
+      <Ionicons 
+        name={icon as any} 
+        size={22} 
+        color={value ? ELECTRIC_CYAN : '#FFFFFF'} 
+        style={styles.rowIcon}
+      />
       <View style={styles.rowTextContainer}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.rowTitle, value && styles.rowTitleActive]}>{title}</Text>
         {subtitle && (
-          <Text style={styles.rowSubtitle} numberOfLines={1}>{subtitle}</Text>
+          <Text style={styles.rowSubtitle}>{subtitle}</Text>
         )}
       </View>
       {rightElement ? (
@@ -98,12 +90,12 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
         <Switch
           value={value}
           onValueChange={handleToggle}
-          trackColor={{ false: '#333', true: '#00FF88' }}
-          thumbColor={value ? '#FFF' : '#888'}
+          trackColor={{ false: '#333', true: ELECTRIC_CYAN }}
+          thumbColor="#FFF"
           ios_backgroundColor="#333"
         />
       ) : onPress ? (
-        <Ionicons name="chevron-forward" size={18} color="#666" />
+        <Ionicons name="chevron-forward" size={18} color={MUTED_GRAY} />
       ) : null}
     </View>
   );
@@ -162,17 +154,10 @@ export default function SettingsScreen() {
     settings,
     updateSetting,
     resetSettings,
-    clearBrowsingData,
     isLoading,
   } = useSettings();
 
-  // Get browser store for clearing history/bookmarks
-  const { history, bookmarks } = useBrowserStore();
-
-  const [showSearchEngineModal, setShowSearchEngineModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
-  const [showClearedToast, setShowClearedToast] = useState(false);
   const [showPrivacyShredder, setShowPrivacyShredder] = useState(false);
 
   const handleClose = () => {
@@ -181,25 +166,17 @@ export default function SettingsScreen() {
   };
 
   // ============================================================================
-  // PRIVACY SHREDDER - Premium data deletion
+  // PRIVACY SHREDDER
   // ============================================================================
   const handleOpenPrivacyShredder = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setShowPrivacyShredder(true);
   };
 
-  /**
-   * Handle Privacy Shredder completion
-   * Navigates back to Home Screen (like Chrome) and shows a toast
-   */
   const handleShredComplete = () => {
-    // Show success toast
     useBrowserStore.getState().showToast('Privacy Shredded. You are on a clean slate.');
-    
-    // Close settings and navigate to home
     router.replace('/');
     
-    // Reset the active tab to New Tab page
     const tabs = useBrowserStore.getState().tabs;
     if (tabs.length > 0) {
       useBrowserStore.getState().updateTab(tabs[0].id, { 
@@ -207,83 +184,7 @@ export default function SettingsScreen() {
         title: 'New Tab' 
       });
     }
-    
-    console.log('[Privacy Shredder] Navigation reset complete');
   };
-
-  // ============================================================================
-  // CLEAR BROWSING DATA - Legacy (kept for backwards compatibility)
-  // ============================================================================
-  const handleClearData = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(
-        'Clear all browsing data?\n\nThis will delete:\n• Browsing history\n• Bookmarks\n• Cached pages\n• Cookies and site data\n\nThis action cannot be undone.'
-      );
-      if (confirmed) {
-        performClearData();
-      }
-    } else {
-      Alert.alert(
-        'Clear Browsing Data',
-        'This will delete:\n\n• Browsing history\n• Bookmarks\n• Cached pages\n• Cookies and site data\n\nThis action cannot be undone.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Clear All',
-            style: 'destructive',
-            onPress: performClearData,
-          },
-        ]
-      );
-    }
-  };
-
-  const performClearData = async () => {
-    setIsClearing(true);
-    try {
-      // Clear via settings context (clears AsyncStorage data)
-      await clearBrowsingData();
-      
-      // Clear history and bookmarks in browser store
-      useBrowserStore.getState().clearHistory();
-      // Note: We don't have a clearBookmarks action, so we'll clear via individual removals
-      const currentBookmarks = useBrowserStore.getState().bookmarks;
-      currentBookmarks.forEach(bookmark => {
-        useBrowserStore.getState().removeBookmark(bookmark.url);
-      });
-      
-      // Show success toast
-      setShowClearedToast(true);
-      setTimeout(() => setShowClearedToast(false), 2000);
-      
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
-      console.error('Failed to clear data:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      setIsClearing(false);
-    }
-  };
-
-  // ============================================================================
-  // TOOLBAR SHORTCUT TOGGLE HANDLER
-  // ============================================================================
-  const handleToolbarShortcutToggle = (shortcutKey: string, value: boolean) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    updateSetting('toolbarShortcuts', {
-      ...settings.toolbarShortcuts,
-      [shortcutKey]: value,
-    });
-  };
-
-  // ============================================================================
-  // SEARCH ENGINE SELECTION
-  // ============================================================================
-  const currentSearchEngine = SEARCH_ENGINES.find(
-    (e) => e.value === settings.defaultSearchEngine
-  );
 
   // ============================================================================
   // RENDER
@@ -291,14 +192,14 @@ export default function SettingsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color="#00FF88" />
+        <ActivityIndicator size="large" color={ELECTRIC_CYAN} />
       </View>
     );
   }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
+      {/* Minimalist Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleClose} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#FFF" />
@@ -309,41 +210,36 @@ export default function SettingsScreen() {
 
       <ScrollView 
         style={styles.content} 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* ================================================================== */}
-        {/* PRIVACY & SECURITY */}
+        {/* SHIELD & PRIVACY */}
         {/* ================================================================== */}
-        <SectionHeader title="PRIVACY & SECURITY" />
+        <SectionHeader title="SHIELD & PRIVACY" />
 
         <SettingsRow
-          icon="shield-checkmark"
-          iconColor="#00FF88"
-          title="Aggressive Ad-Blocking"
+          icon="shield-outline"
+          title="Ad-Blocking"
           subtitle="Block ads, trackers, and pop-ups"
           value={settings.aggressiveAdBlocking}
           onToggle={(v) => updateSetting('aggressiveAdBlocking', v)}
-          isHeavyToggle
-        />
-
-        <SettingsRow
-          icon="globe-outline"
-          iconColor="#00E5FF"
-          title="Always-On VPN"
-          subtitle="Route traffic through secure servers"
-          value={settings.alwaysOnVPN}
-          onToggle={(v) => updateSetting('alwaysOnVPN', v)}
-          isHeavyToggle
         />
 
         <SettingsRow
           icon="eye-off-outline"
-          iconColor="#9B59B6"
           title="Do Not Track"
-          subtitle="Send DNT header to websites"
+          subtitle="Request websites not to track you"
           value={settings.doNotTrack}
           onToggle={(v) => updateSetting('doNotTrack', v)}
+        />
+
+        <SettingsRow
+          icon="globe-outline"
+          title="VPN"
+          subtitle="Route traffic through secure servers"
+          value={settings.alwaysOnVPN}
+          onToggle={(v) => updateSetting('alwaysOnVPN', v)}
         />
 
         {/* ================================================================== */}
@@ -353,105 +249,52 @@ export default function SettingsScreen() {
 
         <SettingsRow
           icon="hardware-chip-outline"
-          iconColor="#FFD700"
           title="Strict Local AI"
-          subtitle="Never send data to cloud AI services"
+          subtitle="Never send data to cloud services"
           value={settings.strictLocalAI}
           onToggle={(v) => updateSetting('strictLocalAI', v)}
-          isHeavyToggle
         />
 
-        {/* PRIVACY GUARD: Semantic Time-Machine AI History Toggle */}
-        {/* All AI History processing happens 100% locally on-device */}
-        {/* No page content or semantic labels ever leave this device */}
         <SettingsRow
-          icon="sparkles"
-          iconColor="#00FFFF"
-          title="AI-Powered History"
-          subtitle="100% local semantic page memory"
+          icon="sparkles-outline"
+          title="AI History"
+          subtitle="Smart page memory (100% local)"
           value={settings.aiHistoryEnabled}
           onToggle={(v) => updateSetting('aiHistoryEnabled', v)}
-          isHeavyToggle
         />
 
         <SettingsRow
           icon="mic-outline"
-          iconColor="#00FF88"
           title="Live Captioning"
-          subtitle="Real-time speech-to-text overlay"
+          subtitle="Real-time speech-to-text"
           value={settings.liveCaptioningEnabled}
           onToggle={(v) => updateSetting('liveCaptioningEnabled', v)}
-          isHeavyToggle
         />
 
         <SettingsRow
           icon="language-outline"
-          iconColor="#888"
-          title="Captioning Language"
+          title="Caption Language"
           subtitle={CAPTIONING_LANGUAGES.find(l => l.value === settings.captioningLanguage)?.label || 'English'}
           onPress={() => setShowLanguageModal(true)}
         />
 
         <SettingsRow
           icon="ear-outline"
-          iconColor="#FF6B6B"
           title="Ambient Awareness"
-          subtitle="Alert on important sounds nearby"
+          subtitle="Alert on important sounds"
           value={settings.ambientAwarenessEnabled}
           onToggle={(v) => updateSetting('ambientAwarenessEnabled', v)}
-          isHeavyToggle
         />
 
         {/* ================================================================== */}
-        {/* BROWSING */}
+        {/* SYSTEM */}
         {/* ================================================================== */}
-        <SectionHeader title="BROWSING" />
-
-        <SettingsRow
-          icon="search-outline"
-          iconColor="#888"
-          title="Search Engine"
-          subtitle={currentSearchEngine?.label || 'Google'}
-          onPress={() => setShowSearchEngineModal(true)}
-        />
-
-        <SettingsRow
-          icon="desktop-outline"
-          iconColor="#888"
-          title="Request Desktop Site"
-          subtitle="Default to desktop layout on new tabs"
-          value={settings.requestDesktopSite}
-          onToggle={(v) => updateSetting('requestDesktopSite', v)}
-        />
-
-        <SettingsRow
-          icon="flash-outline"
-          iconColor="#FFD700"
-          title="Predictive Caching"
-          subtitle="Pre-load links for faster navigation"
-          value={settings.predictiveCaching}
-          onToggle={(v) => updateSetting('predictiveCaching', v)}
-        />
-
-        {/* ================================================================== */}
-        {/* DISPLAY & LAYOUT */}
-        {/* ================================================================== */}
-        <SectionHeader title="DISPLAY & LAYOUT" />
-
-        <SettingsRow
-          icon="moon-outline"
-          iconColor="#9B59B6"
-          title="Dark Mode"
-          subtitle="Use dark theme throughout the app"
-          value={settings.darkMode}
-          onToggle={(v) => updateSetting('darkMode', v)}
-        />
+        <SectionHeader title="SYSTEM" />
 
         <SettingsRow
           icon="swap-vertical-outline"
-          iconColor="#888"
-          title="Address Bar Position"
-          subtitle="Choose top or bottom placement"
+          title="Address Bar"
+          subtitle="Position in browser"
           rightElement={
             <SegmentedControl
               options={[
@@ -465,89 +308,24 @@ export default function SettingsScreen() {
         />
 
         {/* ================================================================== */}
-        {/* TOOLBAR SHORTCUTS */}
-        {/* ================================================================== */}
-        <SectionHeader title="TOOLBAR SHORTCUTS" />
-        <Text style={styles.sectionSubtext}>
-          Show quick-access icons in the navigation bar
-        </Text>
-
-        <SettingsRow
-          icon="mic"
-          iconColor="#00FF88"
-          title="Live Captioning"
-          subtitle="Quick toggle for captions"
-          value={settings.toolbarShortcuts.showLiveCaptioning}
-          onToggle={(v) => handleToolbarShortcutToggle('showLiveCaptioning', v)}
-          isHeavyToggle
-        />
-
-        <SettingsRow
-          icon="sparkles"
-          iconColor="#FFD700"
-          title="AI Agent"
-          subtitle="Access AI features quickly"
-          value={settings.toolbarShortcuts.showAIAgent}
-          onToggle={(v) => handleToolbarShortcutToggle('showAIAgent', v)}
-          isHeavyToggle
-        />
-
-        <SettingsRow
-          icon="shield"
-          iconColor="#00E5FF"
-          title="VPN Toggle"
-          subtitle="Quick VPN on/off switch"
-          value={settings.toolbarShortcuts.showVPNToggle}
-          onToggle={(v) => handleToolbarShortcutToggle('showVPNToggle', v)}
-          isHeavyToggle
-        />
-
-        <SettingsRow
-          icon="ban"
-          iconColor="#FF6B6B"
-          title="Ad-Block Status"
-          subtitle="Show blocked ads counter"
-          value={settings.toolbarShortcuts.showAdBlockStatus}
-          onToggle={(v) => handleToolbarShortcutToggle('showAdBlockStatus', v)}
-          isHeavyToggle
-        />
-
-        <SettingsRow
-          icon={Platform.OS === 'ios' ? "share-outline" : "share-social-outline"}
-          iconColor="#00E5FF"
-          title="Share Button"
-          subtitle="Quick share current page"
-          value={settings.toolbarShortcuts.showShare}
-          onToggle={(v) => handleToolbarShortcutToggle('showShare', v)}
-          isHeavyToggle
-        />
-
-        {/* ================================================================== */}
         {/* DANGER ZONE */}
         {/* ================================================================== */}
         <SectionHeader title="DANGER ZONE" />
 
-        {/* Privacy Shredder - Premium data deletion */}
+        {/* Privacy Shredder - Full-width panic button */}
         <TouchableOpacity 
-          style={styles.privacyShredderButton} 
+          style={styles.shredderButton} 
           onPress={handleOpenPrivacyShredder}
           activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={['#FF6B35', '#FF3D00']}
-            style={styles.privacyShredderIcon}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Ionicons name="flame" size={22} color="#FFF" />
-          </LinearGradient>
-          <View style={styles.privacyShredderContent}>
-            <Text style={styles.privacyShredderTitle}>Privacy Shredder</Text>
-            <Text style={styles.privacyShredderSubtitle}>Secure data destruction</Text>
+          <Ionicons name="flame-outline" size={24} color="#FF4444" />
+          <View style={styles.shredderTextContainer}>
+            <Text style={styles.shredderTitle}>Privacy Shredder</Text>
+            <Text style={styles.shredderSubtitle}>Permanently delete all browsing data</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#FF6B35" />
         </TouchableOpacity>
 
+        {/* Reset to Defaults */}
         <TouchableOpacity 
           style={styles.resetButton} 
           onPress={() => {
@@ -559,7 +337,7 @@ export default function SettingsScreen() {
             } else {
               Alert.alert(
                 'Reset Settings',
-                'This will restore all settings to their default values.',
+                'Restore all settings to default values?',
                 [
                   { text: 'Cancel', style: 'cancel' },
                   { text: 'Reset', style: 'destructive', onPress: resetSettings },
@@ -569,13 +347,12 @@ export default function SettingsScreen() {
           }}
           activeOpacity={0.7}
         >
-          <Ionicons name="refresh-outline" size={20} color="#888" />
+          <Ionicons name="refresh-outline" size={18} color={MUTED_GRAY} />
           <Text style={styles.resetButtonText}>Reset to Defaults</Text>
         </TouchableOpacity>
 
-        {/* Version Info */}
+        {/* Version */}
         <Text style={styles.versionText}>ACCESS Browser v1.0</Text>
-        <Text style={styles.versionSubtext}>Local AI Enabled</Text>
       </ScrollView>
 
       {/* ================================================================== */}
@@ -586,44 +363,6 @@ export default function SettingsScreen() {
         onClose={() => setShowPrivacyShredder(false)}
         onShredComplete={handleShredComplete}
       />
-
-      {/* ================================================================== */}
-      {/* SEARCH ENGINE MODAL */}
-      {/* ================================================================== */}
-      <Modal
-        visible={showSearchEngineModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSearchEngineModal(false)}
-      >
-        <Pressable 
-          style={styles.modalBackdrop} 
-          onPress={() => setShowSearchEngineModal(false)}
-        />
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Search Engine</Text>
-          {SEARCH_ENGINES.map((engine) => (
-            <TouchableOpacity
-              key={engine.value}
-              style={[
-                styles.modalOption,
-                settings.defaultSearchEngine === engine.value && styles.modalOptionActive,
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                updateSetting('defaultSearchEngine', engine.value);
-                setShowSearchEngineModal(false);
-              }}
-            >
-              <Ionicons name={engine.icon as any} size={20} color="#FFF" />
-              <Text style={styles.modalOptionText}>{engine.label}</Text>
-              {settings.defaultSearchEngine === engine.value && (
-                <Ionicons name="checkmark" size={20} color="#00FF88" />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </Modal>
 
       {/* ================================================================== */}
       {/* LANGUAGE MODAL */}
@@ -639,7 +378,7 @@ export default function SettingsScreen() {
           onPress={() => setShowLanguageModal(false)}
         />
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Captioning Language</Text>
+          <Text style={styles.modalTitle}>Caption Language</Text>
           {CAPTIONING_LANGUAGES.map((lang) => (
             <TouchableOpacity
               key={lang.value}
@@ -655,28 +394,18 @@ export default function SettingsScreen() {
             >
               <Text style={styles.modalOptionText}>{lang.label}</Text>
               {settings.captioningLanguage === lang.value && (
-                <Ionicons name="checkmark" size={20} color="#00FF88" />
+                <Ionicons name="checkmark" size={20} color={ELECTRIC_CYAN} />
               )}
             </TouchableOpacity>
           ))}
         </View>
       </Modal>
-
-      {/* ================================================================== */}
-      {/* DATA CLEARED TOAST */}
-      {/* ================================================================== */}
-      {showClearedToast && (
-        <View style={styles.toast}>
-          <Ionicons name="checkmark-circle" size={20} color="#00FF88" />
-          <Text style={styles.toastText}>Data Cleared</Text>
-        </View>
-      )}
     </View>
   );
 }
 
 // ============================================================================
-// STYLES
+// MINIMALIST STYLES
 // ============================================================================
 
 const styles = StyleSheet.create({
@@ -694,20 +423,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     color: '#FFF',
+    letterSpacing: 0.3,
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
@@ -715,59 +445,48 @@ const styles = StyleSheet.create({
     }),
   },
   headerSpacer: {
-    width: 40,
+    width: 44,
   },
   // Content
   content: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 8,
   },
-  // Section Header
+  // Section Header - Minimalist
   sectionHeader: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#666',
-    letterSpacing: 1.5,
-    marginTop: 24,
-    marginBottom: 12,
+    fontWeight: '600',
+    color: MUTED_GRAY,
+    letterSpacing: 2,
+    marginTop: 32,
+    marginBottom: 16,
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
     }),
   },
-  sectionSubtext: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 12,
-    marginTop: -8,
-  },
-  // Settings Row
+  // Settings Row - Clean & Spacious
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 18,  // 20% more padding
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+  rowIcon: {
+    marginRight: 16,
+    width: 24,
   },
   rowTextContainer: {
     flex: 1,
     marginRight: 12,
   },
   rowTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '500',
     color: '#FFF',
     ...Platform.select({
@@ -776,10 +495,13 @@ const styles = StyleSheet.create({
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
     }),
   },
+  rowTitleActive: {
+    color: ELECTRIC_CYAN,
+  },
   rowSubtitle: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
+    fontSize: 13,
+    color: '#666',
+    marginTop: 3,
   },
   // Segmented Control
   segmentedControl: {
@@ -789,17 +511,17 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   segmentButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 6,
   },
   segmentButtonActive: {
-    backgroundColor: '#00FF88',
+    backgroundColor: ELECTRIC_CYAN,
   },
   segmentButtonText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#888',
+    color: MUTED_GRAY,
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
@@ -809,59 +531,24 @@ const styles = StyleSheet.create({
   segmentButtonTextActive: {
     color: '#000',
   },
-  // Danger Zone
-  dangerButton: {
+  // Privacy Shredder - Full-width panic button
+  shredderButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 68, 68, 0.15)',
+    backgroundColor: 'rgba(255, 68, 68, 0.08)',
     borderRadius: 12,
-    paddingVertical: 14,
-    marginTop: 8,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 68, 68, 0.3)',
-  },
-  // Privacy Shredder Button
-  privacyShredderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
+    borderColor: 'rgba(139, 0, 0, 0.5)',  // Dark red outline
   },
-  privacyShredderIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  privacyShredderContent: {
+  shredderTextContainer: {
     flex: 1,
+    marginLeft: 16,
   },
-  privacyShredderTitle: {
+  shredderTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFF',
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
-  },
-  privacyShredderSubtitle: {
-    fontSize: 12,
-    color: '#FF6B35',
-    marginTop: 2,
-  },
-  dangerButtonText: {
-    fontSize: 15,
     fontWeight: '600',
     color: '#FF4444',
     ...Platform.select({
@@ -870,20 +557,24 @@ const styles = StyleSheet.create({
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
     }),
   },
+  shredderSubtitle: {
+    fontSize: 13,
+    color: '#994444',
+    marginTop: 3,
+  },
+  // Reset Button
   resetButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginTop: 12,
+    paddingVertical: 16,
+    marginTop: 16,
     gap: 8,
   },
   resetButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
-    color: '#888',
+    color: MUTED_GRAY,
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
@@ -893,38 +584,34 @@ const styles = StyleSheet.create({
   // Version
   versionText: {
     textAlign: 'center',
-    fontSize: 13,
-    color: '#666',
-    marginTop: 32,
-  },
-  versionSubtext: {
-    textAlign: 'center',
-    fontSize: 11,
+    fontSize: 12,
     color: '#444',
-    marginTop: 4,
+    marginTop: 40,
+    letterSpacing: 0.5,
   },
   // Modal
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   modalContent: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#1A1A1A',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: '#141414',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 24,
     paddingBottom: 40,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     color: '#FFF',
     marginBottom: 20,
     textAlign: 'center',
+    letterSpacing: 0.3,
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
@@ -934,46 +621,18 @@ const styles = StyleSheet.create({
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    gap: 12,
+    borderRadius: 10,
+    marginBottom: 6,
   },
   modalOptionActive: {
-    backgroundColor: 'rgba(0, 255, 136, 0.1)',
+    backgroundColor: 'rgba(0, 255, 255, 0.08)',
   },
   modalOptionText: {
     flex: 1,
     fontSize: 16,
     color: '#FFF',
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
-  },
-  // Toast
-  toast: {
-    position: 'absolute',
-    bottom: 100,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 255, 136, 0.15)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 136, 0.3)',
-  },
-  toastText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#00FF88',
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
