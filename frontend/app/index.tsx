@@ -1001,30 +1001,241 @@ export default function BrowserScreen() {
 
   // ============================================================
   // AI SUMMARIZE - Premium Feature
-  // Opens the AI Summary drawer with loading state
+  // Page Content Extraction, API Wiring, and Error Handling
   // ============================================================
   
   /**
+   * JavaScript injection script to extract text content from the page
+   * Grabs paragraphs and headings, filters short content, limits to 4000 chars
+   */
+  const extractTextScript = `
+    try {
+      const paragraphs = Array.from(document.querySelectorAll('p, h1, h2, h3, article, section, main'))
+        .map(p => p.innerText)
+        .filter(t => t.length > 50)
+        .join('\\n\\n');
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'EXTRACTED_TEXT',
+        payload: paragraphs.substring(0, 4000)
+      }));
+    } catch(e) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'EXTRACTION_ERROR',
+        payload: e.message
+      }));
+    }
+    true;
+  `;
+
+  /**
+   * Generate AI Summary from extracted text
+   * Uses local heuristic fallback (no API key required)
+   * Future: Wire to LLM API (OpenAI/Gemini)
+   */
+  const generateAISummary = useCallback(async (text: string) => {
+    try {
+      console.log('[AI Summary] Processing text, length:', text.length);
+      
+      // ============================================================
+      // ERROR HANDLING: Validation
+      // ============================================================
+      if (!text || text.trim().length < 100) {
+        throw new Error('Not enough readable text found on this page to summarize.');
+      }
+
+      // ============================================================
+      // API ARCHITECTURE (Commented out - for future LLM integration)
+      // ============================================================
+      /*
+      // Option 1: OpenAI GPT-4 API
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that summarizes web page content concisely. Provide 3-5 key bullet points.'
+            },
+            {
+              role: 'user',
+              content: `Please summarize this web page content:\n\n${text}`
+            }
+          ],
+          max_tokens: 500,
+          temperature: 0.7,
+        }),
+      });
+      
+      const data = await response.json();
+      const summary = data.choices[0].message.content;
+      setAiSummaryText(summary);
+      return;
+      */
+
+      /*
+      // Option 2: Google Gemini API
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Summarize this web page content in 3-5 bullet points:\n\n${text}`
+            }]
+          }],
+          generationConfig: {
+            maxOutputTokens: 500,
+            temperature: 0.7,
+          }
+        }),
+      });
+      
+      const data = await response.json();
+      const summary = data.candidates[0].content.parts[0].text;
+      setAiSummaryText(summary);
+      return;
+      */
+
+      // ============================================================
+      // LOCAL FALLBACK: Heuristic-based summary (works without API)
+      // Extracts key sentences from the text
+      // ============================================================
+      console.log('[AI Summary] Using local heuristic fallback');
+      
+      // Clean and split text into sentences
+      const cleanText = text
+        .replace(/\s+/g, ' ')
+        .replace(/\n+/g, ' ')
+        .trim();
+      
+      // Split by sentence-ending punctuation
+      const sentences = cleanText
+        .split(/(?<=[.!?])\s+/)
+        .filter(s => s.length > 30 && s.length < 300)
+        .map(s => s.trim());
+      
+      if (sentences.length < 2) {
+        throw new Error('Could not extract meaningful sentences from this page.');
+      }
+
+      // Select key sentences: first, middle, and one from the end
+      const keyPoints: string[] = [];
+      
+      // First sentence (usually introduction/headline)
+      keyPoints.push(sentences[0]);
+      
+      // A sentence from the middle (core content)
+      if (sentences.length > 2) {
+        const middleIndex = Math.floor(sentences.length / 2);
+        keyPoints.push(sentences[middleIndex]);
+      }
+      
+      // A sentence from later in the text (often conclusion/key info)
+      if (sentences.length > 4) {
+        const lateIndex = Math.floor(sentences.length * 0.75);
+        if (!keyPoints.includes(sentences[lateIndex])) {
+          keyPoints.push(sentences[lateIndex]);
+        }
+      }
+      
+      // Add one more varied sentence if available
+      if (sentences.length > 6 && keyPoints.length < 4) {
+        const randomIndex = Math.floor(sentences.length * 0.4);
+        if (!keyPoints.includes(sentences[randomIndex])) {
+          keyPoints.push(sentences[randomIndex]);
+        }
+      }
+
+      // Format output with bullet points
+      const formattedSummary = [
+        '📄 **Page Summary**\n',
+        ...keyPoints.map((point, i) => `• ${point}`),
+        '\n\n_Generated using local text analysis_'
+      ].join('\n');
+
+      setAiSummaryText(formattedSummary);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+    } catch (error: any) {
+      // ============================================================
+      // ERROR HANDLING: Catch block
+      // ============================================================
+      console.error('[AI Summary] Error:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setAiSummaryText(`⚠️ **AI Error**\n\n${error.message || 'Failed to generate summary. Please try again.'}`);
+    }
+  }, []);
+
+  /**
    * Handle AI Summarize button press
-   * Opens the drawer and sets loading placeholder text
+   * Opens the drawer, shows scanning state, and triggers text extraction
    */
   const handleAISummarize = useCallback(() => {
-    console.log('[AI Summarize] Opening drawer for:', activeTab?.url);
+    console.log('[AI Summarize] Starting for:', activeTab?.url);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     // Close menu first
     setMenuVisible(false);
     
-    // Set loading text
-    setAiSummaryText('Analyzing page content and extracting key insights...');
-    
-    // Open the AI drawer
+    // Open the AI drawer with scanning state
+    setAiSummaryText('🔍 Scanning page...');
     setIsAiDrawerVisible(true);
     
-    // TODO: Wire actual AI API call here
-    // For now, simulate a loading state
-    // In production, this would extract page content and call the backend
-  }, [activeTab?.url]);
+    // Check if we have a valid WebView reference
+    if (!webViewRef.current) {
+      console.log('[AI Summarize] No WebView ref - showing demo');
+      // If no WebView (e.g., on New Tab Page), show a message
+      setTimeout(() => {
+        setAiSummaryText('ℹ️ **Navigate to a webpage first**\n\nOpen any website, then tap AI Summarize to generate a summary of its content.');
+      }, 500);
+      return;
+    }
+    
+    // Inject the text extraction script
+    console.log('[AI Summarize] Injecting extraction script');
+    setAiSummaryText('🔍 Scanning page content...');
+    webViewRef.current.injectJavaScript(extractTextScript);
+    
+  }, [activeTab?.url, extractTextScript]);
+
+  /**
+   * Handle messages from WebView (text extraction results)
+   */
+  const handleWebViewMessage = useCallback((event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('[WebView Message] Type:', data.type);
+      
+      switch (data.type) {
+        case 'EXTRACTED_TEXT':
+          console.log('[WebView Message] Extracted text length:', data.payload?.length);
+          setAiSummaryText('✨ Generating summary...');
+          generateAISummary(data.payload);
+          break;
+          
+        case 'EXTRACTION_ERROR':
+          console.error('[WebView Message] Extraction error:', data.payload);
+          setAiSummaryText(`⚠️ **Extraction Error**\n\n${data.payload || 'Failed to extract page content.'}`);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          break;
+          
+        default:
+          // Handle other message types from existing code
+          handleMessage(event);
+          break;
+      }
+    } catch (e) {
+      // If JSON parsing fails, pass to existing handler
+      handleMessage(event);
+    }
+  }, [generateAISummary, handleMessage]);
 
   /**
    * Close the AI Summary drawer
@@ -1319,8 +1530,8 @@ export default function BrowserScreen() {
                 <View style={styles.aiSummaryBox}>
                   <Text style={styles.aiSummaryText}>{aiSummaryText}</Text>
                   
-                  {/* Loading indicator dots */}
-                  {aiSummaryText.includes('Analyzing') && (
+                  {/* Loading indicator dots - show during scanning/generating */}
+                  {(aiSummaryText.includes('Scanning') || aiSummaryText.includes('Generating') || aiSummaryText.includes('Analyzing')) && (
                     <View style={styles.aiLoadingDots}>
                       <View style={[styles.aiDot, styles.aiDot1]} />
                       <View style={[styles.aiDot, styles.aiDot2]} />
@@ -1391,7 +1602,7 @@ export default function BrowserScreen() {
               onShouldStartLoadWithRequest={handleShouldStartLoad}
               onLoadStart={() => setLoading(true)}
               onLoadEnd={handleLoadEnd}
-              onMessage={handleMessage}
+              onMessage={handleWebViewMessage}
               injectedJavaScript={getInjectedScript()}
               javaScriptEnabled
               domStorageEnabled
