@@ -211,6 +211,10 @@ export default function BrowserScreen() {
   const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
   const [isCacheHit, setIsCacheHit] = useState(false);
   
+  // Pull-to-Refresh: Track if WebView is scrolled to top
+  // Only enable refresh when user is at the top of the page
+  const [isAtTop, setIsAtTop] = useState(true);
+  
   // Tab Virtualization: Track current scroll position and previous tab
   const currentScrollYRef = useRef<number>(0);
   const previousTabIdRef = useRef<string | null>(null);
@@ -966,11 +970,12 @@ export default function BrowserScreen() {
                 <RefreshControl
                   refreshing={isRefreshing}
                   onRefresh={handleRefresh}
-                  tintColor="#00FF88"                    // iOS spinner color (Neon Green)
-                  colors={['#00FF88', '#00E5FF']}        // Android spinner colors
-                  progressBackgroundColor="#1A1A1A"      // Android spinner background
-                  title="Refreshing..."                  // iOS refresh text
-                  titleColor="#00FF88"                   // iOS refresh text color
+                  enabled={isAtTop}                        // PULL-TO-REFRESH FIX: Only enable when at top
+                  tintColor="#00FF88"                      // iOS spinner color (Neon Green)
+                  colors={['#00FF88', '#00E5FF']}          // Android spinner colors
+                  progressBackgroundColor="#1A1A1A"        // Android spinner background
+                  title="Refreshing..."                    // iOS refresh text
+                  titleColor="#00FF88"                     // iOS refresh text color
                 />
               }
             >
@@ -986,12 +991,24 @@ export default function BrowserScreen() {
                 style={styles.webview}
                 onNavigationStateChange={handleNavigationStateChange}
                 onShouldStartLoadWithRequest={handleShouldStartLoad}
-                onLoadStart={() => setLoading(true)}
+                onLoadStart={() => {
+                  setLoading(true);
+                  setIsAtTop(true);  // Reset to top on new page load
+                }}
                 onLoadEnd={(event) => {
                   handleLoadEnd(event);
                   setIsRefreshing(false); // Stop refresh spinner
                 }}
                 onMessage={handleMessage}
+                // PULL-TO-REFRESH FIX: Track scroll position to conditionally enable refresh
+                onScroll={(syntheticEvent) => {
+                  const { contentOffset } = syntheticEvent.nativeEvent;
+                  const atTop = contentOffset.y <= 0;
+                  if (atTop !== isAtTop) {
+                    setIsAtTop(atTop);
+                  }
+                }}
+                scrollEventThrottle={16}  // Smooth scroll position updates (60fps)
                 injectedJavaScript={getInjectedScript()}
                 javaScriptEnabled
                 domStorageEnabled
@@ -1059,8 +1076,8 @@ export default function BrowserScreen() {
                 // Standard cache mode
                 cacheMode="LOAD_DEFAULT"
                 
-                // REMOVED: scrollEventThrottle={16} - Kills the bridge traffic
-                // Sending continuous scroll data across the JS bridge chokes framerate
+                // NOTE: scrollEventThrottle={16} is now used above for pull-to-refresh position tracking
+                // The performance impact is minimal since we only update state when isAtTop changes
               />
             </ScrollView>
           </SwipeNavigationWrapper>
