@@ -1017,9 +1017,20 @@ export default function BrowserScreen() {
             webViewRef.current?.reload();
           }, 100);
         }}
+        onToggleBookmark={() => {
+          if (activeTab) {
+            useBrowserStore.getState().toggleBookmark(activeTab.url, activeTab.title);
+          }
+        }}
+        onToggleAdblock={() => {
+          useBrowserStore.getState().toggleAdblock();
+        }}
         isReading={isReading}
         isGhostMode={isGhostMode}
         isDesktopMode={activeTab?.isDesktopMode ?? false}
+        isBookmarked={activeTab ? useBrowserStore.getState().isBookmarked(activeTab.url) : false}
+        isAdblockEnabled={useBrowserStore.getState().settings.adblockEnabled}
+        currentUrl={activeTab?.url ?? ''}
       />
 
       <View style={styles.webviewContainer}>

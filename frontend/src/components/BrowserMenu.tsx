@@ -26,9 +26,14 @@ interface BrowserMenuProps {
   onShare: () => void;
   onToggleGhostMode: () => void;
   onToggleDesktopMode: () => void;
+  onToggleBookmark: () => void;
+  onToggleAdblock: () => void;
   isReading: boolean;
   isGhostMode: boolean;
   isDesktopMode: boolean;
+  isBookmarked: boolean;
+  isAdblockEnabled: boolean;
+  currentUrl: string;
 }
 
 interface MenuItemProps {
@@ -98,9 +103,14 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onShare,
   onToggleGhostMode,
   onToggleDesktopMode,
+  onToggleBookmark,
+  onToggleAdblock,
   isReading,
   isGhostMode,
   isDesktopMode,
+  isBookmarked,
+  isAdblockEnabled,
+  currentUrl,
 }) => {
   const insets = useSafeAreaInsets();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -243,6 +253,32 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               color="#888"
             />
 
+            {/* Bookmark Toggle (moved from top bar) */}
+            <MenuItem
+              icon={isBookmarked ? "star" : "star-outline"}
+              label={isBookmarked ? "Remove Bookmark" : "Bookmark Page"}
+              onPress={() => {
+                onToggleBookmark();
+                handleClose();
+              }}
+              isActive={isBookmarked}
+              activeColor="#00E5FF"
+              color="#888"
+            />
+
+            {/* Shield / Ad-Block Toggle (moved from top bar) */}
+            <MenuItem
+              icon={isAdblockEnabled ? "shield-checkmark" : "shield-outline"}
+              label={isAdblockEnabled ? "Shield Active" : "Enable Shield"}
+              onPress={() => {
+                onToggleAdblock();
+                handleClose();
+              }}
+              isActive={isAdblockEnabled}
+              activeColor="#00FF88"
+              color="#888"
+            />
+
             {/* Desktop Mode Toggle - Chrome-style checkbox */}
             <MenuItem
               icon={isDesktopMode ? "checkbox" : "square-outline"}
@@ -342,6 +378,32 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
                 onShare();
                 handleClose();
               }}
+              color="#888"
+            />
+
+            {/* Bookmark Toggle (moved from top bar) */}
+            <MenuItem
+              icon={isBookmarked ? "star" : "star-outline"}
+              label={isBookmarked ? "Remove Bookmark" : "Bookmark Page"}
+              onPress={() => {
+                onToggleBookmark();
+                handleClose();
+              }}
+              isActive={isBookmarked}
+              activeColor="#00E5FF"
+              color="#888"
+            />
+
+            {/* Shield / Ad-Block Toggle (moved from top bar) */}
+            <MenuItem
+              icon={isAdblockEnabled ? "shield-checkmark" : "shield-outline"}
+              label={isAdblockEnabled ? "Shield Active" : "Enable Shield"}
+              onPress={() => {
+                onToggleAdblock();
+                handleClose();
+              }}
+              isActive={isAdblockEnabled}
+              activeColor="#00FF88"
               color="#888"
             />
 
