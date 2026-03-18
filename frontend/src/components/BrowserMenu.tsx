@@ -16,30 +16,31 @@ import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Premium color palette
+// Premium Glossy Color Palette
 const ELECTRIC_CYAN = '#00FFFF';
+const ELECTRIC_CYAN_GLOW = 'rgba(0, 255, 255, 0.3)';
 const DANGER_RED = '#FF4444';
 const TEXT_DARK = '#1A1A1A';
-const TEXT_SECONDARY = '#666666';
+const TEXT_SECONDARY = '#555555';
 const GOLD = '#FFD700';
+const GOLD_GLOW = 'rgba(255, 215, 0, 0.3)';
 
 interface BrowserMenuProps {
   visible: boolean;
   onClose: () => void;
-  // Props for state display (UI only for now)
   isBookmarked?: boolean;
   isDesktopMode?: boolean;
 }
 
 /**
- * Premium Glassmorphic Action Menu
+ * Premium Glossy Glassmorphic Command Center
  * 
- * Visual Layout:
- * - Zone 1: Quick Action Grid (Share, Bookmark, Find, Desktop)
- * - Zone 2: Smart Tools (AI Summarize, Reader Mode, Burn This Site)
- * - Zone 3: Navigation Gateways (History, Downloads, Settings)
- * 
- * Currently: UI-only, all actions close the modal
+ * Visual Features:
+ * - Opalescent glass container with deep milky gradient
+ * - Stark white reflective edge highlights
+ * - Deep realistic shadows for 3D depth
+ * - Polished glass buttons with internal shadows
+ * - Electric Cyan glow accents on active states
  */
 export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   visible,
@@ -62,33 +63,66 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   };
 
   // ============================================================
-  // QUICK ACTION ICON BUTTON
+  // GLOSSY GLASS BUTTON - Polished look with internal shadows
   // ============================================================
-  const QuickActionButton: React.FC<{
+  const GlassButton: React.FC<{
     icon: string;
     label: string;
     onPress: () => void;
     isActive?: boolean;
     activeColor?: string;
-  }> = ({ icon, label, onPress, isActive = false, activeColor = ELECTRIC_CYAN }) => (
+    glowColor?: string;
+  }> = ({ icon, label, onPress, isActive = false, activeColor = ELECTRIC_CYAN, glowColor = ELECTRIC_CYAN_GLOW }) => (
     <TouchableOpacity
-      style={styles.quickActionButton}
+      style={styles.glassButtonContainer}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
+      {/* Glass Button with Gradient */}
       <View style={[
-        styles.quickActionIconContainer,
-        isActive && { backgroundColor: `${activeColor}20` }
+        styles.glassButtonOuter,
+        isActive && { borderColor: activeColor }
       ]}>
-        <Ionicons
-          name={icon as any}
-          size={22}
-          color={isActive ? activeColor : TEXT_SECONDARY}
-        />
+        <LinearGradient
+          colors={
+            isActive 
+              ? [`${activeColor}15`, `${activeColor}25`]
+              : ['rgba(255,255,255,0.9)', 'rgba(240,240,240,0.95)']
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.glassButtonGradient}
+        >
+          {/* Inner highlight for polished glass effect */}
+          <View style={styles.glassButtonHighlight} />
+          
+          {/* Icon with potential glow */}
+          <View style={[
+            styles.glassButtonIconWrapper,
+            isActive && { 
+              ...Platform.select({
+                ios: {
+                  shadowColor: activeColor,
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.6,
+                  shadowRadius: 8,
+                },
+              })
+            }
+          ]}>
+            <Ionicons
+              name={icon as any}
+              size={22}
+              color={isActive ? activeColor : TEXT_SECONDARY}
+            />
+          </View>
+        </LinearGradient>
       </View>
+      
+      {/* Label */}
       <Text style={[
-        styles.quickActionLabel,
-        isActive && { color: activeColor }
+        styles.glassButtonLabel,
+        isActive && { color: activeColor, fontWeight: '600' }
       ]}>
         {label}
       </Text>
@@ -96,7 +130,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   );
 
   // ============================================================
-  // MENU ROW ITEM
+  // MENU ROW - Smart Tools & Navigation
   // ============================================================
   const MenuRow: React.FC<{
     icon: string;
@@ -110,22 +144,31 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {emoji ? (
-        <Text style={styles.menuEmoji}>{emoji}</Text>
-      ) : (
-        <Ionicons
-          name={icon as any}
-          size={20}
-          color={isDanger ? DANGER_RED : TEXT_SECONDARY}
-          style={styles.menuIcon}
-        />
-      )}
+      <View style={[
+        styles.menuRowIconContainer,
+        isDanger && styles.menuRowIconContainerDanger
+      ]}>
+        {emoji ? (
+          <Text style={styles.menuEmoji}>{emoji}</Text>
+        ) : (
+          <Ionicons
+            name={icon as any}
+            size={18}
+            color={isDanger ? DANGER_RED : TEXT_SECONDARY}
+          />
+        )}
+      </View>
       <Text style={[
         styles.menuLabel,
         isDanger && styles.menuLabelDanger
       ]}>
         {label}
       </Text>
+      <Ionicons
+        name="chevron-forward"
+        size={16}
+        color={isDanger ? 'rgba(255,68,68,0.5)' : 'rgba(0,0,0,0.2)'}
+      />
     </TouchableOpacity>
   );
 
@@ -139,46 +182,54 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      {/* Backdrop */}
+      {/* Backdrop with subtle blur effect simulation */}
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop} />
       </TouchableWithoutFeedback>
 
-      {/* Glassmorphic Menu Container */}
+      {/* Glossy Glassmorphic Command Center */}
       <View style={[styles.menuContainer, { top: insets.top + 56 }]}>
-        {/* Opalescent Glass Background */}
+        {/* Deep Shadow Layer */}
+        <View style={styles.shadowLayer} />
+        
+        {/* Opalescent Glass Panel */}
         <LinearGradient
-          colors={['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.88)']}
+          colors={['rgba(255,255,255,0.75)', 'rgba(255,255,255,0.92)', 'rgba(250,250,250,0.95)']}
+          locations={[0, 0.5, 1]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.menuGradient}
         >
-          {/* Reflective Edge Highlight */}
+          {/* Reflective Edge - Stark White Highlight */}
           <View style={styles.reflectiveEdgeTop} />
           <View style={styles.reflectiveEdgeLeft} />
+          
+          {/* Subtle inner glow */}
+          <View style={styles.innerGlow} />
 
           {/* ============================================================ */}
-          {/* ZONE 1: QUICK ACTION GRID */}
+          {/* ZONE 1: QUICK ACTION GRID - Polished Glass Buttons */}
           {/* ============================================================ */}
           <View style={styles.quickActionsContainer}>
-            <QuickActionButton
+            <GlassButton
               icon="share-outline"
               label="Share"
               onPress={() => handlePress('Share')}
             />
-            <QuickActionButton
+            <GlassButton
               icon={isBookmarked ? "star" : "star-outline"}
               label="Bookmark"
               onPress={() => handlePress('Bookmark')}
               isActive={isBookmarked}
               activeColor={GOLD}
+              glowColor={GOLD_GLOW}
             />
-            <QuickActionButton
+            <GlassButton
               icon="search-outline"
               label="Find"
               onPress={() => handlePress('Find in Page')}
             />
-            <QuickActionButton
+            <GlassButton
               icon={isDesktopMode ? "desktop" : "desktop-outline"}
               label="Desktop"
               onPress={() => handlePress('Desktop Mode')}
@@ -186,13 +237,21 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
             />
           </View>
 
-          {/* Divider */}
-          <View style={styles.divider} />
+          {/* Glossy Divider */}
+          <View style={styles.dividerContainer}>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.08)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.dividerGradient}
+            />
+          </View>
 
           {/* ============================================================ */}
           {/* ZONE 2: SMART TOOLS */}
           {/* ============================================================ */}
           <View style={styles.section}>
+            <Text style={styles.sectionTitle}>SMART TOOLS</Text>
             <MenuRow
               emoji="✨"
               icon=""
@@ -214,13 +273,21 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
             />
           </View>
 
-          {/* Divider */}
-          <View style={styles.divider} />
+          {/* Glossy Divider */}
+          <View style={styles.dividerContainer}>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.08)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.dividerGradient}
+            />
+          </View>
 
           {/* ============================================================ */}
           {/* ZONE 3: NAVIGATION GATEWAYS */}
           {/* ============================================================ */}
           <View style={styles.section}>
+            <Text style={styles.sectionTitle}>NAVIGATE</Text>
             <MenuRow
               icon="time-outline"
               label="History"
@@ -244,43 +311,52 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
 };
 
 // ============================================================
-// GLASSMORPHIC STYLES
+// PREMIUM GLOSSY GLASSMORPHIC STYLES
 // ============================================================
 
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
-  // Menu Container - Floating near top right
+  // ============================================================
+  // MAIN CONTAINER - Deep Shadows & Positioning
+  // ============================================================
   menuContainer: {
     position: 'absolute',
     right: 12,
-    width: SCREEN_WIDTH * 0.65,
-    maxWidth: 280,
-    borderRadius: 16,
-    overflow: 'hidden',
-    // Deep Glossy Shadow
+    width: SCREEN_WIDTH * 0.72,
+    maxWidth: 300,
+    borderRadius: 20,
+    overflow: 'visible',
+  },
+  shadowLayer: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    // Deep glossy shadows for realistic depth
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.12,
+        shadowRadius: 28,
       },
       android: {
-        elevation: 10,
+        elevation: 12,
       },
     }),
   },
   menuGradient: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
-    // Subtle border for the glass effect
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    // Subtle outer border
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
   },
-  // Reflective Edge Highlights
+  // ============================================================
+  // REFLECTIVE EDGES - Stark White Highlights
+  // ============================================================
   reflectiveEdgeTop: {
     position: 'absolute',
     top: 0,
@@ -288,6 +364,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 1)',
+    zIndex: 10,
   },
   reflectiveEdgeLeft: {
     position: 'absolute',
@@ -295,10 +372,21 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
     width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    zIndex: 10,
+  },
+  innerGlow: {
+    position: 'absolute',
+    top: 1,
+    left: 1,
+    right: 1,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderTopLeftRadius: 19,
+    borderTopRightRadius: 19,
   },
   // ============================================================
-  // ZONE 1: QUICK ACTIONS
+  // ZONE 1: GLASS BUTTON GRID
   // ============================================================
   quickActionsContainer: {
     flexDirection: 'row',
@@ -306,20 +394,51 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 8,
   },
-  quickActionButton: {
+  glassButtonContainer: {
     alignItems: 'center',
-    minWidth: 56,
+    width: 60,
   },
-  quickActionIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+  glassButtonOuter: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.8)',
+    // Inner shadow simulation
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  glassButtonGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    position: 'relative',
   },
-  quickActionLabel: {
+  glassButtonHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    borderTopLeftRadius: 13,
+    borderTopRightRadius: 13,
+  },
+  glassButtonIconWrapper: {
+    zIndex: 1,
+  },
+  glassButtonLabel: {
+    marginTop: 6,
     fontSize: 11,
     fontWeight: '500',
     color: TEXT_SECONDARY,
@@ -331,41 +450,64 @@ const styles = StyleSheet.create({
     }),
   },
   // ============================================================
-  // DIVIDER
+  // DIVIDER - Glossy gradient divider
   // ============================================================
-  divider: {
+  dividerContainer: {
+    paddingHorizontal: 16,
     height: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-    marginHorizontal: 16,
+  },
+  dividerGradient: {
+    flex: 1,
   },
   // ============================================================
-  // MENU SECTIONS
+  // SECTIONS
   // ============================================================
   section: {
     paddingVertical: 8,
   },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: ELECTRIC_CYAN,
+    letterSpacing: 1.5,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 4,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  // ============================================================
+  // MENU ROW
+  // ============================================================
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: 16,
   },
-  menuIcon: {
-    width: 28,
-    textAlign: 'center',
+  menuRowIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
+  },
+  menuRowIconContainerDanger: {
+    backgroundColor: 'rgba(255,68,68,0.1)',
   },
   menuEmoji: {
-    fontSize: 18,
-    width: 28,
-    textAlign: 'center',
-    marginRight: 12,
+    fontSize: 16,
   },
   menuLabel: {
+    flex: 1,
     fontSize: 15,
     fontWeight: '500',
     color: TEXT_DARK,
-    flex: 1,
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
@@ -374,6 +516,7 @@ const styles = StyleSheet.create({
   },
   menuLabelDanger: {
     color: DANGER_RED,
+    fontWeight: '600',
   },
 });
 
