@@ -349,20 +349,20 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   contentWrapper: {
-    paddingBottom: 12,
-    paddingHorizontal: 16,
+    paddingBottom: 8,      // Reduced from 12 for slimmer bar
+    paddingHorizontal: 12, // Reduced from 16 for tighter layout
   },
   // URL Bar Row
   urlBarRow: {
-    marginBottom: 12,
+    marginBottom: 8,       // Reduced from 12 for slimmer bar
   },
   urlBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1A1A1A',
     borderRadius: 10,
-    height: 40,
-    paddingHorizontal: 12,
+    height: 38,            // Reduced from 40 for slimmer bar
+    paddingHorizontal: 10, // Reduced from 12 for tighter layout
   },
   urlBarFocused: {
     backgroundColor: '#222',
@@ -394,25 +394,25 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   // ============================================================
-  // THE CORE 5 - Premium Navigation Row
+  // THE CORE 5 - Premium Navigation Row (Compact)
   // ============================================================
   core5Row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-evenly',
-    paddingVertical: 4,
+    paddingVertical: 2,    // Reduced from 4 for slimmer bar
   },
   // Standard nav icons - NO background, clean floating glyphs
   navIcon: {
-    width: 48,
-    height: 44,
+    width: 44,             // Reduced from 48
+    height: 38,            // Reduced from 44
     alignItems: 'center',
     justifyContent: 'center',
   },
   // Center AI icon - Slightly larger touch target
   navIconCenter: {
-    width: 56,
-    height: 48,
+    width: 52,             // Reduced from 56
+    height: 42,            // Reduced from 48
     alignItems: 'center',
     justifyContent: 'center',
   },

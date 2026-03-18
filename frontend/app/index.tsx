@@ -976,6 +976,12 @@ export default function BrowserScreen() {
     ? insets.bottom 
     : Math.max(insets.bottom, 8);
 
+  // Calculate top padding for status bar
+  // When address bar is at bottom, WebView appears at top and needs status bar padding
+  const topPadding = userSettings.addressBarPosition === 'bottom'
+    ? insets.top
+    : 0;  // When bar is at top, UnifiedTopBar handles its own safe area
+
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1 }}
@@ -986,8 +992,8 @@ export default function BrowserScreen() {
         styles.container, 
         // Address Bar Position: Use column-reverse when position is 'bottom'
         userSettings.addressBarPosition === 'bottom' && styles.containerBottomBar,
-        // Apply bottom safe area padding to avoid home indicator overlap
-        { paddingBottom: bottomPadding }
+        // Apply safe area padding to avoid system UI overlap
+        { paddingBottom: bottomPadding, paddingTop: topPadding }
       ]}>
       {/* Unified Top Bar - Single sleek row with all controls */}
       <UnifiedTopBar
