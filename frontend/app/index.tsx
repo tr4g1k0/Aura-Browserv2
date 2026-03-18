@@ -15,6 +15,7 @@ import {
   ScrollView,
   Pressable,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1004,6 +1005,35 @@ export default function BrowserScreen() {
   // Page Content Extraction, API Wiring, and Error Handling
   // ============================================================
   
+  // Production API Key placeholder - user can add their own key
+  const AI_API_KEY = ''; // Placeholder for user key (OpenAI or Gemini)
+  
+  // State for copy button feedback
+  const [isCopied, setIsCopied] = useState(false);
+  
+  /**
+   * Copy summary text to clipboard
+   */
+  const handleCopySummary = useCallback(async () => {
+    if (!aiSummaryText || aiSummaryText.includes('Scanning') || aiSummaryText.includes('Generating')) {
+      return;
+    }
+    
+    try {
+      await Clipboard.setStringAsync(aiSummaryText);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsCopied(true);
+      
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setIsCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error('[Copy] Failed to copy:', error);
+      Alert.alert('Copy Failed', 'Could not copy to clipboard.');
+    }
+  }, [aiSummaryText]);
+
   /**
    * JavaScript injection script to extract text content from the page
    * Grabs paragraphs and headings, filters short content, limits to 4000 chars
@@ -1029,8 +1059,7 @@ export default function BrowserScreen() {
 
   /**
    * Generate AI Summary from extracted text
-   * Uses local heuristic fallback (no API key required)
-   * Future: Wire to LLM API (OpenAI/Gemini)
+   * Production-ready with API fallback to local heuristics
    */
   const generateAISummary = useCallback(async (text: string) => {
     try {
@@ -1044,70 +1073,100 @@ export default function BrowserScreen() {
       }
 
       // ============================================================
-      // API ARCHITECTURE (Commented out - for future LLM integration)
+      // PRODUCTION API: OpenAI GPT-4 / Gemini Integration
       // ============================================================
-      /*
-      // Option 1: OpenAI GPT-4 API
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful assistant that summarizes web page content concisely. Provide 3-5 key bullet points.'
-            },
-            {
-              role: 'user',
-              content: `Please summarize this web page content:\n\n${text}`
+      const SYSTEM_PROMPT = 'You are a privacy-focused browser assistant. Summarize the following webpage content into 3 clear, high-impact bullet points.';
+      
+      // Try API if key is provided
+      if (AI_API_KEY && AI_API_KEY.length > 10) {
+        console.log('[AI Summary] Using API with provided key');
+        setAiSummaryText('✨ Generating AI summary...');
+        
+        try {
+          // Detect if it's an OpenAI key (starts with sk-) or Gemini key
+          const isOpenAI = AI_API_KEY.startsWith('sk-');
+          
+          if (isOpenAI) {
+            // ============================================================
+            // OpenAI GPT-4 API
+            // ============================================================
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${AI_API_KEY}`,
+              },
+              body: JSON.stringify({
+                model: 'gpt-4',
+                messages: [
+                  { role: 'system', content: SYSTEM_PROMPT },
+                  { role: 'user', content: `Summarize this webpage content:\n\n${text.substring(0, 3000)}` }
+                ],
+                max_tokens: 500,
+                temperature: 0.7,
+              }),
+            });
+            
+            if (!response.ok) {
+              throw new Error(`OpenAI API error: ${response.status}`);
             }
-          ],
-          max_tokens: 500,
-          temperature: 0.7,
-        }),
-      });
-      
-      const data = await response.json();
-      const summary = data.choices[0].message.content;
-      setAiSummaryText(summary);
-      return;
-      */
-
-      /*
-      // Option 2: Google Gemini API
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Summarize this web page content in 3-5 bullet points:\n\n${text}`
-            }]
-          }],
-          generationConfig: {
-            maxOutputTokens: 500,
-            temperature: 0.7,
+            
+            const data = await response.json();
+            const summary = data.choices?.[0]?.message?.content;
+            
+            if (summary) {
+              setAiSummaryText(`✨ **AI Summary**\n\n${summary}`);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              return;
+            }
+          } else {
+            // ============================================================
+            // Google Gemini API
+            // ============================================================
+            const response = await fetch(
+              `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${AI_API_KEY}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{
+                    parts: [{
+                      text: `${SYSTEM_PROMPT}\n\nWebpage content:\n\n${text.substring(0, 3000)}`
+                    }]
+                  }],
+                  generationConfig: {
+                    maxOutputTokens: 500,
+                    temperature: 0.7,
+                  }
+                }),
+              }
+            );
+            
+            if (!response.ok) {
+              throw new Error(`Gemini API error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const summary = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (summary) {
+              setAiSummaryText(`✨ **AI Summary**\n\n${summary}`);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              return;
+            }
           }
-        }),
-      });
-      
-      const data = await response.json();
-      const summary = data.candidates[0].content.parts[0].text;
-      setAiSummaryText(summary);
-      return;
-      */
+        } catch (apiError: any) {
+          console.warn('[AI Summary] API failed, falling back to local:', apiError.message);
+          // Fall through to local heuristic
+        }
+      }
 
       // ============================================================
       // LOCAL FALLBACK: Heuristic-based summary (works without API)
       // Extracts key sentences from the text
       // ============================================================
       console.log('[AI Summary] Using local heuristic fallback');
+      setAiSummaryText('📝 Analyzing content locally...');
       
       // Clean and split text into sentences
       const cleanText = text
@@ -1156,7 +1215,7 @@ export default function BrowserScreen() {
       // Format output with bullet points
       const formattedSummary = [
         '📄 **Page Summary**\n',
-        ...keyPoints.map((point, i) => `• ${point}`),
+        ...keyPoints.map((point) => `• ${point}`),
         '\n\n_Generated using local text analysis_'
       ].join('\n');
 
@@ -1528,6 +1587,27 @@ export default function BrowserScreen() {
             >
               {aiSummaryText ? (
                 <View style={styles.aiSummaryBox}>
+                  {/* Copy Button - Top right of summary */}
+                  {!aiSummaryText.includes('Scanning') && !aiSummaryText.includes('Generating') && !aiSummaryText.includes('Analyzing') && (
+                    <TouchableOpacity
+                      style={styles.aiCopyButton}
+                      onPress={handleCopySummary}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons 
+                        name={isCopied ? "checkmark" : "copy-outline"} 
+                        size={16} 
+                        color={isCopied ? "#00FF88" : "#00FFFF"} 
+                      />
+                      <Text style={[
+                        styles.aiCopyButtonText,
+                        isCopied && { color: '#00FF88' }
+                      ]}>
+                        {isCopied ? 'Copied!' : 'Copy'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  
                   <Text style={styles.aiSummaryText}>{aiSummaryText}</Text>
                   
                   {/* Loading indicator dots - show during scanning/generating */}
@@ -1971,6 +2051,30 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+    position: 'relative',
+  },
+  aiCopyButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+    zIndex: 10,
+  },
+  aiCopyButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#00FFFF',
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
   },
   aiSummaryText: {
     fontSize: 16,
