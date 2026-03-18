@@ -56,6 +56,7 @@ export interface BrowserSettings {
   captioningLanguage: CaptioningLanguage;
   liveCaptioningEnabled: boolean;
   ambientAwarenessEnabled: boolean;
+  quickConverseEnabled: boolean;  // Quick Converse: Face-to-face split-screen mode
   
   // Privacy & Security
   aggressiveAdBlocking: boolean;
@@ -92,6 +93,7 @@ export const DEFAULT_BROWSER_SETTINGS: BrowserSettings = {
   captioningLanguage: 'english',
   liveCaptioningEnabled: false,
   ambientAwarenessEnabled: false,
+  quickConverseEnabled: false,    // Quick Converse disabled by default
   
   // Privacy & Security
   aggressiveAdBlocking: true,

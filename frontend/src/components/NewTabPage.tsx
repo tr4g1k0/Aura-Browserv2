@@ -66,6 +66,7 @@ interface NewTabPageProps {
   onSearch: (query: string) => void;
   onOpenMenu?: () => void;
   onAISummarize?: () => void;
+  onAccessibility?: () => void;
 }
 
 // Get first letter of title for display
@@ -566,6 +567,7 @@ const FloatingIslandDock: React.FC<{
   onHome: () => void;
   onLibrary: () => void;
   onAISummarize: () => void;
+  onAccessibility: () => void;
   onTabs: () => void;
   onMenu: () => void;
   onQRScan: () => void;
@@ -580,6 +582,7 @@ const FloatingIslandDock: React.FC<{
   onHome,
   onLibrary,
   onAISummarize,
+  onAccessibility,
   onTabs,
   onMenu,
   onQRScan,
@@ -711,9 +714,9 @@ const FloatingIslandDock: React.FC<{
                 />
               </TouchableOpacity>
 
-              {/* Library */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onLibrary}>
-                <Ionicons name="library-outline" size={22} color={MUTED_GRAY} />
+              {/* Accessibility */}
+              <TouchableOpacity style={styles.navIconButton} onPress={onAccessibility}>
+                <Ionicons name="accessibility-outline" size={22} color={MUTED_GRAY} />
               </TouchableOpacity>
 
               {/* AI Summarize */}
@@ -800,9 +803,9 @@ const FloatingIslandDock: React.FC<{
                 />
               </TouchableOpacity>
 
-              {/* Library */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onLibrary}>
-                <Ionicons name="library-outline" size={22} color={MUTED_GRAY} />
+              {/* Accessibility */}
+              <TouchableOpacity style={styles.navIconButton} onPress={onAccessibility}>
+                <Ionicons name="accessibility-outline" size={22} color={MUTED_GRAY} />
               </TouchableOpacity>
 
               {/* AI Summarize */}
@@ -974,7 +977,7 @@ const AddLinkModal: React.FC<{
 // ============================================================
 // MAIN NEW TAB PAGE COMPONENT
 // ============================================================
-export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, onOpenMenu, onAISummarize }) => {
+export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, onOpenMenu, onAISummarize, onAccessibility }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { settings } = useSettings();
@@ -1078,6 +1081,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, on
     } else {
       // Fallback to settings
       router.push('/settings');
+    }
+  };
+
+  const handleAccessibility = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Call parent handler to open AccessibilityModal
+    if (onAccessibility) {
+      onAccessibility();
+    } else {
+      Alert.alert('Accessibility', 'Accessibility features are available when browsing.');
     }
   };
 

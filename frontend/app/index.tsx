@@ -1566,6 +1566,7 @@ export default function BrowserScreen() {
             onSearch={handleNavigate}
             onOpenMenu={() => setMenuVisible(true)}
             onAISummarize={handleAISummarize}
+            onAccessibility={() => setAccessibilityModalVisible(true)}
           />
         ) : isNewTabPage ? (
           // Native: Show New Tab Page for blank/new tabs
@@ -1574,6 +1575,7 @@ export default function BrowserScreen() {
             onSearch={handleNavigate}
             onOpenMenu={() => setMenuVisible(true)}
             onAISummarize={handleAISummarize}
+            onAccessibility={() => setAccessibilityModalVisible(true)}
           />
         ) : activeTab && WebView ? (
           <SwipeNavigationWrapper

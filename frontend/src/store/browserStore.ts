@@ -133,6 +133,7 @@ interface BrowserState {
   toggleVPN: () => void;
   toggleLiveCaptioning: () => void;
   toggleAmbientAwareness: () => void;
+  toggleQuickConverse: () => void;
   setSearchQuery: (query: string) => void;
   setLoading: (loading: boolean) => void;
   addCachedPage: (page: CachedPage) => void;
@@ -194,6 +195,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
     vpnEnabled: false,
     liveCaptioningEnabled: false,
     ambientAwarenessEnabled: false,
+    quickConverseEnabled: false,
     predictiveCachingEnabled: true,
   },
   cachedPages: [],
@@ -419,6 +421,13 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
   toggleAmbientAwareness: () => {
     set((state) => ({
       settings: { ...state.settings, ambientAwarenessEnabled: !state.settings.ambientAwarenessEnabled },
+    }));
+    get().persistState();
+  },
+
+  toggleQuickConverse: () => {
+    set((state) => ({
+      settings: { ...state.settings, quickConverseEnabled: !state.settings.quickConverseEnabled },
     }));
     get().persistState();
   },
