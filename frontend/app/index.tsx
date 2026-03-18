@@ -848,6 +848,7 @@ export default function BrowserScreen() {
    * 2. Smart Shield ad-buster (Layer 2)
    * 3. Performance Optimization (Layer 3)
    * 4. VPN indicator
+   * 5. Force Enable Zoom (Chrome-like accessibility override)
    */
   const getInjectedScript = useCallback(() => {
     let scripts = '';
@@ -869,6 +870,29 @@ export default function BrowserScreen() {
     
     // Add VPN indicator script
     scripts += vpnScript;
+    
+    // FORCE ENABLE ZOOM: Chrome-like accessibility override
+    // Many mobile sites block pinch-to-zoom via viewport meta tag
+    // This script overrides those restrictions for native zoom experience
+    scripts += `
+      (function() {
+        try {
+          var meta = document.querySelector('meta[name="viewport"]');
+          if (meta) {
+            meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=10.0, user-scalable=yes');
+          } else {
+            // Create viewport meta if it doesn't exist
+            meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=10.0, user-scalable=yes';
+            document.head.appendChild(meta);
+          }
+          console.log('[Zoom] Force enabled pinch-to-zoom');
+        } catch(e) {
+          console.log('[Zoom] Error enabling zoom:', e);
+        }
+      })();
+    `;
     
     return scripts || 'true;';
   }, [userSettings.aggressiveAdBlocking, visionAISelectors, vpnScript]);
@@ -992,10 +1016,14 @@ export default function BrowserScreen() {
                 console.warn('[WebView] Content process terminated, reloading...', nativeEvent);
                 webViewRef.current?.reload();
               }}
-              // Clean UI settings
-              setBuiltInZoomControls={false}   // Hide Android zoom controls
-              setDisplayZoomControls={false}   // Ensure zoom controls are hidden
-              scalesPageToFit={true}
+              // ============================================================
+              // NATIVE PINCH-TO-ZOOM - Chrome-like zoom experience
+              // Combined with Force Enable Zoom script for full accessibility
+              // ============================================================
+              setBuiltInZoomControls={true}    // Enable Android zoom controls (hidden visually)
+              setDisplayZoomControls={false}   // Hide the +/- zoom UI buttons
+              scalesPageToFit={true}           // Scale content to fit viewport
+              textZoom={100}                   // Default text zoom level (100%)
               // SETTINGS-DRIVEN PROPS (observed from global settings)
               cacheEnabled={!isGhostMode && !userSettings.doNotTrack}
               // YOUTUBE FIX: Don't use strict incognito mode for YouTube

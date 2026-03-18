@@ -243,10 +243,10 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               color="#888"
             />
 
-            {/* Desktop Mode Toggle */}
+            {/* Desktop Mode Toggle - Chrome-style checkbox */}
             <MenuItem
-              icon={isDesktopMode ? "phone-portrait-outline" : "desktop-outline"}
-              label={isDesktopMode ? "Request Mobile Site" : "Request Desktop Site"}
+              icon={isDesktopMode ? "checkbox" : "square-outline"}
+              label="Desktop site"
               onPress={() => {
                 onToggleDesktopMode();
                 handleClose();
@@ -345,10 +345,10 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               color="#888"
             />
 
-            {/* Desktop Mode Toggle */}
+            {/* Desktop Mode Toggle - Chrome-style checkbox */}
             <MenuItem
-              icon={isDesktopMode ? "phone-portrait-outline" : "desktop-outline"}
-              label={isDesktopMode ? "Request Mobile Site" : "Request Desktop Site"}
+              icon={isDesktopMode ? "checkbox" : "square-outline"}
+              label="Desktop site"
               onPress={() => {
                 onToggleDesktopMode();
                 handleClose();
