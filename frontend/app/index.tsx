@@ -1037,7 +1037,9 @@ export default function BrowserScreen() {
         isDesktopMode={activeTab?.isDesktopMode ?? false}
         isBookmarked={activeTab ? useBrowserStore.getState().isBookmarked(activeTab.url) : false}
         isAdblockEnabled={useBrowserStore.getState().settings.adblockEnabled}
+        adsBlocked={adsBlocked}
         currentUrl={activeTab?.url ?? ''}
+        currentTitle={activeTab?.title ?? ''}
       />
 
       <View style={styles.webviewContainer}>

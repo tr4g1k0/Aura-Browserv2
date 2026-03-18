@@ -33,7 +33,9 @@ interface BrowserMenuProps {
   isDesktopMode: boolean;
   isBookmarked: boolean;
   isAdblockEnabled: boolean;
+  adsBlocked: number;  // Dynamic count from adBusterScript
   currentUrl: string;
+  currentTitle: string;  // For Share functionality
 }
 
 interface MenuItemProps {
@@ -110,7 +112,9 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   isDesktopMode,
   isBookmarked,
   isAdblockEnabled,
+  adsBlocked,
   currentUrl,
+  currentTitle,
 }) => {
   const insets = useSafeAreaInsets();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -269,7 +273,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
             {/* Shield / Ad-Block Toggle (moved from top bar) */}
             <MenuItem
               icon={isAdblockEnabled ? "shield-checkmark" : "shield-outline"}
-              label={isAdblockEnabled ? "Shield Active" : "Enable Shield"}
+              label={isAdblockEnabled ? `Shield: ${adsBlocked} Blocked` : "Enable Shield"}
               onPress={() => {
                 onToggleAdblock();
                 handleClose();
@@ -397,7 +401,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
             {/* Shield / Ad-Block Toggle (moved from top bar) */}
             <MenuItem
               icon={isAdblockEnabled ? "shield-checkmark" : "shield-outline"}
-              label={isAdblockEnabled ? "Shield Active" : "Enable Shield"}
+              label={isAdblockEnabled ? `Shield: ${adsBlocked} Blocked` : "Enable Shield"}
               onPress={() => {
                 onToggleAdblock();
                 handleClose();
