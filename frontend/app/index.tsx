@@ -8,6 +8,7 @@ import {
   Share,
   Animated,
   KeyboardAvoidingView,
+  TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -1110,7 +1111,9 @@ export default function BrowserScreen() {
               // ============================================================
               setBuiltInZoomControls={true}    // Enable Android zoom controls (hidden visually)
               setDisplayZoomControls={false}   // Hide the +/- zoom UI buttons
-              scalesPageToFit={true}           // Scale content to fit viewport
+              // SMART SCALING: Only scale for desktop mode
+              // Mobile sites don't need scaling - this gives pull-to-refresh gesture priority
+              scalesPageToFit={activeTab?.isDesktopMode || userSettings.requestDesktopSite}
               textZoom={100}                   // Default text zoom level (100%)
               // SETTINGS-DRIVEN PROPS (observed from global settings)
               cacheEnabled={!isGhostMode && !userSettings.doNotTrack}
@@ -1124,9 +1127,9 @@ export default function BrowserScreen() {
               // WebView handles all scrolling and refresh natively
               // ============================================================
               
-              // NATIVE PULL-TO-REFRESH: Let WebView handle refresh gesture natively
-              // This avoids JS bridge latency from scroll position tracking
-              pullToRefreshEnabled={true}
+              // SMART PULL-TO-REFRESH: Disabled in Desktop Mode
+              // Desktop DOMs swallow the gesture; use floating refresh button instead
+              pullToRefreshEnabled={!(activeTab?.isDesktopMode || userSettings.requestDesktopSite)}
               
               // CRITICAL: Enable nested scrolling for smooth Android scrolling
               // Prevents parent views from stealing scroll gestures
@@ -1189,6 +1192,21 @@ export default function BrowserScreen() {
           onStop={handleStopReading}
           isGhostMode={isGhostMode}
         />
+
+        {/* Floating Refresh Button - Smart Refresh Failsafe */}
+        {/* Appears when pull-to-refresh is disabled (Desktop Mode) */}
+        {(activeTab?.isDesktopMode || userSettings.requestDesktopSite) && !isNewTabPage && Platform.OS !== 'web' && (
+          <TouchableOpacity
+            style={styles.floatingRefreshButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              webViewRef.current?.reload();
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="refresh" size={20} color="#00FFFF" />
+          </TouchableOpacity>
+        )}
 
         {/* Privacy Shredder Toast Confirmation */}
         <PrivacyShredderToast />
@@ -1253,5 +1271,31 @@ const styles = StyleSheet.create({
     color: '#00FF88',
     marginLeft: 4,
     letterSpacing: 0.5,
+  },
+  // Floating Refresh Button - Smart Refresh Failsafe
+  // Appears when pull-to-refresh is disabled (Desktop Mode)
+  floatingRefreshButton: {
+    position: 'absolute',
+    bottom: 100,  // Above the navigation bar
+    right: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(13, 13, 13, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
 });
