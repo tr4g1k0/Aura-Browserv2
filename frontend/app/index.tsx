@@ -982,28 +982,40 @@ export default function BrowserScreen() {
                 incognito={isGhostMode && !activeTab?.url?.includes('youtube.com')}
                 // Desktop Mode: Use desktop user agent if enabled (per-tab or global default)
                 userAgent={activeTab?.isDesktopMode || userSettings.requestDesktopSite ? DESKTOP_USER_AGENT : undefined}
-                // HARDWARE ACCELERATION - Force GPU rendering for video frames
-                // Critical for smooth YouTube Shorts / TikTok-style scrolling
+                // ============================================================
+                // OPTIMIZED WEBVIEW PROPS FOR STANDARD BROWSING
+                // Removed heavy GPU props that were causing global scroll lag
+                // ============================================================
+                
+                // HARDWARE ACCELERATION - Keep enabled but don't force hardware layer
                 androidHardwareAccelerationDisabled={false}
-                androidLayerType="hardware"
+                // REMOVED: androidLayerType="hardware" - Default is better for text sites
+                // Only video sites benefit from hardware layer type
+                
                 // iOS: Native smooth scrolling deceleration
                 decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.998}
                 // iOS: Bounces at scroll edges for native feel
                 bounces={true}
-                // Optimize rendering performance
-                renderToHardwareTextureAndroid={true}
-                // Reduce memory usage by removing offscreen views
-                removeClippedSubviews={true}
-                // YOUTUBE FIX: Use "always" to ensure video player works correctly
-                // "compatibility" mode can block some video resources
-                mixedContentMode="always"
-                // Reduce memory footprint
-                cacheMode="LOAD_DEFAULT"
-                // Ensure smooth scrolling
+                
+                // CRITICAL: Enable nested scrolling for smooth Android scrolling
+                nestedScrollEnabled={true}
+                
+                // Stops Android's visual stretch effect which drops frames
                 overScrollMode="never"
-                // VIEWPORT SANITIZATION: Keep JS bridge synced with scroll position
-                // 16ms = 60fps, ensures smooth scroll tracking for video feeds
-                scrollEventThrottle={16}
+                
+                // Prevents background popups from eating RAM
+                setSupportMultipleWindows={false}
+                
+                // REMOVED: renderToHardwareTextureAndroid - causes lag on text sites
+                // REMOVED: removeClippedSubviews - can cause blank content issues
+                
+                // Mixed content mode for video compatibility
+                mixedContentMode="always"
+                // Standard cache mode
+                cacheMode="LOAD_DEFAULT"
+                
+                // REMOVED: scrollEventThrottle={16} - Kills the bridge traffic
+                // Sending continuous scroll data across the JS bridge chokes framerate
               />
             </ScrollView>
           </SwipeNavigationWrapper>

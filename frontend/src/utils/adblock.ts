@@ -435,61 +435,98 @@ true;`;
 export const adBusterScript = createAdBusterScript();
 
 // ============================================================================
-// LAYER 3: PERFORMANCE OPTIMIZATION (MINIMAL)
+// LAYER 3: SCRIPT ROUTER - URL-BASED INJECTION
 // ============================================================================
 
 /**
- * Minimal Performance Script
- * Only applies basic tap highlight fix - no heavy optimizations
- * All YouTube-specific optimizations have been removed for better performance
+ * Script Router - Checks URL before injecting any scripts
+ * 
+ * CRITICAL: This prevents heavy YouTube fixes from leaking to standard websites
+ * 
+ * - YouTube: Full video optimizations (display:none for inactive, translateZ, etc)
+ * - Other sites: Minimal CSS only (smooth scrolling, no GPU hacks)
  */
-export const gpuLayerSquashingScript = `
+export const scriptRouterScript = `
 (function(){
   'use strict';
   
-  /* MINIMAL CSS - Just basic mobile fixes */
-  var style = document.createElement('style');
-  style.id = 'minimal-mobile-fix';
-  style.innerHTML = 'a, button { -webkit-tap-highlight-color: transparent; }';
+  var currentHost = window.location.hostname;
   
-  if (document.head) {
-    document.head.appendChild(style);
+  if (currentHost.includes('youtube.com')) {
+    /* ================================================ */
+    /* YOUTUBE-SPECIFIC OPTIMIZATIONS                   */
+    /* Only injected when on YouTube domains            */
+    /* ================================================ */
+    
+    var ytStyle = document.createElement('style');
+    ytStyle.id = 'youtube-optimization';
+    ytStyle.innerHTML = [
+      /* Smooth touch scrolling */
+      'html, body {',
+      '  -webkit-overflow-scrolling: touch !important;',
+      '  overscroll-behavior-y: none !important;',
+      '}',
+      
+      /* GPU acceleration for video elements only */
+      'video, .html5-video-player {',
+      '  transform: translateZ(0);',
+      '  backface-visibility: hidden;',
+      '}',
+      
+      /* YouTube Shorts specific */
+      'ytd-shorts, #shorts-player {',
+      '  -webkit-overflow-scrolling: touch;',
+      '}'
+    ].join('\\n');
+    
+    if (document.head) {
+      document.head.appendChild(ytStyle);
+    }
+    
+    console.log('[Script Router] YouTube optimizations applied');
+    
+  } else {
+    /* ================================================ */
+    /* STANDARD WEB FIXES - All other sites             */
+    /* Minimal CSS only - no GPU hacks, no intervals    */
+    /* ================================================ */
+    
+    var style = document.createElement('style');
+    style.id = 'standard-web-fix';
+    style.innerHTML = [
+      'html, body {',
+      '  -webkit-overflow-scrolling: touch !important;',
+      '  overscroll-behavior-y: none !important;',
+      '}',
+      
+      /* Disable tap highlight on interactive elements */
+      'a, button, input, [role="button"] {',
+      '  -webkit-tap-highlight-color: transparent;',
+      '}'
+    ].join('\\n');
+    
+    if (document.head) {
+      document.head.appendChild(style);
+    }
+    
+    console.log('[Script Router] Standard web fixes applied');
   }
 })();
 true;`;
 
 /**
- * Minimal Performance Script
- * Only enables lazy loading - no heavy GPU optimizations
+ * Legacy exports for backwards compatibility
+ * These now just return the script router
  */
-export const performanceOptimizationScript = `
-(function(){
-  'use strict';
-  
-  /* Smart Shield Performance Optimizer v3.0 - Minimal */
-  /* Only lazy loading - no GPU compositing to avoid lag */
-  
-  // Lazy load images
-  document.querySelectorAll('img:not([loading="lazy"])').forEach(function(img) {
-    img.setAttribute('loading', 'lazy');
-  });
-  
-  // Lazy load iframes
-  document.querySelectorAll('iframe:not([loading="lazy"])').forEach(function(iframe) {
-    iframe.setAttribute('loading', 'lazy');
-  });
-})();
-true;`;
+export const gpuLayerSquashingScript = scriptRouterScript;
+export const performanceOptimizationScript = scriptRouterScript;
 
 /**
  * Creates a combined optimization script
- * Minimal version - only lazy loading, no heavy GPU stuff
+ * Now uses the Script Router for URL-based injection
  */
 export const createFullOptimizationScript = (additionalSelectors: string[] = []): string => {
-  return `
-    ${gpuLayerSquashingScript}
-    ${performanceOptimizationScript}
-  `;
+  return scriptRouterScript;
 };
 
 // ============================================================================
