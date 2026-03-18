@@ -67,8 +67,10 @@ export interface BrowserSettings {
   requestDesktopSite: boolean;
   predictiveCaching: boolean;
   
-  // Display
+  // Display & Accessibility
   darkMode: boolean;
+  forceDarkWeb: boolean;          // NEW: Force dark mode on all sites
+  forceZoom: boolean;             // NEW: Override sites that block pinch-to-zoom
   
   // Toolbar Customization
   addressBarPosition: AddressBarPosition;
@@ -101,8 +103,10 @@ export const DEFAULT_BROWSER_SETTINGS: BrowserSettings = {
   requestDesktopSite: false,
   predictiveCaching: true,
   
-  // Display
+  // Display & Accessibility
   darkMode: true,
+  forceDarkWeb: false,            // NEW: Off by default
+  forceZoom: true,                // NEW: On by default for accessibility
   
   // Toolbar Customization
   addressBarPosition: 'bottom',

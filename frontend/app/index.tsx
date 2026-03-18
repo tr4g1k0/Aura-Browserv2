@@ -945,30 +945,36 @@ export default function BrowserScreen() {
     }
     
     // FORCE ENABLE ZOOM: Chrome-like accessibility override
+    // Only inject if forceZoom setting is enabled
     // Many mobile sites block pinch-to-zoom via viewport meta tag
     // This script overrides those restrictions for native zoom experience
-    scripts += `
-      (function() {
-        try {
-          var meta = document.querySelector('meta[name="viewport"]');
-          if (meta) {
-            meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=10.0, user-scalable=yes');
-          } else {
-            // Create viewport meta if it doesn't exist
-            meta = document.createElement('meta');
-            meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=10.0, user-scalable=yes';
-            document.head.appendChild(meta);
+    if (userSettings.forceZoom) {
+      console.log('[Engine] Force Zoom ENABLED - injecting viewport override');
+      scripts += `
+        (function() {
+          try {
+            var meta = document.querySelector('meta[name="viewport"]');
+            if (meta) {
+              meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=10.0, user-scalable=yes');
+            } else {
+              // Create viewport meta if it doesn't exist
+              meta = document.createElement('meta');
+              meta.name = 'viewport';
+              meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=10.0, user-scalable=yes';
+              document.head.appendChild(meta);
+            }
+            console.log('[Zoom] Force enabled pinch-to-zoom');
+          } catch(e) {
+            console.log('[Zoom] Error enabling zoom:', e);
           }
-          console.log('[Zoom] Force enabled pinch-to-zoom');
-        } catch(e) {
-          console.log('[Zoom] Error enabling zoom:', e);
-        }
-      })();
-    `;
+        })();
+      `;
+    } else {
+      console.log('[Engine] Force Zoom DISABLED');
+    }
     
     return scripts || 'true;';
-  }, [userSettings.aggressiveAdBlocking, userSettings.doNotTrack, visionAISelectors, vpnScript]);
+  }, [userSettings.aggressiveAdBlocking, userSettings.doNotTrack, userSettings.forceZoom, visionAISelectors, vpnScript]);
 
   // Calculate bottom padding for home indicator
   // When address bar is at bottom, we need more space for the navigation bar
@@ -1116,12 +1122,13 @@ export default function BrowserScreen() {
               // ============================================================
               // NATIVE PINCH-TO-ZOOM - Chrome-like zoom experience
               // Combined with Force Enable Zoom script for full accessibility
+              // USES forceZoom SETTING FROM GLOBAL CONTEXT
               // ============================================================
-              setBuiltInZoomControls={true}    // Enable Android zoom controls (hidden visually)
+              setBuiltInZoomControls={userSettings.forceZoom || true}  // Force on if forceZoom enabled
               setDisplayZoomControls={false}   // Hide the +/- zoom UI buttons
-              // SMART SCALING: Only scale for desktop mode
-              // Mobile sites don't need scaling - this gives pull-to-refresh gesture priority
-              scalesPageToFit={activeTab?.isDesktopMode || userSettings.requestDesktopSite}
+              // SMART SCALING: Scale for desktop mode OR if forceZoom is enabled
+              // When forceZoom is true, we scale regardless of mode for accessibility
+              scalesPageToFit={userSettings.forceZoom || activeTab?.isDesktopMode || userSettings.requestDesktopSite}
               textZoom={100}                   // Default text zoom level (100%)
               // SETTINGS-DRIVEN PROPS (observed from global settings)
               cacheEnabled={!isGhostMode && !userSettings.doNotTrack}

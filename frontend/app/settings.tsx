@@ -8,12 +8,15 @@ import {
   Switch,
   Platform,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useSettings } from '../src/context/SettingsContext';
+import { SearchEngine } from '../src/hooks/useBrowserSettings';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -24,34 +27,31 @@ const TEXT_DARK = '#1A1A1A';
 const TEXT_SECONDARY = '#666666';
 const TEXT_MUTED = '#999999';
 
+// Search Engine Display Names
+const SEARCH_ENGINE_NAMES: Record<SearchEngine, string> = {
+  google: 'Google',
+  duckduckgo: 'DuckDuckGo',
+  bing: 'Bing',
+};
+
 /**
  * Premium Settings Screen - Glossy Glassmorphic Design
  * 
- * Features:
- * - Radial gradient background for depth
- * - Opalescent glass cards with LinearGradient
- * - Reflective top/left edge highlights
- * - Deep glossy shadows
- * - Electric Cyan accent switches
+ * NOW WIRED TO GLOBAL CONTEXT:
+ * - All settings persist to AsyncStorage
+ * - Changes reflect immediately across the app
+ * - Burn button clears browsing data
  */
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  
+  // GLOBAL SETTINGS CONTEXT - Wired to AsyncStorage
+  const { settings, updateSetting, clearBrowsingData, isLoading } = useSettings();
 
-  // ============================================================
-  // LOCAL STATE (for UI testing - will wire to AsyncStorage later)
-  // ============================================================
-  
-  // Engine & AI
-  const [localAIAssistant, setLocalAIAssistant] = useState(true);
-  
-  // Privacy & Security
-  const [adTrackerShield, setAdTrackerShield] = useState(true);
-  const [strictDoNotTrack, setStrictDoNotTrack] = useState(false);
-  
-  // Display & Accessibility
-  const [forceDarkWeb, setForceDarkWeb] = useState(false);
-  const [forceEnableZoom, setForceEnableZoom] = useState(true);
+  // Modal states for selectors
+  const [showSearchEngineModal, setShowSearchEngineModal] = useState(false);
+  const [showThemeModal, setShowThemeModal] = useState(false);
 
   // ============================================================
   // HANDLERS
@@ -62,24 +62,74 @@ export default function SettingsScreen() {
     router.back();
   };
 
-  const handleBurnData = () => {
+  const handleBurnData = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    console.log('[Settings] Burn Browsing Data triggered');
+    
+    // Confirm before burning
+    if (Platform.OS === 'web') {
+      if (window.confirm('This will permanently delete all browsing history, cache, and cookies. Continue?')) {
+        await performBurn();
+      }
+    } else {
+      Alert.alert(
+        'Burn Browsing Data',
+        'This will permanently delete all browsing history, cache, and cookies. This action cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Burn Everything', 
+            style: 'destructive',
+            onPress: performBurn
+          },
+        ]
+      );
+    }
+  };
+
+  const performBurn = async () => {
+    try {
+      await clearBrowsingData();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      if (Platform.OS === 'web') {
+        alert('All browsing data has been burned. You have a clean slate.');
+      } else {
+        Alert.alert('Success', 'All browsing data has been burned. You have a clean slate.');
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to burn data:', error);
+      if (Platform.OS === 'web') {
+        alert('Failed to burn browsing data. Please try again.');
+      } else {
+        Alert.alert('Error', 'Failed to burn browsing data. Please try again.');
+      }
+    }
   };
 
   const handleSearchEnginePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    console.log('[Settings] Search Engine selector pressed');
+    setShowSearchEngineModal(true);
   };
 
   const handleThemePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    console.log('[Settings] Theme selector pressed');
+    // Theme is currently fixed to dark mode
+    if (Platform.OS === 'web') {
+      alert('Theme is currently set to Dark Mode for optimal viewing.');
+    } else {
+      Alert.alert('App Theme', 'Theme is currently set to Dark Mode for optimal viewing.');
+    }
   };
 
-  const toggleSwitch = (setter: React.Dispatch<React.SetStateAction<boolean>>, currentValue: boolean) => {
+  const handleToggle = (key: keyof typeof settings, currentValue: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setter(!currentValue);
+    updateSetting(key, !currentValue);
+  };
+
+  const handleSearchEngineChange = (engine: SearchEngine) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    updateSetting('defaultSearchEngine', engine);
+    setShowSearchEngineModal(false);
   };
 
   // ============================================================
@@ -88,17 +138,13 @@ export default function SettingsScreen() {
   
   const GlossyCard: React.FC<{ children: React.ReactNode; title: string }> = ({ children, title }) => (
     <View style={styles.cardOuterContainer}>
-      {/* Opalescent Glass Background */}
       <LinearGradient
         colors={['rgba(255,255,255,0.85)', 'rgba(255,255,255,0.95)']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={styles.cardGradient}
       >
-        {/* Reflective Edge Highlight */}
         <View style={styles.reflectiveEdge} />
-        
-        {/* Card Content */}
         <View style={styles.cardContent}>
           <Text style={styles.cardTitle}>{title}</Text>
           {children}
@@ -113,30 +159,30 @@ export default function SettingsScreen() {
 
   const renderSwitchRow = (
     label: string,
-    value: boolean,
-    onToggle: () => void,
+    settingKey: keyof typeof settings,
     subtitle?: string
-  ) => (
-    <View style={styles.row}>
-      <View style={styles.rowTextContainer}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        {subtitle && <Text style={styles.rowSubtitle}>{subtitle}</Text>}
+  ) => {
+    const value = settings[settingKey] as boolean;
+    return (
+      <View style={styles.row}>
+        <View style={styles.rowTextContainer}>
+          <Text style={styles.rowLabel}>{label}</Text>
+          {subtitle && <Text style={styles.rowSubtitle}>{subtitle}</Text>}
+        </View>
+        <View style={styles.switchContainer}>
+          <Switch
+            value={value}
+            onValueChange={() => handleToggle(settingKey, value)}
+            trackColor={{ false: 'rgba(0,0,0,0.1)', true: ELECTRIC_CYAN }}
+            thumbColor={value ? '#FFFFFF' : '#F8F8F8'}
+            ios_backgroundColor="rgba(0,0,0,0.1)"
+            style={styles.switch}
+          />
+          {value && <View style={styles.switchSpecular} pointerEvents="none" />}
+        </View>
       </View>
-      {/* Glossy Switch with Specular Thumb */}
-      <View style={styles.switchContainer}>
-        <Switch
-          value={value}
-          onValueChange={onToggle}
-          trackColor={{ false: 'rgba(0,0,0,0.1)', true: ELECTRIC_CYAN }}
-          thumbColor={value ? '#FFFFFF' : '#F8F8F8'}
-          ios_backgroundColor="rgba(0,0,0,0.1)"
-          style={styles.switch}
-        />
-        {/* Specular highlight overlay on thumb (visual only) */}
-        {value && <View style={styles.switchSpecular} pointerEvents="none" />}
-      </View>
-    </View>
-  );
+    );
+  };
 
   const renderChevronRow = (
     label: string,
@@ -155,8 +201,65 @@ export default function SettingsScreen() {
   );
 
   // ============================================================
+  // SEARCH ENGINE SELECTOR MODAL
+  // ============================================================
+  
+  const renderSearchEngineModal = () => {
+    if (!showSearchEngineModal) return null;
+    
+    return (
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          onPress={() => setShowSearchEngineModal(false)}
+          activeOpacity={1}
+        />
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Default Search Engine</Text>
+          
+          {(['google', 'duckduckgo', 'bing'] as SearchEngine[]).map((engine) => (
+            <TouchableOpacity
+              key={engine}
+              style={[
+                styles.modalOption,
+                settings.defaultSearchEngine === engine && styles.modalOptionActive
+              ]}
+              onPress={() => handleSearchEngineChange(engine)}
+            >
+              <Text style={[
+                styles.modalOptionText,
+                settings.defaultSearchEngine === engine && styles.modalOptionTextActive
+              ]}>
+                {SEARCH_ENGINE_NAMES[engine]}
+              </Text>
+              {settings.defaultSearchEngine === engine && (
+                <Ionicons name="checkmark-circle" size={22} color={ELECTRIC_CYAN} />
+              )}
+            </TouchableOpacity>
+          ))}
+          
+          <TouchableOpacity
+            style={styles.modalCloseButton}
+            onPress={() => setShowSearchEngineModal(false)}
+          >
+            <Text style={styles.modalCloseText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // ============================================================
   // MAIN RENDER
   // ============================================================
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <Text style={styles.loadingText}>Loading settings...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -168,9 +271,6 @@ export default function SettingsScreen() {
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      
-      {/* Subtle Radial Overlay for Depth */}
-      <View style={styles.radialOverlay} />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -192,30 +292,22 @@ export default function SettingsScreen() {
         {/* CARD 1: ENGINE & AI */}
         {/* ============================================================ */}
         <GlossyCard title="Engine & AI">
-          {renderChevronRow('Default Search Engine', 'Google', handleSearchEnginePress)}
-          <View style={styles.divider} />
-          {renderSwitchRow(
-            'Local AI Assistant',
-            localAIAssistant,
-            () => toggleSwitch(setLocalAIAssistant, localAIAssistant)
+          {renderChevronRow(
+            'Default Search Engine', 
+            SEARCH_ENGINE_NAMES[settings.defaultSearchEngine], 
+            handleSearchEnginePress
           )}
+          <View style={styles.divider} />
+          {renderSwitchRow('Local AI Assistant', 'strictLocalAI')}
         </GlossyCard>
 
         {/* ============================================================ */}
         {/* CARD 2: PRIVACY & SECURITY */}
         {/* ============================================================ */}
         <GlossyCard title="Privacy & Security">
-          {renderSwitchRow(
-            'Ad & Tracker Shield',
-            adTrackerShield,
-            () => toggleSwitch(setAdTrackerShield, adTrackerShield)
-          )}
+          {renderSwitchRow('Ad & Tracker Shield', 'aggressiveAdBlocking')}
           <View style={styles.divider} />
-          {renderSwitchRow(
-            'Strict Do Not Track',
-            strictDoNotTrack,
-            () => toggleSwitch(setStrictDoNotTrack, strictDoNotTrack)
-          )}
+          {renderSwitchRow('Strict Do Not Track', 'doNotTrack')}
           <View style={styles.divider} />
           
           {/* Burn Browsing Data - Glossy Danger Button */}
@@ -244,15 +336,13 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
           {renderSwitchRow(
             'Force Dark Web',
-            forceDarkWeb,
-            () => toggleSwitch(setForceDarkWeb, forceDarkWeb),
+            'forceDarkWeb',
             'Attempts to force dark mode on all sites'
           )}
           <View style={styles.divider} />
           {renderSwitchRow(
             'Force Enable Zoom',
-            forceEnableZoom,
-            () => toggleSwitch(setForceEnableZoom, forceEnableZoom),
+            'forceZoom',
             'Override sites that block pinch-to-zoom'
           )}
         </GlossyCard>
@@ -260,6 +350,9 @@ export default function SettingsScreen() {
         {/* Version Footer */}
         <Text style={styles.versionText}>ACCESS Browser v1.0</Text>
       </ScrollView>
+
+      {/* Search Engine Modal */}
+      {renderSearchEngineModal()}
     </View>
   );
 }
@@ -273,12 +366,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F7FA',
   },
-  // Radial Overlay for Depth Effect
-  radialOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-    // Simulated radial gradient using opacity
-    opacity: 0.3,
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: TEXT_SECONDARY,
   },
   // Header
   header: {
@@ -337,13 +431,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
   },
-  // ============================================================
-  // GLOSSY CARD STYLES
-  // ============================================================
+  // Card Styles
   cardOuterContainer: {
     marginBottom: 20,
     borderRadius: 20,
-    // Deep Glossy Shadows
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -359,7 +450,6 @@ const styles = StyleSheet.create({
   cardGradient: {
     borderRadius: 20,
     overflow: 'hidden',
-    // Reflective Edge - Top and Left highlight
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderTopColor: 'rgba(255,255,255,1)',
@@ -387,10 +477,6 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 16,
-    // Text shadow for glossy effect
-    textShadowColor: 'rgba(0, 255, 255, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
@@ -430,7 +516,7 @@ const styles = StyleSheet.create({
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
     }),
   },
-  // Switch Container for Specular Effect
+  // Switch Container
   switchContainer: {
     position: 'relative',
   },
@@ -445,7 +531,6 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: 'rgba(255,255,255,0.9)',
-    // Specular highlight glow
     ...Platform.select({
       ios: {
         shadowColor: '#FFF',
@@ -496,6 +581,90 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: DANGER_RED,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  // Modal
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '85%',
+    maxWidth: 340,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: TEXT_DARK,
+    textAlign: 'center',
+    marginBottom: 20,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
+  modalOptionActive: {
+    backgroundColor: 'rgba(0,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: ELECTRIC_CYAN,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: TEXT_DARK,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  modalOptionTextActive: {
+    fontWeight: '600',
+    color: TEXT_DARK,
+  },
+  modalCloseButton: {
+    marginTop: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    fontSize: 16,
+    color: TEXT_SECONDARY,
+    fontWeight: '500',
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
