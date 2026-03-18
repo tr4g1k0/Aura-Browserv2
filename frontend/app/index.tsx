@@ -5,8 +5,6 @@ import {
   Platform,
   BackHandler,
   Text,
-  ScrollView,
-  RefreshControl,
   Share,
   Animated,
 } from 'react-native';
@@ -190,7 +188,6 @@ export default function BrowserScreen() {
   const [liveCaptionsVisible, setLiveCaptionsVisible] = useState(false);
   const [visionAISelectors, setVisionAISelectors] = useState<string[]>([]);
   const [adsBlocked, setAdsBlocked] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Download Manager state
   const [downloadToastVisible, setDownloadToastVisible] = useState(false);
@@ -210,10 +207,6 @@ export default function BrowserScreen() {
   // Zero-Load Predictive Caching state
   const [cachedPageSource, setCachedPageSource] = useState<CachedPage | null>(null);
   const [isCacheHit, setIsCacheHit] = useState(false);
-  
-  // Pull-to-Refresh: Track if WebView is scrolled to top
-  // Only enable refresh when user is at the top of the page
-  const [isAtTop, setIsAtTop] = useState(true);
   
   // Tab Virtualization: Track current scroll position and previous tab
   const currentScrollYRef = useRef<number>(0);
@@ -837,14 +830,6 @@ export default function BrowserScreen() {
     router.push('/settings');
   };
 
-  // Pull-to-refresh handler with haptic feedback
-  const handleRefresh = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setIsRefreshing(true);
-    webViewRef.current?.reload();
-    // The refresh spinner will be hidden when onLoadEnd is called
-  }, []);
-
   // VPN status indicator injection (MOCK)
   const vpnScript = settings.vpnEnabled ? `
     (function() {
@@ -963,123 +948,98 @@ export default function BrowserScreen() {
             onGoForward={() => webViewRef.current?.goForward()}
             enabled={Platform.OS === 'android'}
           >
-            <ScrollView
-              style={styles.webviewScrollView}
-              contentContainerStyle={styles.webviewScrollContent}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={handleRefresh}
-                  enabled={isAtTop}                        // PULL-TO-REFRESH FIX: Only enable when at top
-                  tintColor="#00FF88"                      // iOS spinner color (Neon Green)
-                  colors={['#00FF88', '#00E5FF']}          // Android spinner colors
-                  progressBackgroundColor="#1A1A1A"        // Android spinner background
-                  title="Refreshing..."                    // iOS refresh text
-                  titleColor="#00FF88"                     // iOS refresh text color
-                />
+            {/* 
+              NATIVE SCROLL FIX: WebView is now a direct child of View (no ScrollView wrapper)
+              This preserves native scroll physics on Android/iOS.
+              Pull-to-refresh is handled by the native WebView via pullToRefreshEnabled prop.
+            */}
+            <WebView
+              key={webViewKey}
+              ref={webViewRef}
+              source={
+                // Zero-Load: Use cached HTML if available, otherwise use URI
+                cachedPageSource && isCacheHit
+                  ? { html: cachedPageSource.html, baseUrl: cachedPageSource.baseUrl }
+                  : { uri: activeTab.url }
               }
-            >
-              <WebView
-                key={webViewKey}
-                ref={webViewRef}
-                source={
-                  // Zero-Load: Use cached HTML if available, otherwise use URI
-                  cachedPageSource && isCacheHit
-                    ? { html: cachedPageSource.html, baseUrl: cachedPageSource.baseUrl }
-                    : { uri: activeTab.url }
-                }
-                style={styles.webview}
-                onNavigationStateChange={handleNavigationStateChange}
-                onShouldStartLoadWithRequest={handleShouldStartLoad}
-                onLoadStart={() => {
-                  setLoading(true);
-                  setIsAtTop(true);  // Reset to top on new page load
-                }}
-                onLoadEnd={(event) => {
-                  handleLoadEnd(event);
-                  setIsRefreshing(false); // Stop refresh spinner
-                }}
-                onMessage={handleMessage}
-                // PULL-TO-REFRESH FIX: Track scroll position to conditionally enable refresh
-                onScroll={(syntheticEvent) => {
-                  const { contentOffset } = syntheticEvent.nativeEvent;
-                  const atTop = contentOffset.y <= 0;
-                  if (atTop !== isAtTop) {
-                    setIsAtTop(atTop);
-                  }
-                }}
-                scrollEventThrottle={16}  // Smooth scroll position updates (60fps)
-                injectedJavaScript={getInjectedScript()}
-                javaScriptEnabled
-                domStorageEnabled
-                startInLoadingState
-                allowsBackForwardNavigationGestures
-                allowsInlineMediaPlayback
-                // MEDIA PLAYBACK POLICY: 
-                // - YouTube URLs: Allow auto-play for Shorts to work properly
-                // - Other sites: Require user action to prevent background video preloading
-                mediaPlaybackRequiresUserAction={
-                  !activeTab.url.includes('youtube.com') && 
-                  !activeTab.url.includes('youtu.be')
-                }
-                // iOS File Download Handler
-                onFileDownload={({ nativeEvent: { downloadUrl } }) => {
-                  handleFileDownload(downloadUrl);
-                }}
-                // MEMORY LEAK PROTECTION: Auto-reload if content process crashes
-                // Clears "sludge" from heavy video feeds like YouTube Shorts
-                onContentProcessDidTerminate={(syntheticEvent) => {
-                  const { nativeEvent } = syntheticEvent;
-                  console.warn('[WebView] Content process terminated, reloading...', nativeEvent);
-                  webViewRef.current?.reload();
-                }}
-                // Clean UI settings
-                setBuiltInZoomControls={false}   // Hide Android zoom controls
-                setDisplayZoomControls={false}   // Ensure zoom controls are hidden
-                scalesPageToFit={true}
-                // SETTINGS-DRIVEN PROPS (observed from global settings)
-                cacheEnabled={!isGhostMode && !userSettings.doNotTrack}
-                // YOUTUBE FIX: Don't use strict incognito mode for YouTube
-                // YouTube's video player can break in strict incognito mode
-                incognito={isGhostMode && !activeTab?.url?.includes('youtube.com')}
-                // Desktop Mode: Use desktop user agent if enabled (per-tab or global default)
-                userAgent={activeTab?.isDesktopMode || userSettings.requestDesktopSite ? DESKTOP_USER_AGENT : undefined}
-                // ============================================================
-                // OPTIMIZED WEBVIEW PROPS FOR STANDARD BROWSING
-                // Removed heavy GPU props that were causing global scroll lag
-                // ============================================================
-                
-                // HARDWARE ACCELERATION - Keep enabled but don't force hardware layer
-                androidHardwareAccelerationDisabled={false}
-                // REMOVED: androidLayerType="hardware" - Default is better for text sites
-                // Only video sites benefit from hardware layer type
-                
-                // iOS: Native smooth scrolling deceleration
-                decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.998}
-                // iOS: Bounces at scroll edges for native feel
-                bounces={true}
-                
-                // CRITICAL: Enable nested scrolling for smooth Android scrolling
-                nestedScrollEnabled={true}
-                
-                // Stops Android's visual stretch effect which drops frames
-                overScrollMode="never"
-                
-                // Prevents background popups from eating RAM
-                setSupportMultipleWindows={false}
-                
-                // REMOVED: renderToHardwareTextureAndroid - causes lag on text sites
-                // REMOVED: removeClippedSubviews - can cause blank content issues
-                
-                // Mixed content mode for video compatibility
-                mixedContentMode="always"
-                // Standard cache mode
-                cacheMode="LOAD_DEFAULT"
-                
-                // NOTE: scrollEventThrottle={16} is now used above for pull-to-refresh position tracking
-                // The performance impact is minimal since we only update state when isAtTop changes
-              />
-            </ScrollView>
+              style={styles.webview}
+              onNavigationStateChange={handleNavigationStateChange}
+              onShouldStartLoadWithRequest={handleShouldStartLoad}
+              onLoadStart={() => setLoading(true)}
+              onLoadEnd={handleLoadEnd}
+              onMessage={handleMessage}
+              injectedJavaScript={getInjectedScript()}
+              javaScriptEnabled
+              domStorageEnabled
+              startInLoadingState
+              allowsBackForwardNavigationGestures
+              allowsInlineMediaPlayback
+              // MEDIA PLAYBACK POLICY: 
+              // - YouTube URLs: Allow auto-play for Shorts to work properly
+              // - Other sites: Require user action to prevent background video preloading
+              mediaPlaybackRequiresUserAction={
+                !activeTab.url.includes('youtube.com') && 
+                !activeTab.url.includes('youtu.be')
+              }
+              // iOS File Download Handler
+              onFileDownload={({ nativeEvent: { downloadUrl } }) => {
+                handleFileDownload(downloadUrl);
+              }}
+              // MEMORY LEAK PROTECTION: Auto-reload if content process crashes
+              // Clears "sludge" from heavy video feeds like YouTube Shorts
+              onContentProcessDidTerminate={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.warn('[WebView] Content process terminated, reloading...', nativeEvent);
+                webViewRef.current?.reload();
+              }}
+              // Clean UI settings
+              setBuiltInZoomControls={false}   // Hide Android zoom controls
+              setDisplayZoomControls={false}   // Ensure zoom controls are hidden
+              scalesPageToFit={true}
+              // SETTINGS-DRIVEN PROPS (observed from global settings)
+              cacheEnabled={!isGhostMode && !userSettings.doNotTrack}
+              // YOUTUBE FIX: Don't use strict incognito mode for YouTube
+              // YouTube's video player can break in strict incognito mode
+              incognito={isGhostMode && !activeTab?.url?.includes('youtube.com')}
+              // Desktop Mode: Use desktop user agent if enabled (per-tab or global default)
+              userAgent={activeTab?.isDesktopMode || userSettings.requestDesktopSite ? DESKTOP_USER_AGENT : undefined}
+              // ============================================================
+              // NATIVE SCROLL PHYSICS - No JS bridge overhead
+              // WebView handles all scrolling and refresh natively
+              // ============================================================
+              
+              // NATIVE PULL-TO-REFRESH: Let WebView handle refresh gesture natively
+              // This avoids JS bridge latency from scroll position tracking
+              pullToRefreshEnabled={true}
+              
+              // CRITICAL: Enable nested scrolling for smooth Android scrolling
+              // Prevents parent views from stealing scroll gestures
+              nestedScrollEnabled={true}
+              
+              // Stops Android's visual stretch effect which drops frames
+              overScrollMode="never"
+              
+              // Hide scroll indicators for cleaner UI
+              showsVerticalScrollIndicator={false}
+              showsHorizontalScrollIndicator={false}
+              
+              // iOS: Bounces at scroll edges for native feel
+              bounces={true}
+              
+              // iOS: Native smooth scrolling deceleration
+              decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.998}
+              
+              // HARDWARE ACCELERATION - Keep enabled but don't force hardware layer
+              androidHardwareAccelerationDisabled={false}
+              
+              // Prevents background popups from eating RAM
+              setSupportMultipleWindows={false}
+              
+              // Mixed content mode for video compatibility
+              mixedContentMode="always"
+              // Standard cache mode
+              cacheMode="LOAD_DEFAULT"
+            />
           </SwipeNavigationWrapper>
         ) : null}
 
@@ -1155,12 +1115,6 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: '#0D0D0D',
-  },
-  webviewScrollView: {
-    flex: 1,
-  },
-  webviewScrollContent: {
-    flex: 1,
   },
   // Zero-Load Cache Hit Indicator
   cacheHitIndicator: {
