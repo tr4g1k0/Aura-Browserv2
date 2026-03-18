@@ -159,6 +159,10 @@ export const useBrowserSettings = (): UseBrowserSettingsReturn => {
     setSettings(prev => {
       const newSettings = { ...prev, [key]: value };
       persistSettings(newSettings);
+      
+      // AUDIT: Console log for debugging state changes
+      console.log(`[Settings] ${String(key)} set to ${JSON.stringify(value)}`);
+      
       return newSettings;
     });
   }, [persistSettings]);

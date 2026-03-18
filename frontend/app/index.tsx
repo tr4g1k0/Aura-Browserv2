@@ -48,6 +48,7 @@ import {
   PageContext 
 } from '../src/services/SemanticHistoryService';
 import * as Haptics from 'expo-haptics';
+import { ambientAwarenessService } from '../src/services/AmbientAwarenessService';
 
 // Conditionally import WebView only on native platforms
 let WebView: any = null;
@@ -265,6 +266,35 @@ export default function BrowserScreen() {
       return () => backHandler.remove();
     }
   }, [activeTab?.canGoBack]);
+
+  // ============================================================================
+  // AMBIENT AWARENESS ENGINE WIRING
+  // Start/stop microphone listener based on user setting
+  // This ensures battery is saved when the feature is disabled
+  // ============================================================================
+  useEffect(() => {
+    if (userSettings.ambientAwarenessEnabled) {
+      console.log('[Engine] Ambient Awareness ENABLED - starting microphone listener');
+      ambientAwarenessService.start().then((success) => {
+        if (success) {
+          console.log('[Engine] Ambient Awareness service started successfully');
+        } else {
+          console.warn('[Engine] Ambient Awareness service failed to start (permission denied?)');
+        }
+      });
+    } else {
+      console.log('[Engine] Ambient Awareness DISABLED - stopping microphone listener');
+      ambientAwarenessService.stop();
+    }
+
+    // Cleanup on unmount or setting change
+    return () => {
+      if (ambientAwarenessService.getIsActive()) {
+        console.log('[Engine] Ambient Awareness cleanup - stopping service');
+        ambientAwarenessService.stop();
+      }
+    };
+  }, [userSettings.ambientAwarenessEnabled]);
 
   /**
    * Handle navigation - parse user input and navigate to URL
@@ -573,6 +603,8 @@ export default function BrowserScreen() {
      * PERFORMANCE: Debounced to prevent multiple timers stacking
      */
     if (!isGhostMode && userSettings.aiHistoryEnabled !== false && activeTab?.url) {
+      console.log('[Engine] AI History ENABLED - scheduling page context extraction');
+      
       // Clear any existing timer to prevent stacking
       if ((window as any).__semanticHistoryTimer) {
         clearTimeout((window as any).__semanticHistoryTimer);
@@ -583,6 +615,8 @@ export default function BrowserScreen() {
         console.log('[Semantic History] Capturing page context after 3s delay...');
         webViewRef.current?.injectJavaScript(pageContextExtractionScript);
       }, 3000);
+    } else if (!isGhostMode && userSettings.aiHistoryEnabled === false) {
+      console.log('[Engine] AI History DISABLED - skipping page context extraction');
     }
   }, [userSettings.aggressiveAdBlocking, userSettings.aiHistoryEnabled, settings.predictiveCachingEnabled, visionAISelectors, cachedPageSource, activeTab?.scrollY, activeTab?.url, isGhostMode]);
 
@@ -849,6 +883,7 @@ export default function BrowserScreen() {
    * 3. Performance Optimization (Layer 3)
    * 4. VPN indicator
    * 5. Force Enable Zoom (Chrome-like accessibility override)
+   * 6. Do Not Track (DNT) header signal to JavaScript
    */
   const getInjectedScript = useCallback(() => {
     let scripts = '';
@@ -857,11 +892,17 @@ export default function BrowserScreen() {
     // Forces video elements into Compositor Layers for GPU rendering
     scripts += gpuLayerSquashingScript;
     
-    // Add Smart Shield ad-buster script if enabled
+    // ============================================================================
+    // AD-BLOCKING ENGINE WIRING
+    // Only inject ad-buster script if aggressive ad-blocking is enabled
+    // ============================================================================
     if (userSettings.aggressiveAdBlocking) {
+      console.log('[Engine] Ad-Blocking ENABLED - injecting ad-buster script');
       scripts += visionAISelectors.length > 0 
         ? createAdBusterScript(visionAISelectors)
         : adBusterScript;
+    } else {
+      console.log('[Engine] Ad-Blocking DISABLED - skipping ad-buster script');
     }
     
     // Always add performance optimization script (lazy loading, auto-play killing)
@@ -870,6 +911,36 @@ export default function BrowserScreen() {
     
     // Add VPN indicator script
     scripts += vpnScript;
+    
+    // ============================================================================
+    // DO NOT TRACK (DNT) ENGINE WIRING
+    // Set navigator.doNotTrack to "1" when DNT is enabled
+    // This signals to JavaScript on the page that the user prefers not to be tracked
+    // ============================================================================
+    if (userSettings.doNotTrack) {
+      console.log('[Engine] Do Not Track ENABLED - injecting DNT signal');
+      scripts += `
+        (function() {
+          try {
+            // Override navigator.doNotTrack to return "1"
+            Object.defineProperty(navigator, 'doNotTrack', {
+              get: function() { return '1'; },
+              configurable: true
+            });
+            // Also set globalPrivacyControl for modern sites
+            Object.defineProperty(navigator, 'globalPrivacyControl', {
+              get: function() { return true; },
+              configurable: true
+            });
+            console.log('[DNT] Do Not Track signal injected');
+          } catch(e) {
+            console.log('[DNT] Error setting DNT:', e);
+          }
+        })();
+      `;
+    } else {
+      console.log('[Engine] Do Not Track DISABLED');
+    }
     
     // FORCE ENABLE ZOOM: Chrome-like accessibility override
     // Many mobile sites block pinch-to-zoom via viewport meta tag
@@ -895,7 +966,7 @@ export default function BrowserScreen() {
     `;
     
     return scripts || 'true;';
-  }, [userSettings.aggressiveAdBlocking, visionAISelectors, vpnScript]);
+  }, [userSettings.aggressiveAdBlocking, userSettings.doNotTrack, visionAISelectors, vpnScript]);
 
   // Calculate bottom padding for home indicator
   // When address bar is at bottom, we need more space for the navigation bar
