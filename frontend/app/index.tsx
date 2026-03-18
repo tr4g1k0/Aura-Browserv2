@@ -7,6 +7,7 @@ import {
   Text,
   Share,
   Animated,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -975,13 +976,18 @@ export default function BrowserScreen() {
     : Math.max(insets.bottom, 8);
 
   return (
-    <View style={[
-      styles.container, 
-      // Address Bar Position: Use column-reverse when position is 'bottom'
-      userSettings.addressBarPosition === 'bottom' && styles.containerBottomBar,
-      // Apply bottom safe area padding to avoid home indicator overlap
-      { paddingBottom: bottomPadding }
-    ]}>
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+      <View style={[
+        styles.container, 
+        // Address Bar Position: Use column-reverse when position is 'bottom'
+        userSettings.addressBarPosition === 'bottom' && styles.containerBottomBar,
+        // Apply bottom safe area padding to avoid home indicator overlap
+        { paddingBottom: bottomPadding }
+      ]}>
       {/* Unified Top Bar - Single sleek row with all controls */}
       <UnifiedTopBar
         onNavigate={handleNavigate}
@@ -1204,6 +1210,7 @@ export default function BrowserScreen() {
         }}
       />
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
