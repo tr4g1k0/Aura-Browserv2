@@ -435,502 +435,61 @@ true;`;
 export const adBusterScript = createAdBusterScript();
 
 // ============================================================================
-// LAYER 3: PERFORMANCE OPTIMIZATION (DOM STRIPPING)
+// LAYER 3: PERFORMANCE OPTIMIZATION (MINIMAL)
 // ============================================================================
 
 /**
- * CRITICAL: Aggressive GPU Layer Squashing Script v1.3
- * This MUST run FIRST before any other scripts to force GPU compositing
- * Moves ALL video rendering off CPU onto Graphics Chip
- * 
- * v1.3 - YouTube Shorts Auto-Play Fix:
- * - Changed to "contain: layout style" (removes SIZE containment)
- * - SIZE containment was telling YouTube the next video is 0px
- * - This broke the Intersection Observer that triggers auto-play
- * - Added force GPU rule for Shorts containers
- * - Added resize event dispatch to wake up Intersection Observers
- * - v2.2: Made optimizations site-specific to avoid lag on Google/other sites
+ * Minimal Performance Script
+ * Only applies basic tap highlight fix - no heavy optimizations
+ * All YouTube-specific optimizations have been removed for better performance
  */
 export const gpuLayerSquashingScript = `
 (function(){
   'use strict';
   
-  /* LAYER SQUASHING v2.2 - Site-Specific Optimizations */
-  /* Only applies heavy GPU rules to video sites (YouTube, TikTok, Instagram) */
-  /* Other sites get minimal CSS for smooth scrolling */
-  
-  var isVideoSite = location.hostname.includes('youtube.com') || 
-                    location.hostname.includes('tiktok.com') || 
-                    location.hostname.includes('instagram.com');
-  
-  /* MINIMAL BASE CSS - Safe for all sites */
-  var baseStyle = document.createElement('style');
-  baseStyle.id = 'base-scroll-fix';
-  baseStyle.innerHTML = [
-    /* Only disable tap highlight - minimal impact */
-    'a, button, input, [role="button"] { -webkit-tap-highlight-color: transparent; }',
-    
-    /* Smooth scrolling on iOS */
-    'html { -webkit-overflow-scrolling: touch; }'
-  ].join('\\n');
+  /* MINIMAL CSS - Just basic mobile fixes */
+  var style = document.createElement('style');
+  style.id = 'minimal-mobile-fix';
+  style.innerHTML = 'a, button { -webkit-tap-highlight-color: transparent; }';
   
   if (document.head) {
-    document.head.insertBefore(baseStyle, document.head.firstChild);
-  }
-  
-  /* VIDEO SITE OPTIMIZATIONS - Only apply to YouTube/TikTok/Instagram */
-  if (isVideoSite) {
-    var gpuStyle = document.createElement('style');
-    gpuStyle.id = 'gpu-layer-squashing';
-    gpuStyle.innerHTML = [
-      /* Disable overscroll glow on video sites */
-      'html, body { overscroll-behavior: none; }',
-      
-      /* GPU acceleration for video elements only */
-      'video, .html5-video-player, #player-container {',
-      '  transform: translateZ(0);',
-      '  will-change: transform;',
-      '  backface-visibility: hidden;',
-      '  -webkit-backface-visibility: hidden;',
-      '}'
-    ].join('\\n');
-    
-    if (document.head) {
-      document.head.appendChild(gpuStyle);
-    }
-    
-    console.log('[GPU Optimization] Video site detected - GPU acceleration enabled');
-  }
-  
-  /* YOUTUBE-SPECIFIC OPTIMIZATIONS */
-  var isYouTube = location.hostname.includes('youtube.com');
-  
-  if (isYouTube) {
-    var ytStyle = document.createElement('style');
-    ytStyle.id = 'youtube-optimization';
-    ytStyle.innerHTML = [
-      /* YouTube Shorts containers */
-      'ytd-shorts, #shorts-player, ytd-reel-video-renderer {',
-      '  transform: translateZ(0);',
-      '  will-change: transform, opacity;',
-      '  -webkit-backface-visibility: hidden;',
-      '}',
-      
-      /* Shorts container smooth scrolling */
-      '#shorts-container, .ytd-shorts, #shorts-inner-container {',
-      '  -webkit-overflow-scrolling: touch;',
-      '}'
-    ].join('\\n');
-    
-    if (document.head) {
-      document.head.appendChild(ytStyle);
-    }
-    
-    console.log('[YouTube Optimization] YouTube-specific CSS applied');
-    
-    /* ================================================================== */
-    /* DOM ISOLATION - YOUTUBE ONLY                                       */
-    /* "layout style" ONLY (no size containment!)                         */
-    /* This allows Intersection Observer to calculate video heights       */
-    /* ================================================================== */
-    
-    var isolationStyle = document.createElement('style');
-    isolationStyle.id = 'dom-isolation';
-    isolationStyle.innerHTML = [
-      /* contain: layout style - NO SIZE containment */
-      'ytd-shorts, ytd-reel-video-renderer, .video-stream, #shorts-player {',
-      '  contain: layout style !important;',
-      '}',
-      
-      /* Shorts feed container - layout style only */
-      '#shorts-inner-container, ytd-reel-shelf-renderer, #shorts-container {',
-      '  contain: layout style !important;',
-      '}',
-      
-      /* Individual reel items - layout style + isolation */
-      '.reel-video-in-sequence {',
-      '  contain: layout style !important;',
-      '  isolation: isolate;',
-      '}',
-      
-      /* YouTube player container - needs proper height calculation */
-      '#player-container, .html5-video-player {',
-      '  contain: layout style !important;',
-      '}',
-      
-      /* VIEWPORT PRE-RENDER - For regular YouTube feed */
-      'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer {',
-      '  content-visibility: auto;',
-      '  contain-intrinsic-size: 1px 300px;',
-      '}',
-      
-      /* YouTube feed items */
-      'ytd-grid-video-renderer, ytd-playlist-video-renderer {',
-      '  content-visibility: auto;',
-      '  contain-intrinsic-size: 1px 250px;',
-      '}'
-    ].join('\\n');
-    
-    if (document.head) {
-      document.head.appendChild(isolationStyle);
-    }
-    
-    console.log('[DOM Isolation] YouTube-specific containment applied');
-  }
-  
-  /* ================================================================== */
-  /* INTERSECTION OBSERVER FIX - YOUTUBE ONLY                           */
-  /* Only runs on YouTube to fix auto-play detection                    */
-  /* ================================================================== */
-  
-  /* ================================================================== */
-  /* INTERSECTION OBSERVER FIX - YOUTUBE ONLY                           */
-  /* Only runs on YouTube to fix auto-play detection                    */
-  /* ================================================================== */
-  
-  var isYouTube = location.hostname.includes('youtube.com');
-  var isYouTubeShorts = location.pathname.includes('/shorts');
-  
-  // Only run intersection fix on YouTube
-  if (isYouTube) {
-    function triggerIntersectionRecalc() {
-      window.dispatchEvent(new Event('resize'));
-      window.dispatchEvent(new Event('scroll'));
-    }
-    
-    // Run once on load for YouTube
-    if (document.readyState === 'complete') {
-      setTimeout(triggerIntersectionRecalc, 500);
-    } else {
-      window.addEventListener('load', function() {
-        setTimeout(triggerIntersectionRecalc, 500);
-      });
-    }
-    
-    // Periodic recalc ONLY for Shorts pages (not all YouTube)
-    if (isYouTubeShorts) {
-      setInterval(function() {
-        window.dispatchEvent(new Event('resize'));
-      }, 2000);
-      console.log('[Intersection Fix] YouTube Shorts - periodic recalc enabled');
-    }
-  }
-  
-  /* ================================================================== */
-  /* PURE VIDEO SCRIPT v2.1 - YOUTUBE SHORTS ONLY                       */
-  /* These aggressive fixes ONLY apply to YouTube Shorts pages          */
-  /* Other pages (Google, etc.) remain unaffected for smooth scrolling  */
-  /* ================================================================== */
-  
-  if (isYouTubeShorts) {
-    // KILL THE BLANK VIEWPORT: Force 100vh height and native scrolling
-    var pureVideoStyle = document.createElement('style');
-    pureVideoStyle.id = 'pure-video-style';
-    pureVideoStyle.innerHTML = [
-      'ytd-shorts {',
-      '  height: 100vh !important;',
-      '  overflow-y: scroll !important;',
-      '  -webkit-overflow-scrolling: touch !important;',
-      '  scroll-snap-type: y mandatory;',
-      '}',
-      'ytd-reel-video-renderer {',
-      '  height: 100vh !important;',
-      '  contain: none !important;',
-      '  scroll-snap-align: start;',
-      '}',
-      'ytd-reel-video-renderer[is-active] {',
-      '  display: block !important;',
-      '  visibility: visible !important;',
-      '  opacity: 1 !important;',
-      '  height: 100vh !important;',
-      '}',
-      'ytd-reel-video-renderer video, #shorts-player video {',
-      '  width: 100% !important;',
-      '  height: 100% !important;',
-      '  object-fit: cover !important;',
-      '}',
-      'ytd-reel-video-renderer[is-active] *, #shorts-player * {',
-      '  content-visibility: visible !important;',
-      '}'
-    ].join('\\n');
-    
-    if (document.head) {
-      document.head.appendChild(pureVideoStyle);
-    }
-    
-    console.log('[Pure Video] YouTube Shorts CSS injected');
-    
-    /* PURE VIDEO CLEANER - Only runs on Shorts pages */
-    var pureVideoCleaner = setInterval(function() {
-      var activeShort = document.querySelector('[is-active]');
-      
-      if (activeShort) {
-        document.querySelectorAll('ytd-reel-video-renderer:not([is-active])').forEach(function(el) {
-          el.style.display = 'none';
-          var video = el.querySelector('video');
-          if (video && !video.paused) {
-            video.pause();
-          }
-        });
-        
-        activeShort.style.display = 'block';
-        activeShort.style.height = '100vh';
-        activeShort.style.visibility = 'visible';
-        activeShort.style.opacity = '1';
-        
-        var activeVideo = activeShort.querySelector('video');
-        if (activeVideo && activeVideo.paused && activeVideo.readyState >= 2) {
-          activeVideo.play().catch(function(e) {});
-        }
-      }
-    }, 1000);
-    
-    console.log('[Pure Video] Shorts cleaner started');
-    
-    /* SINGLE-ACTIVE PLAYBACK - Only on Shorts */
-    setInterval(function() {
-      var videos = document.querySelectorAll('video');
-      var activeCount = 0;
-      
-      videos.forEach(function(v) {
-        var isInActive = v.parentElement && v.parentElement.closest('[is-active]');
-        if (!isInActive && !v.paused) {
-          v.pause();
-        } else if (isInActive && !v.paused) {
-          activeCount++;
-        }
-      });
-      
-      if (activeCount === 0) {
-        var activeShort = document.querySelector('[is-active]');
-        if (activeShort) {
-          var activeVideo = activeShort.querySelector('video');
-          if (activeVideo && activeVideo.paused && activeVideo.readyState >= 2) {
-            activeVideo.play().catch(function(e) {});
-          }
-        }
-      }
-    }, 500);
-    
-    console.log('[Single-Active] Shorts playback enforcement started');
+    document.head.appendChild(style);
   }
 })();
 true;`;
 
 /**
- * Aggressive DOM Stripping Script
- * Optimizes network and rendering payload by:
- * 1. Lazy loading all images and iframes
- * 2. Killing auto-play on all videos
- * 3. Reducing unnecessary resource consumption
- * 
- * This runs after the page loads to ensure all elements are captured.
+ * Minimal Performance Script
+ * Only enables lazy loading - no heavy GPU optimizations
  */
 export const performanceOptimizationScript = `
 (function(){
   'use strict';
   
-  /* Smart Shield Performance Optimizer v2.1 */
-  /* Layer 3: Aggressive DOM Stripping + GPU Compositing for video feeds */
+  /* Smart Shield Performance Optimizer v3.0 - Minimal */
+  /* Only lazy loading - no GPU compositing to avoid lag */
   
-  /**
-   * CRITICAL: Inject GPU Compositing styles for smoother video rendering
-   * Forces hardware acceleration on video elements (especially YouTube Shorts)
-   */
-  function injectGPUCompositing() {
-    var style = document.createElement('style');
-    style.id = 'smart-shield-gpu-compositing';
-    style.innerHTML = \`
-      /* GPU Compositing for video elements - smoother Shorts/Reels transitions */
-      video {
-        transform: translateZ(0);
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-        perspective: 1000px;
-        will-change: transform;
-      }
-      
-      /* Native-feeling scroll physics */
-      * {
-        -webkit-overflow-scrolling: touch;
-      }
-      
-      /* Optimize scroll containers */
-      [class*="scroll"], [class*="feed"], [class*="list"], [class*="shorts"] {
-        -webkit-overflow-scrolling: touch;
-        overflow-scrolling: touch;
-        transform: translateZ(0);
-      }
-      
-      /* YouTube Shorts specific optimizations */
-      ytd-shorts, ytd-reel-video-renderer, .reel-video-container {
-        transform: translateZ(0);
-        backface-visibility: hidden;
-        will-change: transform, opacity;
-      }
-      
-      /* TikTok-style video containers */
-      [class*="video-card"], [class*="video-player"] {
-        transform: translateZ(0);
-        will-change: transform;
-      }
-      
-      /* Reduce paint complexity on feed items */
-      [class*="feed-item"], [class*="content-item"] {
-        contain: layout style paint;
-      }
-    \`;
-    
-    if (!document.getElementById('smart-shield-gpu-compositing')) {
-      document.head.appendChild(style);
-      console.log('[Performance] GPU compositing styles injected');
-    }
-  }
-  
-  /**
-   * Force lazy loading on all images and iframes
-   * Prevents wasting data/bandwidth on off-screen media
-   */
-  function enableLazyLoading() {
-    // Lazy load all images
-    var images = document.querySelectorAll('img:not([loading="lazy"])');
-    images.forEach(function(img) {
-      // Only modify if not already in viewport
-      img.setAttribute('loading', 'lazy');
-      // Also set decoding to async for smoother rendering
-      img.setAttribute('decoding', 'async');
-    });
-    
-    // Lazy load all iframes (embeds, ads, widgets)
-    var iframes = document.querySelectorAll('iframe:not([loading="lazy"])');
-    iframes.forEach(function(iframe) {
-      iframe.setAttribute('loading', 'lazy');
-    });
-    
-    console.log('[Performance] Lazy loading enabled:', images.length, 'images,', iframes.length, 'iframes');
-  }
-  
-  /**
-   * Kill all video auto-play to save battery and data
-   * Videos should only play when user explicitly taps them
-   * NOTE: This is now controlled by mediaPlaybackRequiresUserAction prop
-   */
-  function killVideoAutoPlay() {
-    var videos = document.querySelectorAll('video');
-    videos.forEach(function(video) {
-      // Apply GPU compositing to each video
-      video.style.transform = 'translateZ(0)';
-      video.style.backfaceVisibility = 'hidden';
-      
-      // Don't force pause - let mediaPlaybackRequiresUserAction handle it
-      // Just optimize the rendering
-    });
-    
-    console.log('[Performance] Video GPU optimization applied to', videos.length, 'videos');
-  }
-  
-  /**
-   * Optimize scroll performance with passive listeners
-   */
-  function optimizeScrollPerformance() {
-    // Debounced scroll handler to re-apply optimizations
-    var scrollTimeout;
-    var lastScrollY = 0;
-    
-    window.addEventListener('scroll', function() {
-      // Use requestAnimationFrame for smoother scroll handling
-      if (!scrollTimeout) {
-        scrollTimeout = requestAnimationFrame(function() {
-          var currentScrollY = window.scrollY;
-          
-          // Only re-optimize if scrolled significantly
-          if (Math.abs(currentScrollY - lastScrollY) > 500) {
-            enableLazyLoading();
-            killVideoAutoPlay();
-            lastScrollY = currentScrollY;
-          }
-          
-          scrollTimeout = null;
-        });
-      }
-    }, { passive: true });
-  }
-  
-  /**
-   * Memory cleanup - remove off-screen heavy elements
-   */
-  function memoryCleanup() {
-    // Find videos that are way off-screen and pause them
-    var videos = document.querySelectorAll('video');
-    var viewportHeight = window.innerHeight;
-    
-    videos.forEach(function(video) {
-      var rect = video.getBoundingClientRect();
-      var isOffScreen = rect.bottom < -viewportHeight || rect.top > viewportHeight * 2;
-      
-      if (isOffScreen && !video.paused) {
-        try {
-          video.pause();
-          console.log('[Performance] Paused off-screen video');
-        } catch(e) {}
-      }
-    });
-  }
-  
-  // Run immediately if document is ready, otherwise wait
-  function init() {
-    injectGPUCompositing();
-    enableLazyLoading();
-    killVideoAutoPlay();
-    optimizeScrollPerformance();
-    
-    // Run memory cleanup periodically
-    setInterval(memoryCleanup, 5000);
-    
-    console.log('[Smart Shield] Performance optimization v2.0 active');
-  }
-  
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-  
-  // Also observe for dynamically added content
-  var perfObserver = new MutationObserver(function(mutations) {
-    var hasNewMedia = mutations.some(function(m) {
-      return Array.from(m.addedNodes).some(function(node) {
-        if (node.nodeType !== 1) return false;
-        return node.tagName === 'IMG' || 
-               node.tagName === 'IFRAME' || 
-               node.tagName === 'VIDEO' ||
-               node.tagName === 'AUDIO' ||
-               (node.querySelectorAll && (
-                 node.querySelectorAll('img, iframe, video, audio').length > 0
-               ));
-      });
-    });
-    
-    if (hasNewMedia) {
-      enableLazyLoading();
-      killVideoAutoPlay();
-    }
+  // Lazy load images
+  document.querySelectorAll('img:not([loading="lazy"])').forEach(function(img) {
+    img.setAttribute('loading', 'lazy');
   });
   
-  perfObserver.observe(document.documentElement, {
-    childList: true,
-    subtree: true
+  // Lazy load iframes
+  document.querySelectorAll('iframe:not([loading="lazy"])').forEach(function(iframe) {
+    iframe.setAttribute('loading', 'lazy');
   });
 })();
 true;`;
 
 /**
- * Combined optimization script - includes both ad blocking and performance optimization
- * Use this as the primary injectedJavaScript when full optimization is enabled
+ * Creates a combined optimization script
+ * Minimal version - only lazy loading, no heavy GPU stuff
  */
 export const createFullOptimizationScript = (additionalSelectors: string[] = []): string => {
-  const adBlockScript = createAdBusterScript(additionalSelectors);
-  return adBlockScript + performanceOptimizationScript;
+  return `
+    ${gpuLayerSquashingScript}
+    ${performanceOptimizationScript}
+  `;
 };
 
 // ============================================================================
