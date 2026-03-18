@@ -7,7 +7,7 @@ import uuid
 from typing import Dict, List, Any
 
 # Get backend URL from frontend config
-BACKEND_BASE_URL = "https://ai-browser-fix-1.preview.emergentagent.com/api"
+BACKEND_BASE_URL = "https://semantic-browser.preview.emergentagent.com/api"
 
 class BackendTester:
     def __init__(self):

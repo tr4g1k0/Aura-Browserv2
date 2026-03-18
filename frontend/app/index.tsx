@@ -667,14 +667,30 @@ export default function BrowserScreen() {
       }
       
       // Handle TTS content extraction response
-      if (data.type === 'TTS_CONTENT' && data.content) {
-        console.log(`[TTS] Received content from ${data.source}: ${data.length} chars`);
-        handleTTSContent(data.content);
+      // STABILITY FIX: Wrapped in try/catch to prevent crashes
+      if (data.type === 'TTS_CONTENT') {
+        try {
+          if (data.truncated) {
+            console.log(`[TTS] Content was truncated: ${data.originalLength} -> ${data.length} chars`);
+          }
+          console.log(`[TTS] Received content from ${data.source}: ${data.length} chars`);
+          if (data.content) {
+            handleTTSContent(data.content);
+          } else {
+            console.warn('[TTS] Received empty content');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          }
+        } catch (ttsError) {
+          console.error('[TTS] Error handling content:', ttsError);
+          setIsReading(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
       }
       
       // Handle TTS extraction error
       if (data.type === 'TTS_ERROR') {
         console.error('[TTS] Content extraction error:', data.error);
+        setIsReading(false);  // Reset UI state
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (e) {
@@ -685,41 +701,70 @@ export default function BrowserScreen() {
   /**
    * Handle TTS content - speak the extracted text
    * Uses the ttsRate from the store for pace control
+   * 
+   * STABILITY FIX: Wrapped in try/catch to prevent crashes on large pages.
+   * Text is also pre-truncated to 3500 chars as a safety measure.
    */
   const handleTTSContent = useCallback((content: string) => {
-    if (!content || content.trim().length === 0) {
-      console.log('[TTS] No content to read');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      return;
+    try {
+      if (!content || content.trim().length === 0) {
+        console.log('[TTS] No content to read');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return;
+      }
+
+      // STABILITY FIX: Truncate content to 3500 chars max to prevent speech engine crashes
+      const MAX_TTS_LENGTH = 3500;
+      let safeContent = content.trim();
+      if (safeContent.length > MAX_TTS_LENGTH) {
+        console.log(`[TTS] Truncating content from ${safeContent.length} to ${MAX_TTS_LENGTH} chars`);
+        // Try to break at a sentence boundary
+        const truncated = safeContent.substring(0, MAX_TTS_LENGTH);
+        const lastSentenceEnd = Math.max(
+          truncated.lastIndexOf('.'),
+          truncated.lastIndexOf('!'),
+          truncated.lastIndexOf('?')
+        );
+        if (lastSentenceEnd > MAX_TTS_LENGTH - 500) {
+          safeContent = truncated.substring(0, lastSentenceEnd + 1) + ' Content truncated for reading.';
+        } else {
+          safeContent = truncated + '... Content truncated for reading.';
+        }
+      }
+
+      setIsReading(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // Get current TTS rate from store
+      const currentRate = useBrowserStore.getState().ttsRate;
+      console.log(`[TTS] Starting with rate: ${currentRate}x, content length: ${safeContent.length}`);
+
+      ttsService.speak(safeContent, {
+        pitch: 1.0,
+        rate: currentRate,  // Use rate from store
+        onStart: () => {
+          console.log('[TTS] Started reading');
+        },
+        onDone: () => {
+          console.log('[TTS] Finished reading');
+          setIsReading(false);
+        },
+        onStopped: () => {
+          console.log('[TTS] Reading stopped');
+          setIsReading(false);
+        },
+        onError: (error) => {
+          console.error('[TTS] Error:', error);
+          setIsReading(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        },
+      });
+    } catch (error) {
+      // STABILITY FIX: Catch any unexpected errors to prevent app crash
+      console.error('[TTS] Unexpected error in handleTTSContent:', error);
+      setIsReading(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
-
-    setIsReading(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    // Get current TTS rate from store
-    const currentRate = useBrowserStore.getState().ttsRate;
-    console.log(`[TTS] Starting with rate: ${currentRate}x`);
-
-    ttsService.speak(content, {
-      pitch: 1.0,
-      rate: currentRate,  // Use rate from store
-      onStart: () => {
-        console.log('[TTS] Started reading');
-      },
-      onDone: () => {
-        console.log('[TTS] Finished reading');
-        setIsReading(false);
-      },
-      onStopped: () => {
-        console.log('[TTS] Reading stopped');
-        setIsReading(false);
-      },
-      onError: (error) => {
-        console.error('[TTS] Error:', error);
-        setIsReading(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      },
-    });
   }, []);
 
   /**
