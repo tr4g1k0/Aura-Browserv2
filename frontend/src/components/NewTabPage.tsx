@@ -632,18 +632,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch }) 
           </View>
         </Animated.View>
 
-        {/* Spacer */}
-        <View style={styles.spacer} />
-
-        {/* Status Footer */}
-        <Animated.View 
-          entering={FadeIn.delay(600).duration(800)}
-          style={styles.statusFooter}
-        >
-          <Text style={styles.statusText}>
-            ACCESS Browser v1.0 | Local AI Enabled
-          </Text>
-        </Animated.View>
+        {/* Bottom Spacer - maintains balanced spacing above navigation bar */}
+        <View style={styles.bottomSpacer} />
       </View>
 
       {/* Add Quick Link Modal */}
@@ -969,23 +959,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  // Footer Styles
-  spacer: {
-    flex: 1,
-  },
-  statusFooter: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#444',
-    letterSpacing: 1,
-    ...Platform.select({
-      ios: { fontFamily: 'Menlo' },
-      android: { fontFamily: 'monospace' },
-      web: { fontFamily: 'Monaco, "Courier New", monospace' },
-    }),
+  // Bottom Spacer - Clean production layout
+  bottomSpacer: {
+    height: 40,  // Fixed height for balanced spacing above navigation bar
   },
 });
 
