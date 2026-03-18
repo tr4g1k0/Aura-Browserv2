@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Switch,
   Platform,
   Pressable,
+  Alert,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrowserStore } from '../store/browserStore';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+
+// Conditionally import Audio for permission checks
+let Audio: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    Audio = require('expo-av').Audio;
+  } catch (e) {
+    console.log('[Accessibility] expo-av not available');
+  }
+}
 
 // Premium Color Palette
 const ELECTRIC_CYAN = '#00FFFF';
@@ -119,6 +130,80 @@ export const AccessibilityModal: React.FC<AccessibilityModalProps> = ({
     toggleQuickConverse,
   } = useBrowserStore();
 
+  /**
+   * Request audio permission before enabling features
+   */
+  const requestAudioPermission = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS === 'web' || !Audio) {
+      Alert.alert(
+        'Not Available on Web',
+        'Audio features require a native mobile app. Please use Expo Go or a native build.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      const granted = status === 'granted';
+      
+      if (!granted) {
+        Alert.alert(
+          'Microphone Permission Required',
+          'This accessibility feature needs microphone access to function. Audio is processed locally on your device and is never sent to external servers.',
+          [{ text: 'OK' }]
+        );
+      }
+      
+      return granted;
+    } catch (error) {
+      console.error('[Accessibility] Permission error:', error);
+      return false;
+    }
+  }, []);
+
+  /**
+   * Handle Live Captioning toggle with permission check
+   */
+  const handleLiveCaptioningToggle = useCallback(async () => {
+    if (!settings.liveCaptioningEnabled) {
+      // Turning ON - check permissions first
+      const hasPermission = await requestAudioPermission();
+      if (!hasPermission) {
+        return; // Don't toggle if permission denied
+      }
+    }
+    toggleLiveCaptioning();
+  }, [settings.liveCaptioningEnabled, requestAudioPermission, toggleLiveCaptioning]);
+
+  /**
+   * Handle Ambient Awareness toggle with permission check
+   */
+  const handleAmbientAwarenessToggle = useCallback(async () => {
+    if (!settings.ambientAwarenessEnabled) {
+      // Turning ON - check permissions first
+      const hasPermission = await requestAudioPermission();
+      if (!hasPermission) {
+        return; // Don't toggle if permission denied
+      }
+    }
+    toggleAmbientAwareness();
+  }, [settings.ambientAwarenessEnabled, requestAudioPermission, toggleAmbientAwareness]);
+
+  /**
+   * Handle Quick Converse toggle with permission check
+   */
+  const handleQuickConverseToggle = useCallback(async () => {
+    if (!settings.quickConverseEnabled) {
+      // Turning ON - check permissions first
+      const hasPermission = await requestAudioPermission();
+      if (!hasPermission) {
+        return; // Don't toggle if permission denied
+      }
+    }
+    toggleQuickConverse();
+  }, [settings.quickConverseEnabled, requestAudioPermission, toggleQuickConverse]);
+
   const handleClose = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onClose();
@@ -159,7 +244,7 @@ export const AccessibilityModal: React.FC<AccessibilityModalProps> = ({
           title="Live Captioning"
           subtitle="Generate real-time text overlays for any audio playing through the browser."
           value={settings.liveCaptioningEnabled}
-          onValueChange={toggleLiveCaptioning}
+          onValueChange={handleLiveCaptioningToggle}
           delay={100}
         />
 
@@ -170,7 +255,7 @@ export const AccessibilityModal: React.FC<AccessibilityModalProps> = ({
           title="Ambient Awareness"
           subtitle="Listen for environmental sounds and translate them into visual alerts and haptic feedback."
           value={settings.ambientAwarenessEnabled}
-          onValueChange={toggleAmbientAwareness}
+          onValueChange={handleAmbientAwarenessToggle}
           delay={200}
         />
 
@@ -181,7 +266,7 @@ export const AccessibilityModal: React.FC<AccessibilityModalProps> = ({
           title="Quick Converse"
           subtitle="Activate an instant split-screen communication board to speak face-to-face."
           value={settings.quickConverseEnabled}
-          onValueChange={toggleQuickConverse}
+          onValueChange={handleQuickConverseToggle}
           delay={300}
         />
       </View>

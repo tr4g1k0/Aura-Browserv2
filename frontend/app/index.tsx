@@ -30,6 +30,8 @@ import { LibraryScreen } from './library';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
+import { CaptionPill } from '../src/components/CaptionPill';
+import { useAmbientAwareness } from '../src/hooks/useAmbientAwareness';
 import { downloadManager } from '../src/services/FileDownloadManager';
 import { ttsService, contentExtractionScript } from '../src/services/TextToSpeechService';
 import { TTSControlBar } from '../src/components/TTSControlBar';
@@ -197,6 +199,32 @@ export default function BrowserScreen() {
   const [liveCaptionsVisible, setLiveCaptionsVisible] = useState(false);
   const [visionAISelectors, setVisionAISelectors] = useState<string[]>([]);
   const [adsBlocked, setAdsBlocked] = useState(0);
+  
+  // Ambient Awareness - sound detection hook
+  const { isDanger, isWarning, currentLevel } = useAmbientAwareness();
+  
+  // Ambient flash effect state
+  const [ambientFlash, setAmbientFlash] = useState(false);
+  const ambientFlashAnim = useRef(new Animated.Value(0)).current;
+  
+  // Trigger ambient flash when danger detected
+  useEffect(() => {
+    if (isDanger && settings.ambientAwarenessEnabled) {
+      setAmbientFlash(true);
+      Animated.sequence([
+        Animated.timing(ambientFlashAnim, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(ambientFlashAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setAmbientFlash(false));
+    }
+  }, [isDanger, settings.ambientAwarenessEnabled]);
   
   // Download Manager state
   const [downloadToastVisible, setDownloadToastVisible] = useState(false);
@@ -1775,6 +1803,25 @@ export default function BrowserScreen() {
           </View>
         )}
 
+        {/* Live Captioning Pill - Demo Mode */}
+        <CaptionPill
+          visible={settings.liveCaptioningEnabled}
+          onClose={() => useBrowserStore.getState().toggleLiveCaptioning()}
+        />
+
+        {/* Ambient Flash Overlay - Flashes cyan when loud sound detected */}
+        {settings.ambientAwarenessEnabled && (
+          <Animated.View
+            style={[
+              styles.ambientFlashOverlay,
+              {
+                opacity: ambientFlashAnim,
+                pointerEvents: 'none',
+              },
+            ]}
+          />
+        )}
+
         {/* Accessibility Overlays */}
         <LiveCaptionsOverlay
           visible={liveCaptionsVisible}
@@ -2148,5 +2195,13 @@ const styles = StyleSheet.create({
       android: { fontFamily: 'Roboto' },
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
     }),
+  },
+  // ============================================================
+  // AMBIENT AWARENESS - Flash overlay for danger sounds
+  // ============================================================
+  ambientFlashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#00FFFF',
+    zIndex: 9999,
   },
 });
