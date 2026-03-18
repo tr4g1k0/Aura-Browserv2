@@ -9,6 +9,8 @@ import {
   Animated,
   KeyboardAvoidingView,
   TouchableOpacity,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -203,6 +205,11 @@ export default function BrowserScreen() {
   
   // Browser Menu (3-dot menu) state
   const [menuVisible, setMenuVisible] = useState(false);
+  
+  // Find in Page state
+  const [isFindModeActive, setIsFindModeActive] = useState(false);
+  const [findText, setFindText] = useState('');
+  const findInputRef = useRef<TextInput>(null);
   
   // TTS (Text-to-Speech) state
   const [isReading, setIsReading] = useState(false);
@@ -851,6 +858,140 @@ export default function BrowserScreen() {
     }
   }, [activeTab]);
 
+  // ============================================================
+  // FIND IN PAGE - Premium Feature
+  // Uses window.find() JavaScript API to search and highlight text
+  // ============================================================
+  
+  /**
+   * Open Find in Page mode
+   * Called from BrowserMenu "Find" button
+   */
+  const handleOpenFindInPage = useCallback(() => {
+    console.log('[Find in Page] Opening search bar');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsFindModeActive(true);
+    setFindText('');
+    // Focus the input after a small delay to allow render
+    setTimeout(() => {
+      findInputRef.current?.focus();
+    }, 100);
+  }, []);
+
+  /**
+   * Execute Find in Page search
+   * Uses window.find() to locate and highlight text
+   */
+  const handleFindNext = useCallback(() => {
+    if (!findText.trim() || !webViewRef.current) {
+      console.log('[Find in Page] No search text or no WebView ref');
+      return;
+    }
+    
+    console.log(`[Find in Page] Searching for: "${findText}"`);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Escape special characters in the search text for safe injection
+    const escapedText = findText.replace(/[\\'"]/g, '\\$&');
+    
+    // window.find(searchString, caseSensitive, backwards, wrapAround)
+    const findScript = `
+      (function() {
+        try {
+          const found = window.find("${escapedText}", false, false, true);
+          if (!found) {
+            console.log('[Find in Page] No more matches found');
+          } else {
+            console.log('[Find in Page] Match found');
+          }
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FIND_RESULT',
+            found: found
+          }));
+        } catch(e) {
+          console.error('[Find in Page] Error:', e);
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FIND_RESULT',
+            found: false,
+            error: e.message
+          }));
+        }
+      })();
+      true;
+    `;
+    
+    webViewRef.current.injectJavaScript(findScript);
+  }, [findText]);
+
+  /**
+   * Close Find in Page mode
+   * Clears the search and removes highlighting
+   */
+  const handleCloseFindInPage = useCallback(() => {
+    console.log('[Find in Page] Closing search bar');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsFindModeActive(false);
+    setFindText('');
+    
+    // Clear the selection/highlight in the WebView
+    if (webViewRef.current) {
+      const clearScript = `
+        (function() {
+          try {
+            // Clear the current selection
+            if (window.getSelection) {
+              window.getSelection().removeAllRanges();
+            }
+            console.log('[Find in Page] Selection cleared');
+          } catch(e) {
+            console.log('[Find in Page] Error clearing selection:', e);
+          }
+        })();
+        true;
+      `;
+      webViewRef.current.injectJavaScript(clearScript);
+    }
+  }, []);
+
+  // ============================================================
+  // BURN THIS SITE - Premium Feature
+  // Clears localStorage, sessionStorage, and cookies for current site
+  // ============================================================
+  
+  /**
+   * Burn This Site - Incinerate all site data
+   * Clears localStorage, sessionStorage, and cookies
+   */
+  const handleBurnSite = useCallback(() => {
+    if (!webViewRef.current || !activeTab?.url) {
+      console.log('[Burn Site] No WebView ref or URL');
+      return;
+    }
+    
+    console.log('[Burn Site] Incinerating site data for:', activeTab.url);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    
+    // The burn script - clears all site storage and cookies
+    const burnScript = `
+      localStorage.clear(); 
+      sessionStorage.clear(); 
+      document.cookie.split(';').forEach(function(c) { 
+        document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/'); 
+      }); 
+      window.location.reload(); 
+      true;
+    `;
+    
+    webViewRef.current.injectJavaScript(burnScript);
+    
+    // Show feedback toast/alert
+    Alert.alert(
+      '🔥 Site Data Incinerated',
+      'All cookies, localStorage, and sessionStorage have been cleared. The page is reloading...',
+      [{ text: 'OK', style: 'default' }]
+    );
+  }, [activeTab?.url]);
+
   const openTabsManager = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push('/tabs-manager');
@@ -1013,6 +1154,49 @@ export default function BrowserScreen() {
         currentTitle={activeTab?.title || ''}
       />
 
+      {/* ============================================================ */}
+      {/* FIND IN PAGE SEARCH BAR - Glassmorphic Premium UI */}
+      {/* Conditionally renders below the URL bar when active */}
+      {/* ============================================================ */}
+      {isFindModeActive && (
+        <View style={styles.findInPageContainer}>
+          <View style={styles.findInPageBar}>
+            {/* Search Input */}
+            <TextInput
+              ref={findInputRef}
+              style={styles.findInPageInput}
+              placeholder="Find in page..."
+              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              value={findText}
+              onChangeText={setFindText}
+              onSubmitEditing={handleFindNext}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              selectionColor="#00FFFF"
+            />
+            
+            {/* Next Button - Arrow Down */}
+            <TouchableOpacity
+              style={styles.findInPageButton}
+              onPress={handleFindNext}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-down" size={24} color="#00FFFF" />
+            </TouchableOpacity>
+            
+            {/* Close Button - X */}
+            <TouchableOpacity
+              style={styles.findInPageCloseButton}
+              onPress={handleCloseFindInPage}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Browser Menu (3-dot menu) - Premium Glassmorphic Design */}
       <BrowserMenu
         visible={menuVisible}
@@ -1033,6 +1217,8 @@ export default function BrowserScreen() {
             webViewRef.current?.reload();
           }, 100);
         }}
+        onFindInPage={handleOpenFindInPage}
+        onBurnSite={handleBurnSite}
       />
 
       <View style={styles.webviewContainer}>
@@ -1293,5 +1479,56 @@ const styles = StyleSheet.create({
         elevation: 8,
       },
     }),
+  },
+  // ============================================================
+  // FIND IN PAGE - Premium Glassmorphic Search Bar
+  // ============================================================
+  findInPageContainer: {
+    backgroundColor: 'rgba(20, 20, 20, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  findInPageBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 12,
+    height: 52,
+  },
+  findInPageInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFFFFF',
+    paddingVertical: 12,
+    paddingRight: 8,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  findInPageButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 255, 255, 0.1)',
+  },
+  findInPageCloseButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
 });

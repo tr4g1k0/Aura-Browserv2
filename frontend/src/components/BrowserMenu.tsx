@@ -37,6 +37,8 @@ interface BrowserMenuProps {
   isDesktopMode?: boolean;
   onToggleBookmark?: () => void;
   onToggleDesktopMode?: () => void;
+  onFindInPage?: () => void;
+  onBurnSite?: () => void;
 }
 
 /**
@@ -57,6 +59,8 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   isDesktopMode = false,
   onToggleBookmark,
   onToggleDesktopMode,
+  onFindInPage,
+  onBurnSite,
 }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -109,8 +113,8 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     // GOLDEN RULE: Close menu first
     onClose();
     
-    // TODO: Implement find in page functionality
-    Alert.alert('Find in Page', 'Coming soon! This will allow you to search text on the current page.');
+    // Trigger Find in Page mode via callback
+    onFindInPage?.();
   };
 
   const handleDesktopMode = () => {
@@ -153,18 +157,8 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     // GOLDEN RULE: Close menu first
     onClose();
     
-    // TODO: Implement burn site (clear site data)
-    Alert.alert(
-      'Burn This Site',
-      'This will clear all cookies and cache for this website. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Burn', style: 'destructive', onPress: () => {
-          console.log('[Menu] Site data burned');
-          // TODO: Clear site-specific data
-        }},
-      ]
-    );
+    // Trigger Burn Site via callback - parent handles the WebView injection
+    onBurnSite?.();
   };
 
   const handleHistory = () => {
