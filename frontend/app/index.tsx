@@ -1485,17 +1485,20 @@ export default function BrowserScreen() {
         // Apply safe area padding to avoid system UI overlap
         { paddingBottom: bottomPadding, paddingTop: topPadding }
       ]}>
-      {/* Unified Top Bar - Single sleek row with all controls */}
-      <UnifiedTopBar
-        onNavigate={handleNavigate}
-        onTabsPress={openTabsManager}
-        onSettingsPress={() => setMenuVisible(true)}
-        onAccessibilityPress={() => setAccessibilityModalVisible(true)}
-        onLibraryPress={() => setLibraryVisible(true)}
-        onShare={handleShare}
-        currentUrl={activeTab?.url || ''}
-        currentTitle={activeTab?.title || ''}
-      />
+      {/* Unified Top Bar - Only shown when NOT on the Home Hub (NewTabPage) */}
+      {/* On Home Hub, the FloatingIslandDock handles search/navigation */}
+      {!isNewTabPage && (
+        <UnifiedTopBar
+          onNavigate={handleNavigate}
+          onTabsPress={openTabsManager}
+          onSettingsPress={() => setMenuVisible(true)}
+          onAccessibilityPress={() => setAccessibilityModalVisible(true)}
+          onLibraryPress={() => setLibraryVisible(true)}
+          onShare={handleShare}
+          currentUrl={activeTab?.url || ''}
+          currentTitle={activeTab?.title || ''}
+        />
+      )}
 
       {/* ============================================================ */}
       {/* FIND IN PAGE SEARCH BAR - Glassmorphic Premium UI */}
