@@ -7,28 +7,32 @@ import {
   TouchableOpacity,
   Switch,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
-// Premium color palette
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Premium Glossy Color Palette
 const ELECTRIC_CYAN = '#00FFFF';
 const DANGER_RED = '#FF4444';
-const CARD_BG = '#1A1A1A';
-const SURFACE_BG = '#0D0D0D';
-const TEXT_PRIMARY = '#FFFFFF';
-const TEXT_SECONDARY = '#888888';
-const TEXT_MUTED = '#555555';
-const BORDER_COLOR = 'rgba(255, 255, 255, 0.08)';
+const TEXT_DARK = '#1A1A1A';
+const TEXT_SECONDARY = '#666666';
+const TEXT_MUTED = '#999999';
 
 /**
- * Premium Settings Screen
+ * Premium Settings Screen - Glossy Glassmorphic Design
  * 
- * Clean, card-based design with Electric Cyan accents.
- * Currently using local state for UI testing.
- * Will be wired to AsyncStorage later.
+ * Features:
+ * - Radial gradient background for depth
+ * - Opalescent glass cards with LinearGradient
+ * - Reflective top/left edge highlights
+ * - Deep glossy shadows
+ * - Electric Cyan accent switches
  */
 export default function SettingsScreen() {
   const router = useRouter();
@@ -60,19 +64,16 @@ export default function SettingsScreen() {
 
   const handleBurnData = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    // TODO: Wire to Privacy Shredder
     console.log('[Settings] Burn Browsing Data triggered');
   };
 
   const handleSearchEnginePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // TODO: Open search engine selector
     console.log('[Settings] Search Engine selector pressed');
   };
 
   const handleThemePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // TODO: Open theme selector
     console.log('[Settings] Theme selector pressed');
   };
 
@@ -82,12 +83,33 @@ export default function SettingsScreen() {
   };
 
   // ============================================================
+  // GLASSMORPHIC CARD COMPONENT
+  // ============================================================
+  
+  const GlossyCard: React.FC<{ children: React.ReactNode; title: string }> = ({ children, title }) => (
+    <View style={styles.cardOuterContainer}>
+      {/* Opalescent Glass Background */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.85)', 'rgba(255,255,255,0.95)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.cardGradient}
+      >
+        {/* Reflective Edge Highlight */}
+        <View style={styles.reflectiveEdge} />
+        
+        {/* Card Content */}
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>{title}</Text>
+          {children}
+        </View>
+      </LinearGradient>
+    </View>
+  );
+
+  // ============================================================
   // RENDER HELPERS
   // ============================================================
-
-  const renderCardTitle = (title: string) => (
-    <Text style={styles.cardTitle}>{title}</Text>
-  );
 
   const renderSwitchRow = (
     label: string,
@@ -100,13 +122,19 @@ export default function SettingsScreen() {
         <Text style={styles.rowLabel}>{label}</Text>
         {subtitle && <Text style={styles.rowSubtitle}>{subtitle}</Text>}
       </View>
-      <Switch
-        value={value}
-        onValueChange={onToggle}
-        trackColor={{ false: '#333', true: ELECTRIC_CYAN }}
-        thumbColor="#FFF"
-        ios_backgroundColor="#333"
-      />
+      {/* Glossy Switch with Specular Thumb */}
+      <View style={styles.switchContainer}>
+        <Switch
+          value={value}
+          onValueChange={onToggle}
+          trackColor={{ false: 'rgba(0,0,0,0.1)', true: ELECTRIC_CYAN }}
+          thumbColor={value ? '#FFFFFF' : '#F8F8F8'}
+          ios_backgroundColor="rgba(0,0,0,0.1)"
+          style={styles.switch}
+        />
+        {/* Specular highlight overlay on thumb (visual only) */}
+        {value && <View style={styles.switchSpecular} pointerEvents="none" />}
+      </View>
     </View>
   );
 
@@ -131,11 +159,25 @@ export default function SettingsScreen() {
   // ============================================================
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
+      {/* Glossy Radial Background */}
+      <LinearGradient
+        colors={['#E8ECF0', '#F5F7FA', '#FFFFFF', '#F0F4F8']}
+        locations={[0, 0.3, 0.7, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      {/* Subtle Radial Overlay for Depth */}
+      <View style={styles.radialOverlay} />
+
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={TEXT_PRIMARY} />
+          <View style={styles.backButtonGlass}>
+            <Ionicons name="arrow-back" size={22} color={TEXT_DARK} />
+          </View>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
         <View style={styles.headerSpacer} />
@@ -149,79 +191,71 @@ export default function SettingsScreen() {
         {/* ============================================================ */}
         {/* CARD 1: ENGINE & AI */}
         {/* ============================================================ */}
-        <View style={styles.card}>
-          {renderCardTitle('Engine & AI')}
-          
+        <GlossyCard title="Engine & AI">
           {renderChevronRow('Default Search Engine', 'Google', handleSearchEnginePress)}
-          
           <View style={styles.divider} />
-          
           {renderSwitchRow(
             'Local AI Assistant',
             localAIAssistant,
             () => toggleSwitch(setLocalAIAssistant, localAIAssistant)
           )}
-        </View>
+        </GlossyCard>
 
         {/* ============================================================ */}
         {/* CARD 2: PRIVACY & SECURITY */}
         {/* ============================================================ */}
-        <View style={styles.card}>
-          {renderCardTitle('Privacy & Security')}
-          
+        <GlossyCard title="Privacy & Security">
           {renderSwitchRow(
             'Ad & Tracker Shield',
             adTrackerShield,
             () => toggleSwitch(setAdTrackerShield, adTrackerShield)
           )}
-          
           <View style={styles.divider} />
-          
           {renderSwitchRow(
             'Strict Do Not Track',
             strictDoNotTrack,
             () => toggleSwitch(setStrictDoNotTrack, strictDoNotTrack)
           )}
-          
           <View style={styles.divider} />
           
-          {/* Burn Browsing Data - Danger Button */}
+          {/* Burn Browsing Data - Glossy Danger Button */}
           <TouchableOpacity
             style={styles.dangerButton}
             onPress={handleBurnData}
             activeOpacity={0.8}
           >
-            <Ionicons name="flame" size={20} color={DANGER_RED} />
-            <Text style={styles.dangerButtonText}>Burn Browsing Data</Text>
+            <LinearGradient
+              colors={['rgba(255,68,68,0.15)', 'rgba(255,68,68,0.25)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={styles.dangerButtonGradient}
+            >
+              <Ionicons name="flame" size={20} color={DANGER_RED} />
+              <Text style={styles.dangerButtonText}>Burn Browsing Data</Text>
+            </LinearGradient>
           </TouchableOpacity>
-        </View>
+        </GlossyCard>
 
         {/* ============================================================ */}
         {/* CARD 3: DISPLAY & ACCESSIBILITY */}
         {/* ============================================================ */}
-        <View style={styles.card}>
-          {renderCardTitle('Display & Accessibility')}
-          
+        <GlossyCard title="Display & Accessibility">
           {renderChevronRow('App Theme', 'System Default', handleThemePress)}
-          
           <View style={styles.divider} />
-          
           {renderSwitchRow(
             'Force Dark Web',
             forceDarkWeb,
             () => toggleSwitch(setForceDarkWeb, forceDarkWeb),
             'Attempts to force dark mode on all sites'
           )}
-          
           <View style={styles.divider} />
-          
           {renderSwitchRow(
             'Force Enable Zoom',
             forceEnableZoom,
             () => toggleSwitch(setForceEnableZoom, forceEnableZoom),
             'Override sites that block pinch-to-zoom'
           )}
-        </View>
+        </GlossyCard>
 
         {/* Version Footer */}
         <Text style={styles.versionText}>ACCESS Browser v1.0</Text>
@@ -231,13 +265,20 @@ export default function SettingsScreen() {
 }
 
 // ============================================================
-// STYLES
+// GLOSSY GLASSMORPHIC STYLES
 // ============================================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: SURFACE_BG,
+    backgroundColor: '#F5F7FA',
+  },
+  // Radial Overlay for Depth Effect
+  radialOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    // Simulated radial gradient using opacity
+    opacity: 0.3,
   },
   // Header
   header: {
@@ -245,9 +286,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER_COLOR,
+    paddingBottom: 12,
   },
   backButton: {
     width: 44,
@@ -255,10 +294,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  backButtonGlass: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,1)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '600',
-    color: TEXT_PRIMARY,
+    color: TEXT_DARK,
     letterSpacing: 0.3,
     ...Platform.select({
       ios: { fontFamily: 'System' },
@@ -275,48 +335,75 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 8,
   },
-  // Card
-  card: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 16,
+  // ============================================================
+  // GLOSSY CARD STYLES
+  // ============================================================
+  cardOuterContainer: {
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
+    borderRadius: 20,
+    // Deep Glossy Shadows
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
       },
       android: {
-        elevation: 4,
+        elevation: 8,
       },
     }),
   },
+  cardGradient: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    // Reflective Edge - Top and Left highlight
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderTopColor: 'rgba(255,255,255,1)',
+    borderLeftColor: 'rgba(255,255,255,1)',
+    borderRightWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderRightColor: 'rgba(0,0,0,0.05)',
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  reflectiveEdge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  cardContent: {
+    padding: 20,
+  },
   cardTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: ELECTRIC_CYAN,
-    letterSpacing: 1.5,
+    letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 16,
+    // Text shadow for glossy effect
+    textShadowColor: 'rgba(0, 255, 255, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
     }),
   },
-  // Row
+  // Row Styles
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    minHeight: 48,
+    paddingVertical: 14,
+    minHeight: 52,
   },
   rowTextContainer: {
     flex: 1,
@@ -325,7 +412,7 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: TEXT_PRIMARY,
+    color: TEXT_DARK,
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
@@ -341,6 +428,31 @@ const styles = StyleSheet.create({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  // Switch Container for Specular Effect
+  switchContainer: {
+    position: 'relative',
+  },
+  switch: {
+    transform: [{ scale: 0.95 }],
+  },
+  switchSpecular: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 7 : 4,
+    right: Platform.OS === 'ios' ? 8 : 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    // Specular highlight glow
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FFF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 2,
+      },
     }),
   },
   // Chevron Row
@@ -360,22 +472,24 @@ const styles = StyleSheet.create({
   },
   // Divider
   divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: BORDER_COLOR,
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.06)',
     marginVertical: 4,
   },
   // Danger Button
   dangerButton: {
+    marginTop: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,68,68,0.3)',
+  },
+  dangerButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 68, 68, 0.1)',
-    borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 20,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 68, 68, 0.3)',
     gap: 10,
   },
   dangerButtonText: {
