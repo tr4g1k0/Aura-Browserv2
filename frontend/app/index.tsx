@@ -7,6 +7,7 @@ import {
   Text,
   Share,
   Animated,
+  Easing,
   KeyboardAvoidingView,
   TouchableOpacity,
   TextInput,
@@ -270,6 +271,54 @@ export default function BrowserScreen() {
                        activeTab.url === 'about:newtab' ||
                        activeTab.url === '' ||
                        activeTab.url === 'https://www.google.com';
+
+  // ============================================================
+  // SLIDE & FADE TRANSITION ANIMATION
+  // Smooth transition between Home Hub and Browser View
+  // ============================================================
+  const transitionAnim = useRef(new Animated.Value(isNewTabPage ? 0 : 1)).current;
+  
+  // Watch URL changes and animate the transition
+  useEffect(() => {
+    if (isNewTabPage) {
+      // Transitioning to Home Hub
+      Animated.timing(transitionAnim, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Transitioning to Browser View
+      Animated.timing(transitionAnim, {
+        toValue: 1,
+        duration: 450,
+        easing: Easing.out(Easing.back(1.5)), // High-end bounce effect
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isNewTabPage]);
+
+  // Interpolated animation values
+  const homeHubOpacity = transitionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+  
+  const homeHubTranslateY = transitionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -50], // Slides up as it fades
+  });
+  
+  const browserViewOpacity = transitionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+  
+  const browserViewTranslateY = transitionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [20, 0], // Slides up with bounce
+  });
 
   // Tab Virtualization: Save scroll position when switching tabs
   useEffect(() => {
@@ -1487,17 +1536,25 @@ export default function BrowserScreen() {
       ]}>
       {/* Unified Top Bar - Only shown when NOT on the Home Hub (NewTabPage) */}
       {/* On Home Hub, the FloatingIslandDock handles search/navigation */}
+      {/* Animated slide-up with bounce when transitioning to browser view */}
       {!isNewTabPage && (
-        <UnifiedTopBar
-          onNavigate={handleNavigate}
-          onTabsPress={openTabsManager}
-          onSettingsPress={() => setMenuVisible(true)}
-          onAccessibilityPress={() => setAccessibilityModalVisible(true)}
-          onLibraryPress={() => setLibraryVisible(true)}
-          onShare={handleShare}
-          currentUrl={activeTab?.url || ''}
-          currentTitle={activeTab?.title || ''}
-        />
+        <Animated.View
+          style={{
+            opacity: browserViewOpacity,
+            transform: [{ translateY: browserViewTranslateY }],
+          }}
+        >
+          <UnifiedTopBar
+            onNavigate={handleNavigate}
+            onTabsPress={openTabsManager}
+            onSettingsPress={() => setMenuVisible(true)}
+            onAccessibilityPress={() => setAccessibilityModalVisible(true)}
+            onLibraryPress={() => setLibraryVisible(true)}
+            onShare={handleShare}
+            currentUrl={activeTab?.url || ''}
+            currentTitle={activeTab?.title || ''}
+          />
+        </Animated.View>
       )}
 
       {/* ============================================================ */}
@@ -1671,23 +1728,39 @@ export default function BrowserScreen() {
 
       <View style={styles.webviewContainer}>
         {Platform.OS === 'web' ? (
-          // Web platform: Show New Tab Page
-          <NewTabPage
-            onNavigate={handleNavigate}
-            onSearch={handleNavigate}
-            onOpenMenu={() => setMenuVisible(true)}
-            onAISummarize={handleAISummarize}
-            onAccessibility={() => setAccessibilityModalVisible(true)}
-          />
+          // Web platform: Show New Tab Page with slide/fade animation
+          <Animated.View
+            style={{
+              flex: 1,
+              opacity: homeHubOpacity,
+              transform: [{ translateY: homeHubTranslateY }],
+            }}
+          >
+            <NewTabPage
+              onNavigate={handleNavigate}
+              onSearch={handleNavigate}
+              onOpenMenu={() => setMenuVisible(true)}
+              onAISummarize={handleAISummarize}
+              onAccessibility={() => setAccessibilityModalVisible(true)}
+            />
+          </Animated.View>
         ) : isNewTabPage ? (
-          // Native: Show New Tab Page for blank/new tabs
-          <NewTabPage
-            onNavigate={handleNavigate}
-            onSearch={handleNavigate}
-            onOpenMenu={() => setMenuVisible(true)}
-            onAISummarize={handleAISummarize}
-            onAccessibility={() => setAccessibilityModalVisible(true)}
-          />
+          // Native: Show New Tab Page for blank/new tabs with slide/fade animation
+          <Animated.View
+            style={{
+              flex: 1,
+              opacity: homeHubOpacity,
+              transform: [{ translateY: homeHubTranslateY }],
+            }}
+          >
+            <NewTabPage
+              onNavigate={handleNavigate}
+              onSearch={handleNavigate}
+              onOpenMenu={() => setMenuVisible(true)}
+              onAISummarize={handleAISummarize}
+              onAccessibility={() => setAccessibilityModalVisible(true)}
+            />
+          </Animated.View>
         ) : activeTab && WebView ? (
           <SwipeNavigationWrapper
             canGoBack={activeTab?.canGoBack || false}
