@@ -1,160 +1,133 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Modal,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Platform,
-  Animated,
-  Pressable,
+  Dimensions,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useBrowserStore } from '../store/browserStore';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Premium color palette
+const ELECTRIC_CYAN = '#00FFFF';
+const DANGER_RED = '#FF4444';
+const TEXT_DARK = '#1A1A1A';
+const TEXT_SECONDARY = '#666666';
+const GOLD = '#FFD700';
 
 interface BrowserMenuProps {
   visible: boolean;
   onClose: () => void;
-  onReadAloud: () => void;
-  onStopReading: () => void;
-  onSettings: () => void;
-  onRefresh: () => void;
-  onNewTab: () => void;
-  onShare: () => void;
-  onToggleGhostMode: () => void;
-  onToggleDesktopMode: () => void;
-  onToggleBookmark: () => void;
-  onToggleAdblock: () => void;
-  isReading: boolean;
-  isGhostMode: boolean;
-  isDesktopMode: boolean;
-  isBookmarked: boolean;
-  isAdblockEnabled: boolean;
-  adsBlocked: number;  // Dynamic count from adBusterScript
-  currentUrl: string;
-  currentTitle: string;  // For Share functionality
+  // Props for state display (UI only for now)
+  isBookmarked?: boolean;
+  isDesktopMode?: boolean;
 }
-
-interface MenuItemProps {
-  icon: string;
-  label: string;
-  onPress: () => void;
-  color?: string;
-  isActive?: boolean;
-  activeColor?: string;
-}
-
-const MenuItem: React.FC<MenuItemProps> = ({ 
-  icon, 
-  label, 
-  onPress, 
-  color = '#FFF',
-  isActive = false,
-  activeColor = '#00FF88'
-}) => {
-  const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress();
-  };
-
-  return (
-    <TouchableOpacity
-      style={[styles.menuItem, isActive && styles.menuItemActive]}
-      onPress={handlePress}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.menuItemIcon, isActive && { backgroundColor: `${activeColor}20` }]}>
-        <Ionicons 
-          name={icon as any} 
-          size={20} 
-          color={isActive ? activeColor : color} 
-        />
-      </View>
-      <Text style={[styles.menuItemLabel, isActive && { color: activeColor }]}>
-        {label}
-      </Text>
-      {isActive && (
-        <View style={[styles.activeIndicator, { backgroundColor: activeColor }]} />
-      )}
-    </TouchableOpacity>
-  );
-};
 
 /**
- * BrowserMenu - 3-dot menu with browser options
+ * Premium Glassmorphic Action Menu
  * 
- * Features:
- * - Read Page Aloud (TTS)
- * - Stop Reading (when TTS active)
- * - Refresh page
- * - New Tab
- * - Share
- * - Settings
+ * Visual Layout:
+ * - Zone 1: Quick Action Grid (Share, Bookmark, Find, Desktop)
+ * - Zone 2: Smart Tools (AI Summarize, Reader Mode, Burn This Site)
+ * - Zone 3: Navigation Gateways (History, Downloads, Settings)
+ * 
+ * Currently: UI-only, all actions close the modal
  */
 export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   visible,
   onClose,
-  onReadAloud,
-  onStopReading,
-  onSettings,
-  onRefresh,
-  onNewTab,
-  onShare,
-  onToggleGhostMode,
-  onToggleDesktopMode,
-  onToggleBookmark,
-  onToggleAdblock,
-  isReading,
-  isGhostMode,
-  isDesktopMode,
-  isBookmarked,
-  isAdblockEnabled,
-  adsBlocked,
-  currentUrl,
-  currentTitle,
+  isBookmarked = false,
+  isDesktopMode = false,
 }) => {
   const insets = useSafeAreaInsets();
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const slideAnim = React.useRef(new Animated.Value(20)).current;
 
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          damping: 20,
-          stiffness: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      fadeAnim.setValue(0);
-      slideAnim.setValue(20);
-    }
-  }, [visible]);
-
-  const handleClose = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => onClose());
+  const handlePress = (action: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log(`[Menu] ${action} pressed`);
+    onClose();
   };
 
-  // Ghost Mode colors
-  const accentColor = isGhostMode ? '#9B59B6' : '#00FF88';
+  const handleDangerPress = (action: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    console.log(`[Menu] ${action} pressed`);
+    onClose();
+  };
 
-  const isWeb = Platform.OS === 'web';
+  // ============================================================
+  // QUICK ACTION ICON BUTTON
+  // ============================================================
+  const QuickActionButton: React.FC<{
+    icon: string;
+    label: string;
+    onPress: () => void;
+    isActive?: boolean;
+    activeColor?: string;
+  }> = ({ icon, label, onPress, isActive = false, activeColor = ELECTRIC_CYAN }) => (
+    <TouchableOpacity
+      style={styles.quickActionButton}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={[
+        styles.quickActionIconContainer,
+        isActive && { backgroundColor: `${activeColor}20` }
+      ]}>
+        <Ionicons
+          name={icon as any}
+          size={22}
+          color={isActive ? activeColor : TEXT_SECONDARY}
+        />
+      </View>
+      <Text style={[
+        styles.quickActionLabel,
+        isActive && { color: activeColor }
+      ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // ============================================================
+  // MENU ROW ITEM
+  // ============================================================
+  const MenuRow: React.FC<{
+    icon: string;
+    label: string;
+    onPress: () => void;
+    isDanger?: boolean;
+    emoji?: string;
+  }> = ({ icon, label, onPress, isDanger = false, emoji }) => (
+    <TouchableOpacity
+      style={styles.menuRow}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {emoji ? (
+        <Text style={styles.menuEmoji}>{emoji}</Text>
+      ) : (
+        <Ionicons
+          name={icon as any}
+          size={20}
+          color={isDanger ? DANGER_RED : TEXT_SECONDARY}
+          style={styles.menuIcon}
+        />
+      )}
+      <Text style={[
+        styles.menuLabel,
+        isDanger && styles.menuLabelDanger
+      ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
 
   if (!visible) return null;
 
@@ -162,366 +135,245 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="none"
-      onRequestClose={handleClose}
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
     >
       {/* Backdrop */}
-      <Pressable style={styles.backdrop} onPress={handleClose}>
-        <Animated.View style={[styles.backdropInner, { opacity: fadeAnim }]} />
-      </Pressable>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.backdrop} />
+      </TouchableWithoutFeedback>
 
-      {/* Menu */}
-      <Animated.View
-        style={[
-          styles.menuContainer,
-          {
-            top: insets.top + 60,
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        {isWeb ? (
-          <View style={[styles.menuContent, isGhostMode && styles.menuContentGhost]}>
-            {/* Ghost Mode Toggle - Prominent at top */}
-            <MenuItem
-              icon={isGhostMode ? "eye-off" : "eye-off-outline"}
-              label={isGhostMode ? "Exit Ghost Mode" : "Enter Ghost Mode"}
-              onPress={() => {
-                onToggleGhostMode();
-                handleClose();
-              }}
-              isActive={isGhostMode}
-              activeColor="#9B59B6"
-              color="#9B59B6"
-            />
+      {/* Glassmorphic Menu Container */}
+      <View style={[styles.menuContainer, { top: insets.top + 56 }]}>
+        {/* Opalescent Glass Background */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.88)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.menuGradient}
+        >
+          {/* Reflective Edge Highlight */}
+          <View style={styles.reflectiveEdgeTop} />
+          <View style={styles.reflectiveEdgeLeft} />
 
-            <View style={styles.divider} />
-
-            {/* TTS Read Aloud / Stop Reading */}
-            {isReading ? (
-              <MenuItem
-                icon="stop-circle"
-                label="Stop Reading"
-                onPress={() => {
-                  onStopReading();
-                  handleClose();
-                }}
-                isActive={true}
-                activeColor="#FF6B6B"
-              />
-            ) : (
-              <MenuItem
-                icon="volume-high"
-                label="Read Page Aloud"
-                onPress={() => {
-                  onReadAloud();
-                  handleClose();
-                }}
-                color="#888"
-              />
-            )}
-
-            <View style={styles.divider} />
-
-            {/* Refresh */}
-            <MenuItem
-              icon="refresh"
-              label="Refresh Page"
-              onPress={() => {
-                onRefresh();
-                handleClose();
-              }}
-              color="#888"
-            />
-
-            {/* New Tab */}
-            <MenuItem
-              icon="add-circle-outline"
-              label="New Tab"
-              onPress={() => {
-                onNewTab();
-                handleClose();
-              }}
-              color="#888"
-            />
-
-            {/* Share */}
-            <MenuItem
+          {/* ============================================================ */}
+          {/* ZONE 1: QUICK ACTION GRID */}
+          {/* ============================================================ */}
+          <View style={styles.quickActionsContainer}>
+            <QuickActionButton
               icon="share-outline"
-              label="Share Page"
-              onPress={() => {
-                onShare();
-                handleClose();
-              }}
-              color="#888"
+              label="Share"
+              onPress={() => handlePress('Share')}
             />
-
-            {/* Bookmark Toggle (moved from top bar) */}
-            <MenuItem
+            <QuickActionButton
               icon={isBookmarked ? "star" : "star-outline"}
-              label={isBookmarked ? "Remove Bookmark" : "Bookmark Page"}
-              onPress={() => {
-                onToggleBookmark();
-                handleClose();
-              }}
+              label="Bookmark"
+              onPress={() => handlePress('Bookmark')}
               isActive={isBookmarked}
-              activeColor="#00E5FF"
-              color="#888"
+              activeColor={GOLD}
             />
-
-            {/* Shield / Ad-Block Toggle (moved from top bar) */}
-            <MenuItem
-              icon={isAdblockEnabled ? "shield-checkmark" : "shield-outline"}
-              label={isAdblockEnabled ? `Shield: ${adsBlocked} Blocked` : "Enable Shield"}
-              onPress={() => {
-                onToggleAdblock();
-                handleClose();
-              }}
-              isActive={isAdblockEnabled}
-              activeColor="#00FF88"
-              color="#888"
+            <QuickActionButton
+              icon="search-outline"
+              label="Find"
+              onPress={() => handlePress('Find in Page')}
             />
-
-            {/* Desktop Mode Toggle - Chrome-style checkbox */}
-            <MenuItem
-              icon={isDesktopMode ? "checkbox" : "square-outline"}
-              label="Desktop site"
-              onPress={() => {
-                onToggleDesktopMode();
-                handleClose();
-              }}
+            <QuickActionButton
+              icon={isDesktopMode ? "desktop" : "desktop-outline"}
+              label="Desktop"
+              onPress={() => handlePress('Desktop Mode')}
               isActive={isDesktopMode}
-              activeColor="#00E5FF"
-              color="#888"
-            />
-
-            <View style={styles.divider} />
-
-            {/* Settings */}
-            <MenuItem
-              icon="settings-outline"
-              label="Settings"
-              onPress={() => {
-                onSettings();
-                handleClose();
-              }}
-              color="#888"
             />
           </View>
-        ) : (
-          <BlurView tint="dark" intensity={80} style={[styles.menuContent, isGhostMode && styles.menuContentGhost]}>
-            {/* Ghost Mode Toggle - Prominent at top */}
-            <MenuItem
-              icon={isGhostMode ? "eye-off" : "eye-off-outline"}
-              label={isGhostMode ? "Exit Ghost Mode" : "Enter Ghost Mode"}
-              onPress={() => {
-                onToggleGhostMode();
-                handleClose();
-              }}
-              isActive={isGhostMode}
-              activeColor="#9B59B6"
-              color="#9B59B6"
+
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* ============================================================ */}
+          {/* ZONE 2: SMART TOOLS */}
+          {/* ============================================================ */}
+          <View style={styles.section}>
+            <MenuRow
+              emoji="✨"
+              icon=""
+              label="AI Summarize"
+              onPress={() => handlePress('AI Summarize')}
             />
-
-            <View style={styles.divider} />
-
-            {/* TTS Read Aloud / Stop Reading */}
-            {isReading ? (
-              <MenuItem
-                icon="stop-circle"
-                label="Stop Reading"
-                onPress={() => {
-                  onStopReading();
-                  handleClose();
-                }}
-                isActive={true}
-                activeColor="#FF6B6B"
-              />
-            ) : (
-              <MenuItem
-                icon="volume-high"
-                label="Read Page Aloud"
-                onPress={() => {
-                  onReadAloud();
-                  handleClose();
-                }}
-                color="#888"
-              />
-            )}
-
-            <View style={styles.divider} />
-
-            {/* Refresh */}
-            <MenuItem
-              icon="refresh"
-              label="Refresh Page"
-              onPress={() => {
-                onRefresh();
-                handleClose();
-              }}
-              color="#888"
+            <MenuRow
+              emoji="📖"
+              icon=""
+              label="Reader Mode"
+              onPress={() => handlePress('Reader Mode')}
             />
-
-            {/* New Tab */}
-            <MenuItem
-              icon="add-circle-outline"
-              label="New Tab"
-              onPress={() => {
-                onNewTab();
-                handleClose();
-              }}
-              color="#888"
+            <MenuRow
+              emoji="🔥"
+              icon=""
+              label="Burn This Site"
+              onPress={() => handleDangerPress('Burn This Site')}
+              isDanger
             />
+          </View>
 
-            {/* Share */}
-            <MenuItem
-              icon="share-outline"
-              label="Share Page"
-              onPress={() => {
-                onShare();
-                handleClose();
-              }}
-              color="#888"
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* ============================================================ */}
+          {/* ZONE 3: NAVIGATION GATEWAYS */}
+          {/* ============================================================ */}
+          <View style={styles.section}>
+            <MenuRow
+              icon="time-outline"
+              label="History"
+              onPress={() => handlePress('History')}
             />
-
-            {/* Bookmark Toggle (moved from top bar) */}
-            <MenuItem
-              icon={isBookmarked ? "star" : "star-outline"}
-              label={isBookmarked ? "Remove Bookmark" : "Bookmark Page"}
-              onPress={() => {
-                onToggleBookmark();
-                handleClose();
-              }}
-              isActive={isBookmarked}
-              activeColor="#00E5FF"
-              color="#888"
+            <MenuRow
+              icon="download-outline"
+              label="Downloads"
+              onPress={() => handlePress('Downloads')}
             />
-
-            {/* Shield / Ad-Block Toggle (moved from top bar) */}
-            <MenuItem
-              icon={isAdblockEnabled ? "shield-checkmark" : "shield-outline"}
-              label={isAdblockEnabled ? `Shield: ${adsBlocked} Blocked` : "Enable Shield"}
-              onPress={() => {
-                onToggleAdblock();
-                handleClose();
-              }}
-              isActive={isAdblockEnabled}
-              activeColor="#00FF88"
-              color="#888"
-            />
-
-            {/* Desktop Mode Toggle - Chrome-style checkbox */}
-            <MenuItem
-              icon={isDesktopMode ? "checkbox" : "square-outline"}
-              label="Desktop site"
-              onPress={() => {
-                onToggleDesktopMode();
-                handleClose();
-              }}
-              isActive={isDesktopMode}
-              activeColor="#00E5FF"
-              color="#888"
-            />
-
-            <View style={styles.divider} />
-
-            {/* Settings */}
-            <MenuItem
+            <MenuRow
               icon="settings-outline"
               label="Settings"
-              onPress={() => {
-                onSettings();
-                handleClose();
-              }}
-              color="#888"
+              onPress={() => handlePress('Settings')}
             />
-          </BlurView>
-        )}
-      </Animated.View>
+          </View>
+        </LinearGradient>
+      </View>
     </Modal>
   );
 };
 
+// ============================================================
+// GLASSMORPHIC STYLES
+// ============================================================
+
 const styles = StyleSheet.create({
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
-  backdropInner: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
+  // Menu Container - Floating near top right
   menuContainer: {
     position: 'absolute',
     right: 12,
-    minWidth: 200,
+    width: SCREEN_WIDTH * 0.65,
     maxWidth: 280,
-    zIndex: 1000,
-  },
-  menuContent: {
-    backgroundColor: 'rgba(26, 26, 26, 0.95)',
     borderRadius: 16,
-    paddingVertical: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
     overflow: 'hidden',
+    // Deep Glossy Shadow
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 16,
+        shadowOpacity: 0.15,
+        shadowRadius: 24,
       },
       android: {
-        elevation: 12,
+        elevation: 10,
       },
-      web: {},
     }),
   },
-  menuContentGhost: {
-    backgroundColor: 'rgba(42, 0, 0, 0.95)',
-    borderColor: 'rgba(155, 89, 182, 0.3)',
+  menuGradient: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    // Subtle border for the glass effect
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
-  menuItem: {
+  // Reflective Edge Highlights
+  reflectiveEdgeTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 1)',
+  },
+  reflectiveEdgeLeft: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 1)',
+  },
+  // ============================================================
+  // ZONE 1: QUICK ACTIONS
+  // ============================================================
+  quickActionsContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+  },
+  quickActionButton: {
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    minWidth: 56,
   },
-  menuItemActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  menuItemIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  quickActionIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginBottom: 6,
   },
-  menuItemLabel: {
-    flex: 1,
-    fontSize: 15,
+  quickActionLabel: {
+    fontSize: 11,
     fontWeight: '500',
-    color: '#FFF',
+    color: TEXT_SECONDARY,
+    textAlign: 'center',
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
     }),
   },
-  activeIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginLeft: 8,
-  },
+  // ============================================================
+  // DIVIDER
+  // ============================================================
   divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: 6,
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
     marginHorizontal: 16,
+  },
+  // ============================================================
+  // MENU SECTIONS
+  // ============================================================
+  section: {
+    paddingVertical: 8,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  menuIcon: {
+    width: 28,
+    textAlign: 'center',
+    marginRight: 12,
+  },
+  menuEmoji: {
+    fontSize: 18,
+    width: 28,
+    textAlign: 'center',
+    marginRight: 12,
+  },
+  menuLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: TEXT_DARK,
+    flex: 1,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  menuLabelDanger: {
+    color: DANGER_RED,
   },
 });
 

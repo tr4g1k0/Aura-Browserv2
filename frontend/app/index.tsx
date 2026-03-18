@@ -1013,45 +1013,12 @@ export default function BrowserScreen() {
         currentTitle={activeTab?.title || ''}
       />
 
-      {/* Browser Menu (3-dot menu) */}
+      {/* Browser Menu (3-dot menu) - Premium Glassmorphic Design */}
       <BrowserMenu
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
-        onReadAloud={handleReadAloud}
-        onStopReading={handleStopReading}
-        onSettings={openSettings}
-        onRefresh={() => webViewRef.current?.reload()}
-        onNewTab={() => {
-          useBrowserStore.getState().addTab();
-          setMenuVisible(false);
-        }}
-        onShare={handleShare}
-        onToggleGhostMode={() => {
-          useBrowserStore.getState().toggleGhostMode();
-        }}
-        onToggleDesktopMode={() => {
-          toggleDesktopMode();
-          // Reload page to fetch with new user agent
-          setTimeout(() => {
-            webViewRef.current?.reload();
-          }, 100);
-        }}
-        onToggleBookmark={() => {
-          if (activeTab) {
-            useBrowserStore.getState().toggleBookmark(activeTab.url, activeTab.title);
-          }
-        }}
-        onToggleAdblock={() => {
-          useBrowserStore.getState().toggleAdblock();
-        }}
-        isReading={isReading}
-        isGhostMode={isGhostMode}
-        isDesktopMode={activeTab?.isDesktopMode ?? false}
         isBookmarked={activeTab ? useBrowserStore.getState().isBookmarked(activeTab.url) : false}
-        isAdblockEnabled={useBrowserStore.getState().settings.adblockEnabled}
-        adsBlocked={adsBlocked}
-        currentUrl={activeTab?.url ?? ''}
-        currentTitle={activeTab?.title ?? ''}
+        isDesktopMode={activeTab?.isDesktopMode ?? false}
       />
 
       <View style={styles.webviewContainer}>
