@@ -8,10 +8,13 @@ import {
   TouchableWithoutFeedback,
   Platform,
   Dimensions,
+  Share,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -28,38 +31,173 @@ const GOLD_GLOW = 'rgba(255, 215, 0, 0.3)';
 interface BrowserMenuProps {
   visible: boolean;
   onClose: () => void;
+  currentUrl: string;
+  currentTitle: string;
   isBookmarked?: boolean;
   isDesktopMode?: boolean;
+  onToggleBookmark?: () => void;
+  onToggleDesktopMode?: () => void;
 }
 
 /**
  * Premium Glossy Glassmorphic Command Center
  * 
- * Visual Features:
- * - Opalescent glass container with deep milky gradient
- * - Stark white reflective edge highlights
- * - Deep realistic shadows for 3D depth
- * - Polished glass buttons with internal shadows
- * - Electric Cyan glow accents on active states
+ * NOW WIRED WITH:
+ * - Native Share API
+ * - Settings navigation via expo-router
+ * - History/Library navigation
+ * - Golden Rule: Menu dismisses BEFORE any action
  */
 export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   visible,
   onClose,
+  currentUrl,
+  currentTitle,
   isBookmarked = false,
   isDesktopMode = false,
+  onToggleBookmark,
+  onToggleDesktopMode,
 }) => {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
-  const handlePress = (action: string) => {
+  // ============================================================
+  // GOLDEN RULE: Close menu FIRST, then perform action
+  // ============================================================
+
+  const handleShare = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    console.log(`[Menu] ${action} pressed`);
+    console.log('[Menu] Share pressed');
+    
+    // GOLDEN RULE: Close menu first
     onClose();
+    
+    // Then trigger native share sheet
+    try {
+      const result = await Share.share({
+        message: currentTitle ? `${currentTitle}\n${currentUrl}` : currentUrl,
+        url: Platform.OS === 'ios' ? currentUrl : undefined, // iOS supports separate URL
+        title: currentTitle || 'Share this page',
+      });
+      
+      if (result.action === Share.sharedAction) {
+        console.log('[Menu] Share completed');
+      } else if (result.action === Share.dismissedAction) {
+        console.log('[Menu] Share dismissed');
+      }
+    } catch (error: any) {
+      console.error('[Menu] Share error:', error);
+      Alert.alert('Share Failed', 'Unable to share this page. Please try again.');
+    }
   };
 
-  const handleDangerPress = (action: string) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    console.log(`[Menu] ${action} pressed`);
+  const handleBookmark = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    console.log('[Menu] Bookmark pressed');
+    
+    // GOLDEN RULE: Close menu first
     onClose();
+    
+    // Then toggle bookmark
+    onToggleBookmark?.();
+  };
+
+  const handleFind = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log('[Menu] Find in Page pressed');
+    
+    // GOLDEN RULE: Close menu first
+    onClose();
+    
+    // TODO: Implement find in page functionality
+    Alert.alert('Find in Page', 'Coming soon! This will allow you to search text on the current page.');
+  };
+
+  const handleDesktopMode = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log('[Menu] Desktop Mode pressed');
+    
+    // GOLDEN RULE: Close menu first
+    onClose();
+    
+    // Then toggle desktop mode
+    onToggleDesktopMode?.();
+  };
+
+  const handleAISummarize = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log('[Menu] AI Summarize pressed');
+    
+    // GOLDEN RULE: Close menu first
+    onClose();
+    
+    // TODO: Implement AI summarization
+    Alert.alert('AI Summarize', 'Coming soon! Our AI will create a concise summary of this page.');
+  };
+
+  const handleReaderMode = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log('[Menu] Reader Mode pressed');
+    
+    // GOLDEN RULE: Close menu first
+    onClose();
+    
+    // TODO: Implement reader mode
+    Alert.alert('Reader Mode', 'Coming soon! This will strip away clutter for distraction-free reading.');
+  };
+
+  const handleBurnSite = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    console.log('[Menu] Burn This Site pressed');
+    
+    // GOLDEN RULE: Close menu first
+    onClose();
+    
+    // TODO: Implement burn site (clear site data)
+    Alert.alert(
+      'Burn This Site',
+      'This will clear all cookies and cache for this website. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Burn', style: 'destructive', onPress: () => {
+          console.log('[Menu] Site data burned');
+          // TODO: Clear site-specific data
+        }},
+      ]
+    );
+  };
+
+  const handleHistory = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log('[Menu] History pressed');
+    
+    // GOLDEN RULE: Close menu first
+    onClose();
+    
+    // Then navigate to library/history
+    router.push('/library');
+  };
+
+  const handleDownloads = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log('[Menu] Downloads pressed');
+    
+    // GOLDEN RULE: Close menu first
+    onClose();
+    
+    // TODO: Navigate to downloads screen
+    Alert.alert('Downloads', 'Coming soon! Your downloaded files will appear here.');
+  };
+
+  const handleSettings = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log('[Menu] Settings pressed');
+    
+    // GOLDEN RULE: Close menu first
+    onClose();
+    
+    // Then navigate to settings
+    router.push('/settings');
   };
 
   // ============================================================
@@ -78,7 +216,6 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
       onPress={onPress}
       activeOpacity={0.8}
     >
-      {/* Glass Button with Gradient */}
       <View style={[
         styles.glassButtonOuter,
         isActive && { borderColor: activeColor }
@@ -93,10 +230,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
           end={{ x: 0, y: 1 }}
           style={styles.glassButtonGradient}
         >
-          {/* Inner highlight for polished glass effect */}
           <View style={styles.glassButtonHighlight} />
-          
-          {/* Icon with potential glow */}
           <View style={[
             styles.glassButtonIconWrapper,
             isActive && { 
@@ -118,8 +252,6 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
           </View>
         </LinearGradient>
       </View>
-      
-      {/* Label */}
       <Text style={[
         styles.glassButtonLabel,
         isActive && { color: activeColor, fontWeight: '600' }
@@ -182,17 +314,15 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      {/* Backdrop with subtle blur effect simulation */}
+      {/* Backdrop */}
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop} />
       </TouchableWithoutFeedback>
 
       {/* Glossy Glassmorphic Command Center */}
       <View style={[styles.menuContainer, { top: insets.top + 56 }]}>
-        {/* Deep Shadow Layer */}
         <View style={styles.shadowLayer} />
         
-        {/* Opalescent Glass Panel */}
         <LinearGradient
           colors={['rgba(255,255,255,0.75)', 'rgba(255,255,255,0.92)', 'rgba(250,250,250,0.95)']}
           locations={[0, 0.5, 1]}
@@ -200,26 +330,23 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
           end={{ x: 0, y: 1 }}
           style={styles.menuGradient}
         >
-          {/* Reflective Edge - Stark White Highlight */}
           <View style={styles.reflectiveEdgeTop} />
           <View style={styles.reflectiveEdgeLeft} />
-          
-          {/* Subtle inner glow */}
           <View style={styles.innerGlow} />
 
           {/* ============================================================ */}
-          {/* ZONE 1: QUICK ACTION GRID - Polished Glass Buttons */}
+          {/* ZONE 1: QUICK ACTION GRID */}
           {/* ============================================================ */}
           <View style={styles.quickActionsContainer}>
             <GlassButton
               icon="share-outline"
               label="Share"
-              onPress={() => handlePress('Share')}
+              onPress={handleShare}
             />
             <GlassButton
               icon={isBookmarked ? "star" : "star-outline"}
               label="Bookmark"
-              onPress={() => handlePress('Bookmark')}
+              onPress={handleBookmark}
               isActive={isBookmarked}
               activeColor={GOLD}
               glowColor={GOLD_GLOW}
@@ -227,12 +354,12 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
             <GlassButton
               icon="search-outline"
               label="Find"
-              onPress={() => handlePress('Find in Page')}
+              onPress={handleFind}
             />
             <GlassButton
               icon={isDesktopMode ? "desktop" : "desktop-outline"}
               label="Desktop"
-              onPress={() => handlePress('Desktop Mode')}
+              onPress={handleDesktopMode}
               isActive={isDesktopMode}
             />
           </View>
@@ -256,19 +383,19 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               emoji="✨"
               icon=""
               label="AI Summarize"
-              onPress={() => handlePress('AI Summarize')}
+              onPress={handleAISummarize}
             />
             <MenuRow
               emoji="📖"
               icon=""
               label="Reader Mode"
-              onPress={() => handlePress('Reader Mode')}
+              onPress={handleReaderMode}
             />
             <MenuRow
               emoji="🔥"
               icon=""
               label="Burn This Site"
-              onPress={() => handleDangerPress('Burn This Site')}
+              onPress={handleBurnSite}
               isDanger
             />
           </View>
@@ -291,17 +418,17 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
             <MenuRow
               icon="time-outline"
               label="History"
-              onPress={() => handlePress('History')}
+              onPress={handleHistory}
             />
             <MenuRow
               icon="download-outline"
               label="Downloads"
-              onPress={() => handlePress('Downloads')}
+              onPress={handleDownloads}
             />
             <MenuRow
               icon="settings-outline"
               label="Settings"
-              onPress={() => handlePress('Settings')}
+              onPress={handleSettings}
             />
           </View>
         </LinearGradient>
@@ -319,9 +446,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
-  // ============================================================
-  // MAIN CONTAINER - Deep Shadows & Positioning
-  // ============================================================
   menuContainer: {
     position: 'absolute',
     right: 12,
@@ -334,7 +458,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.02)',
-    // Deep glossy shadows for realistic depth
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -350,13 +473,9 @@ const styles = StyleSheet.create({
   menuGradient: {
     borderRadius: 20,
     overflow: 'hidden',
-    // Subtle outer border
     borderWidth: 0.5,
     borderColor: 'rgba(255, 255, 255, 0.6)',
   },
-  // ============================================================
-  // REFLECTIVE EDGES - Stark White Highlights
-  // ============================================================
   reflectiveEdgeTop: {
     position: 'absolute',
     top: 0,
@@ -385,9 +504,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 19,
     borderTopRightRadius: 19,
   },
-  // ============================================================
-  // ZONE 1: GLASS BUTTON GRID
-  // ============================================================
   quickActionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',
@@ -405,7 +521,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.8)',
-    // Inner shadow simulation
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -449,9 +564,6 @@ const styles = StyleSheet.create({
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
     }),
   },
-  // ============================================================
-  // DIVIDER - Glossy gradient divider
-  // ============================================================
   dividerContainer: {
     paddingHorizontal: 16,
     height: 1,
@@ -459,9 +571,6 @@ const styles = StyleSheet.create({
   dividerGradient: {
     flex: 1,
   },
-  // ============================================================
-  // SECTIONS
-  // ============================================================
   section: {
     paddingVertical: 8,
   },
@@ -479,9 +588,6 @@ const styles = StyleSheet.create({
       web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
     }),
   },
-  // ============================================================
-  // MENU ROW
-  // ============================================================
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',

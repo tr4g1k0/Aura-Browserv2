@@ -1017,8 +1017,22 @@ export default function BrowserScreen() {
       <BrowserMenu
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
+        currentUrl={activeTab?.url ?? ''}
+        currentTitle={activeTab?.title ?? ''}
         isBookmarked={activeTab ? useBrowserStore.getState().isBookmarked(activeTab.url) : false}
         isDesktopMode={activeTab?.isDesktopMode ?? false}
+        onToggleBookmark={() => {
+          if (activeTab) {
+            useBrowserStore.getState().toggleBookmark(activeTab.url, activeTab.title);
+          }
+        }}
+        onToggleDesktopMode={() => {
+          toggleDesktopMode();
+          // Reload page to fetch with new user agent
+          setTimeout(() => {
+            webViewRef.current?.reload();
+          }, 100);
+        }}
       />
 
       <View style={styles.webviewContainer}>

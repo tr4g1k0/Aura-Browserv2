@@ -13,7 +13,8 @@
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Enable ambient sound detection for accessibility",
         "NSSpeechRecognitionUsageDescription": "Enable live captioning for media content"
-      }
+      },
+      "bundleIdentifier": "com.anonymous.accessbrowser"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,8 +26,14 @@
       "permissions": [
         "RECORD_AUDIO",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
-      ]
+        "ACCESS_NETWORK_STATE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.anonymous.accessbrowser"
     },
     "web": {
       "bundler": "metro",
