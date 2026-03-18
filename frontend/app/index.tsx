@@ -11,6 +11,9 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Modal,
+  ScrollView,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -210,6 +213,10 @@ export default function BrowserScreen() {
   const [isFindModeActive, setIsFindModeActive] = useState(false);
   const [findText, setFindText] = useState('');
   const findInputRef = useRef<TextInput>(null);
+  
+  // AI Summarizer Drawer state
+  const [isAiDrawerVisible, setIsAiDrawerVisible] = useState(false);
+  const [aiSummaryText, setAiSummaryText] = useState('');
   
   // TTS (Text-to-Speech) state
   const [isReading, setIsReading] = useState(false);
@@ -992,6 +999,44 @@ export default function BrowserScreen() {
     );
   }, [activeTab?.url]);
 
+  // ============================================================
+  // AI SUMMARIZE - Premium Feature
+  // Opens the AI Summary drawer with loading state
+  // ============================================================
+  
+  /**
+   * Handle AI Summarize button press
+   * Opens the drawer and sets loading placeholder text
+   */
+  const handleAISummarize = useCallback(() => {
+    console.log('[AI Summarize] Opening drawer for:', activeTab?.url);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Close menu first
+    setMenuVisible(false);
+    
+    // Set loading text
+    setAiSummaryText('Analyzing page content and extracting key insights...');
+    
+    // Open the AI drawer
+    setIsAiDrawerVisible(true);
+    
+    // TODO: Wire actual AI API call here
+    // For now, simulate a loading state
+    // In production, this would extract page content and call the backend
+  }, [activeTab?.url]);
+
+  /**
+   * Close the AI Summary drawer
+   */
+  const handleCloseAiDrawer = useCallback(() => {
+    setIsAiDrawerVisible(false);
+    // Clear text after animation
+    setTimeout(() => {
+      setAiSummaryText('');
+    }, 300);
+  }, []);
+
   const openTabsManager = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push('/tabs-manager');
@@ -1219,7 +1264,88 @@ export default function BrowserScreen() {
         }}
         onFindInPage={handleOpenFindInPage}
         onBurnSite={handleBurnSite}
+        onAISummarize={handleAISummarize}
       />
+
+      {/* ============================================================ */}
+      {/* AI SUMMARIZER DRAWER - Premium Glassmorphic Bottom Sheet */}
+      {/* Slides up from bottom with opalescent dark background */}
+      {/* ============================================================ */}
+      <Modal
+        visible={isAiDrawerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCloseAiDrawer}
+      >
+        <Pressable 
+          style={styles.aiDrawerOverlay}
+          onPress={handleCloseAiDrawer}
+        >
+          <Pressable 
+            style={[
+              styles.aiDrawerContainer,
+              { paddingBottom: Math.max(insets.bottom, 24) }
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Electric Cyan Top Border Highlight */}
+            <View style={styles.aiDrawerTopHighlight} />
+            
+            {/* Header */}
+            <View style={styles.aiDrawerHeader}>
+              <View style={styles.aiDrawerHeaderLeft}>
+                <Ionicons name="sparkles" size={24} color="#00FFFF" />
+                <Text style={styles.aiDrawerTitle}>AI Page Summary</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.aiDrawerCloseButton}
+                onPress={handleCloseAiDrawer}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={24} color="#888" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Divider */}
+            <View style={styles.aiDrawerDivider} />
+
+            {/* Summary Content */}
+            <ScrollView 
+              style={styles.aiDrawerContent}
+              contentContainerStyle={styles.aiDrawerContentContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              {aiSummaryText ? (
+                <View style={styles.aiSummaryBox}>
+                  <Text style={styles.aiSummaryText}>{aiSummaryText}</Text>
+                  
+                  {/* Loading indicator dots */}
+                  {aiSummaryText.includes('Analyzing') && (
+                    <View style={styles.aiLoadingDots}>
+                      <View style={[styles.aiDot, styles.aiDot1]} />
+                      <View style={[styles.aiDot, styles.aiDot2]} />
+                      <View style={[styles.aiDot, styles.aiDot3]} />
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <Text style={styles.aiEmptyText}>
+                  Navigate to a webpage and tap the AI button to generate a summary.
+                </Text>
+              )}
+            </ScrollView>
+
+            {/* Close Button */}
+            <TouchableOpacity 
+              style={styles.aiDrawerActionButton}
+              onPress={handleCloseAiDrawer}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.aiDrawerActionText}>Close</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <View style={styles.webviewContainer}>
         {Platform.OS === 'web' ? (
@@ -1227,12 +1353,16 @@ export default function BrowserScreen() {
           <NewTabPage
             onNavigate={handleNavigate}
             onSearch={handleNavigate}
+            onOpenMenu={() => setMenuVisible(true)}
+            onAISummarize={handleAISummarize}
           />
         ) : isNewTabPage ? (
           // Native: Show New Tab Page for blank/new tabs
           <NewTabPage
             onNavigate={handleNavigate}
             onSearch={handleNavigate}
+            onOpenMenu={() => setMenuVisible(true)}
+            onAISummarize={handleAISummarize}
           />
         ) : activeTab && WebView ? (
           <SwipeNavigationWrapper
@@ -1530,5 +1660,176 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     borderRadius: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  // ============================================================
+  // AI SUMMARIZER DRAWER - Premium Glassmorphic Bottom Sheet
+  // ============================================================
+  aiDrawerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  aiDrawerContainer: {
+    backgroundColor: 'rgba(20, 20, 25, 0.95)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingHorizontal: 20,
+    minHeight: 320,
+    maxHeight: '70%',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 24,
+      },
+      web: {
+        boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.5)',
+      },
+    }),
+  },
+  aiDrawerTopHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#00FFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#00FFFF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 12,
+      },
+    }),
+  },
+  aiDrawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  aiDrawerHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  aiDrawerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  aiDrawerCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiDrawerDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 16,
+  },
+  aiDrawerContent: {
+    flex: 1,
+  },
+  aiDrawerContentContainer: {
+    paddingBottom: 16,
+  },
+  aiSummaryBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  aiSummaryText: {
+    fontSize: 16,
+    lineHeight: 26,
+    color: '#DDDDDD',
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  aiEmptyText: {
+    fontSize: 15,
+    color: '#888888',
+    textAlign: 'center',
+    paddingVertical: 40,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  aiLoadingDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 8,
+  },
+  aiDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#00FFFF',
+    opacity: 0.5,
+  },
+  aiDot1: {
+    opacity: 1,
+  },
+  aiDot2: {
+    opacity: 0.7,
+  },
+  aiDot3: {
+    opacity: 0.4,
+  },
+  aiDrawerActionButton: {
+    backgroundColor: '#00FFFF',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#00FFFF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  aiDrawerActionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0A0A0A',
+    letterSpacing: 0.5,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
   },
 });

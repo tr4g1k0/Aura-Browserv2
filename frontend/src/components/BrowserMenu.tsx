@@ -39,6 +39,7 @@ interface BrowserMenuProps {
   onToggleDesktopMode?: () => void;
   onFindInPage?: () => void;
   onBurnSite?: () => void;
+  onAISummarize?: () => void;
 }
 
 /**
@@ -61,6 +62,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onToggleDesktopMode,
   onFindInPage,
   onBurnSite,
+  onAISummarize,
 }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -132,11 +134,8 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     console.log('[Menu] AI Summarize pressed');
     
-    // GOLDEN RULE: Close menu first
-    onClose();
-    
-    // TODO: Implement AI summarization
-    Alert.alert('AI Summarize', 'Coming soon! Our AI will create a concise summary of this page.');
+    // Call the parent handler which handles menu closing and drawer opening
+    onAISummarize?.();
   };
 
   const handleReaderMode = () => {

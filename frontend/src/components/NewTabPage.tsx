@@ -64,6 +64,8 @@ const OFFLINE_GRAY = '#666666';
 interface NewTabPageProps {
   onNavigate: (url: string) => void;
   onSearch: (query: string) => void;
+  onOpenMenu?: () => void;
+  onAISummarize?: () => void;
 }
 
 // Get first letter of title for display
@@ -972,7 +974,7 @@ const AddLinkModal: React.FC<{
 // ============================================================
 // MAIN NEW TAB PAGE COMPONENT
 // ============================================================
-export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch }) => {
+export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, onOpenMenu, onAISummarize }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { settings } = useSettings();
@@ -1051,11 +1053,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch }) 
 
   const handleAISummarize = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      '✨ AI Summarize',
-      'Navigate to a website first to get an AI-powered summary of the page content.',
-      [{ text: 'OK' }]
-    );
+    // Call parent handler if provided, otherwise show alert
+    if (onAISummarize) {
+      onAISummarize();
+    } else {
+      Alert.alert(
+        '✨ AI Summarize',
+        'Navigate to a website first to get an AI-powered summary of the page content.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleTabs = () => {
@@ -1065,9 +1072,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch }) 
 
   const handleMenu = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Open the 3-dot menu - this will be handled by the parent
-    // For now, show settings
-    router.push('/settings');
+    // Call parent handler to open BrowserMenu
+    if (onOpenMenu) {
+      onOpenMenu();
+    } else {
+      // Fallback to settings
+      router.push('/settings');
+    }
   };
 
   const handleQRScan = () => {
