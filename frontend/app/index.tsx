@@ -32,6 +32,7 @@ import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
 import { CaptionPill } from '../src/components/CaptionPill';
+import { QuickConverseView } from '../src/components/QuickConverseView';
 import { useAmbientAwareness } from '../src/hooks/useAmbientAwareness';
 import { downloadManager } from '../src/services/FileDownloadManager';
 import { ttsService, contentExtractionScript } from '../src/services/TextToSpeechService';
@@ -188,6 +189,7 @@ export default function BrowserScreen() {
     ttsRate,
     toggleDesktopMode,
     getActiveTabDesktopMode,
+    toggleQuickConverse,
   } = useBrowserStore();
 
   // Access user settings for search engine preference and other settings
@@ -1944,6 +1946,12 @@ export default function BrowserScreen() {
       <AccessibilityModal
         visible={accessibilityModalVisible}
         onClose={() => setAccessibilityModalVisible(false)}
+      />
+
+      {/* Quick Converse - Full-screen split-screen communication interface */}
+      <QuickConverseView
+        visible={settings.quickConverseEnabled}
+        onClose={() => toggleQuickConverse()}
       />
 
       {/* Library Screen (Bookmarks & History) */}
