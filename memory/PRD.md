@@ -390,3 +390,40 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - `/app/frontend/src/services/ResumableDownloadService.ts` - HTTP Range & persistence
 - `/app/frontend/src/services/FileDownloadManager.ts` - Enhanced with resume support
 
+### Kids Mode (Mar 2026)
+A comprehensive child-safe browsing mode for parents.
+
+**Features Implemented:**
+1. **Kids Mode Activation** - Menu item triggers setup wizard or direct activation
+2. **4-Step Setup Wizard** - PIN creation, PIN confirmation, child name/age group, time limit selection
+3. **Secure PIN Storage** - expo-secure-store for encrypted PIN, AsyncStorage for config persistence
+4. **Full UI Transformation** - Colorful gradient background (purple/blue/green), animated floating bubbles, friendly shield mascot, large rounded tiles for safe sites, "Hi [Name]! Stay Safe Online" greeting
+5. **Content Filtering** - Comprehensive adult content domain blocklist, age-based filtering (Little Kids: whitelist-only, Kids/Teens: blocklist+safe), custom parent-managed allow/block lists
+6. **SafeSearch Enforcement** - Google (&safe=strict), DuckDuckGo (&kp=1), Bing (&adlt=strict), Yahoo (&vm=r)
+7. **Time Limits** - 30min/1hr/2hrs/unlimited daily limits, live timer display, "Time's Up" screen with offline activity suggestions
+8. **PIN-Protected Exit** - 4-digit PIN verification, 3-attempt lockout (5 min), friendly "Ask a grown-up" message
+9. **Parent Dashboard** - Activity report (sites visited, time spent, blocked attempts), site management (add/remove allowed/blocked), settings (age group, time limit, child name), time extension (+30 min)
+10. **Settings Integration** - Kids Mode status card with ON/OFF badge, age group and time limit display
+
+**Architecture:**
+- **Store**: `useKidsModeStore.ts` (Zustand) - State management for PIN, config, sessions, activity logs
+- **Service**: `KidsContentFilter.ts` - URL filtering, SafeSearch enforcement, safe sites catalog
+- **Components**: KidsModeSetupModal, KidsModeBrowser, KidsModeExitModal, KidsModeParentDashboard, KidsModeTimeUp
+- **Integration**: index.tsx (overlay + content filtering in WebView), BrowserMenu (menu item), settings.tsx (status card), useWebViewEngine (URL blocking + activity logging)
+
+**Key Files:**
+- `/app/frontend/src/store/useKidsModeStore.ts` - Zustand store
+- `/app/frontend/src/services/KidsContentFilter.ts` - Content filtering service
+- `/app/frontend/src/components/KidsModeSetupModal.tsx` - 4-step setup wizard
+- `/app/frontend/src/components/KidsModeBrowser.tsx` - Full-screen kids UI overlay
+- `/app/frontend/src/components/KidsModeExitModal.tsx` - PIN exit modal
+- `/app/frontend/src/components/KidsModeParentDashboard.tsx` - Parent controls (3 tabs)
+- `/app/frontend/src/components/KidsModeTimeUp.tsx` - Time limit reached screen
+
+## Upcoming Tasks
+- (P1) Wire AI Actions: Implement Explain/Summarize in AuraActionPill + Aura Vision in ImageContextMenu using GPT-4o
+- (P2) Add Define Button: Dictionary lookups in AuraActionPill
+- (P2) Add Translate Button: Translation in text/image menus
+- (P3) Downloads Storage Insights: Visual chart of storage by category
+- (P3) Cloud Sync: Backup/sync for bookmarks and download history
+
