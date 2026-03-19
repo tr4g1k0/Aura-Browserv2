@@ -72,13 +72,7 @@
           "enableFileSharing": true
         }
       ],
-      "expo-audio",
-      [
-        "expo-av",
-        {
-          "microphonePermission": "Allow Aura Browser to access your microphone for voice search."
-        }
-      ]
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true
