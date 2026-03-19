@@ -50,6 +50,8 @@ import { SwipeNavigationWrapper } from '../src/components/SwipeNavigationWrapper
 import { DownloadToast } from '../src/components/DownloadToast';
 import { LibraryScreen } from './library';
 import { VideoControlToolbar } from '../src/components/VideoControlToolbar';
+import { DownloadProgressSheet } from '../src/components/DownloadProgressSheet';
+import { MediaDownloadOverlay } from '../src/components/MediaDownloadOverlay';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { CaptionPill } from '../src/components/CaptionPill';
 import { DownloadNotificationBanner } from '../src/components/DownloadNotificationBanner';
@@ -62,6 +64,8 @@ import { ambientAwarenessService } from '../src/services/AmbientAwarenessService
 import { prefetchQuickAccessDNS } from '../src/services/DNSPrefetchService';
 import { startupOptimizer } from '../src/services/StartupOptimizer';
 import { tabVirtualizationService } from '../src/services/TabVirtualizationService';
+import { mediaDetectionScript } from '../src/services/MediaDownloadService';
+import { useDownloadsStore } from '../src/store/useDownloadsStore';
 import * as Haptics from 'expo-haptics';
 
 // Conditionally import WebView only on native platforms
@@ -107,6 +111,12 @@ export default function BrowserScreen() {
   const [isActionPillVisible, setIsActionPillVisible] = useState(false);
   const [showBotBanner, setShowBotBanner] = useState(false);
   const [isReading, setIsReading] = useState(false);
+  
+  // ── Download manager state ──
+  const [downloadProgressSheetVisible, setDownloadProgressSheetVisible] = useState(false);
+  const [detectedMedia, setDetectedMedia] = useState<any[]>([]);
+  const activeDownloadsCount = useDownloadsStore((s) => Object.keys(s.activeDownloads).length);
+  const completedDownloadsCount = useDownloadsStore((s) => s.completedCount);
 
   // ── Extracted hooks ──
   const { barTranslateY, showBar, hideBar, handleScrollDirection } = useAutoHideBar();
@@ -308,6 +318,10 @@ export default function BrowserScreen() {
       if (data.type === 'VIDEO_STATE') {
         backgroundMedia.handleVideoMessage(data);
       }
+      // Media download: Handle detected media for download overlay
+      if (data.type === 'DETECTED_MEDIA' && data.media) {
+        setDetectedMedia(data.media);
+      }
       if (data.type === 'PAGE_CONTEXT' && !isGhostMode) {
         const pageContext: PageContext = {
           url: data.url, title: data.title, metaDescription: data.metaDescription,
@@ -368,6 +382,27 @@ export default function BrowserScreen() {
   // ── Routing helpers ──
   const openTabsManager = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/tabs-manager'); };
   const openAIAgent = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/ai-agent'); };
+
+  // ── Media download handler ──
+  const handleMediaDownload = useCallback((media: any) => {
+    if (media.src) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // Check for duplicates
+      if (useDownloadsStore.getState().isDuplicate(media.src)) {
+        Alert.alert(
+          'Download Again?',
+          'This file has already been downloaded. Download again?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Download', onPress: () => handleFileDownload(media.src) },
+          ]
+        );
+      } else {
+        handleFileDownload(media.src);
+        setDownloadProgressSheetVisible(true);
+      }
+    }
+  }, [handleFileDownload]);
 
   // ── Layout calculations ──
   // No extra padding - the bar is absolutely positioned over the webview
@@ -543,6 +578,15 @@ export default function BrowserScreen() {
             />
           )}
 
+          {/* Media Download Overlay - appears when downloadable media detected */}
+          {!isNewTabPage && detectedMedia.length > 0 && Platform.OS !== 'web' && (
+            <MediaDownloadOverlay
+              detectedMedia={detectedMedia}
+              onDownload={handleMediaDownload}
+              bottomOffset={backgroundMedia.isVideoToolbarVisible ? 160 + insets.bottom : 100 + insets.bottom}
+            />
+          )}
+
           {/* Bottom Navigation Bar - absolutely positioned, overlays webview */}
           {!isNewTabPage && (
             <Animated.View 
@@ -572,6 +616,13 @@ export default function BrowserScreen() {
         <AccessibilityModal visible={accessibilityModalVisible} onClose={() => setAccessibilityModalVisible(false)} />
         <QuickConverseView visible={settings.quickConverseEnabled} onClose={() => toggleQuickConverse()} />
         <LibraryScreen visible={libraryVisible} onClose={() => setLibraryVisible(false)} onNavigate={(url: string) => { setLibraryVisible(false); navigation.handleNavigate(url); }} />
+        
+        {/* Download Progress Sheet */}
+        <DownloadProgressSheet
+          visible={downloadProgressSheetVisible || activeDownloadsCount > 0}
+          onClose={() => setDownloadProgressSheetVisible(false)}
+          onOpenDownloads={() => setDownloadsModalVisible(true)}
+        />
       </View>
     </KeyboardAvoidingView>
   );

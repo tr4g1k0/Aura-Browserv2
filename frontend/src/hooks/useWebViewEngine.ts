@@ -1,5 +1,6 @@
 import { useState, useCallback, RefObject } from 'react';
 import { Platform } from 'react-native';
+import { Platform } from 'react-native';
 import {
   isAdOrTracker,
   adBusterScript,
@@ -329,6 +330,14 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
           console.log('[BackgroundMedia] YouTube background play script injected');
         }, 1000);
       }
+    }
+
+    // Media detection for downloads (inject separately from video detector)
+    if (activeTab?.url && Platform.OS !== 'web') {
+      // Import dynamically to avoid circular deps
+      import('../services/MediaDownloadService').then(({ mediaDetectionScript }) => {
+        webViewRef.current?.injectJavaScript(mediaDetectionScript);
+      });
     }
 
     // Semantic history
