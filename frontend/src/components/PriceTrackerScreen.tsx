@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,14 @@ import {
   Platform,
   Animated,
   Image,
+  Share,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePriceTrackerStore } from '../store/usePriceTrackerStore';
 import { priceTrackerDB, TrackedProduct, PriceHistoryEntry } from '../services/PriceTrackerDB';
-import { priceAnalysisService, DealScore } from '../services/PriceAnalysisService';
+import { priceAnalysisService, DealScore, PriceStats } from '../services/PriceAnalysisService';
 import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -35,22 +37,64 @@ interface ProductCardData {
   history: PriceHistoryEntry[];
   dealScore: DealScore;
   sparkline: number[];
+  stats: PriceStats | null;
+  isFlashSale: boolean;
+  recommendation: string;
 }
 
+// ══════════════════════════════════════════
+// ANIMATED SAVINGS COUNTER
+// ══════════════════════════════════════════
+const AnimatedCounter: React.FC<{ value: number; prefix?: string; color?: string }> = ({ value, prefix = '$', color = '#fff' }) => {
+  const animValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(animValue, {
+      toValue: value,
+      duration: 1200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [value]);
+
+  const displayValue = animValue.interpolate({
+    inputRange: [0, value || 1],
+    outputRange: ['0', String(Math.round(value))],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <Animated.Text style={[styles.summaryValue, { color }]}>
+      {prefix}{Math.round(value)}
+    </Animated.Text>
+  );
+};
+
+// ══════════════════════════════════════════
+// MAIN SCREEN
+// ══════════════════════════════════════════
 export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => void; onNavigate?: (url: string) => void }> = ({ visible, onClose, onNavigate }) => {
   const insets = useSafeAreaInsets();
   const {
     trackedProducts, totalSavings, priceDropCount, bestDeal,
-    loadTrackedProducts, loadStats, openSheet,
+    loadTrackedProducts, loadStats,
   } = usePriceTrackerStore();
 
   const [activeFilter, setActiveFilter] = React.useState<FilterTab>('all');
   const [cardDataMap, setCardDataMap] = React.useState<Map<string, ProductCardData>>(new Map());
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (visible) {
       loadTrackedProducts();
       loadStats();
+      // Pulse animation for flash sale badges
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ])
+      ).start();
     }
   }, [visible]);
 
@@ -63,7 +107,27 @@ export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => voi
         const history = await priceTrackerDB.getProductHistory(product.id);
         const dealScore = priceAnalysisService.calculateDealScore(product, history);
         const sparkline = priceAnalysisService.getSparklineData(history, 15);
-        map.set(product.id, { product, history, dealScore, sparkline });
+        const stats = history.length >= 2 ? priceAnalysisService.calculateStats(product, history) : null;
+
+        // Flash sale: 30%+ drop in recent history
+        let isFlashSale = false;
+        if (history.length >= 2) {
+          const recent = history.slice(-5);
+          const prev = recent[0].price;
+          const drop = ((prev - product.currentPrice) / prev) * 100;
+          if (drop >= 30) isFlashSale = true;
+        }
+
+        // Quick recommendation
+        let recommendation = '';
+        if (history.length < 3) {
+          recommendation = 'Tracking started...';
+        } else if (stats) {
+          const rec = priceAnalysisService.getBuyRecommendation(product, history, stats);
+          recommendation = rec.title;
+        }
+
+        map.set(product.id, { product, history, dealScore, sparkline, stats, isFlashSale, recommendation });
       }
       setCardDataMap(map);
     };
@@ -89,6 +153,12 @@ export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => voi
     return list;
   }, [trackedProducts, activeFilter, cardDataMap]);
 
+  const flashSaleCount = useMemo(() => {
+    let count = 0;
+    cardDataMap.forEach(d => { if (d.isFlashSale) count++; });
+    return count;
+  }, [cardDataMap]);
+
   const handleProductPress = useCallback((product: TrackedProduct) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (onNavigate) {
@@ -104,6 +174,33 @@ export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => voi
     loadStats();
   }, [loadTrackedProducts, loadStats]);
 
+  const handleShareDeal = useCallback(async (product: TrackedProduct) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const data = cardDataMap.get(product.id);
+    const priceDiff = product.initialPrice - product.currentPrice;
+    const priceDiffPercent = product.initialPrice > 0 ? (priceDiff / product.initialPrice) * 100 : 0;
+
+    let msg = `🏷️ Deal Alert!\n\n`;
+    msg += `${product.title}\n`;
+    if (priceDiff > 0) {
+      msg += `💰 NOW: ${product.currency}${product.currentPrice.toFixed(2)}\n`;
+      msg += `~~Was: ${product.currency}${product.initialPrice.toFixed(2)}~~\n`;
+      msg += `🔥 Save ${product.currency}${priceDiff.toFixed(2)} (${priceDiffPercent.toFixed(0)}% OFF)\n`;
+    } else {
+      msg += `💰 Price: ${product.currency}${product.currentPrice.toFixed(2)}\n`;
+    }
+    if (data?.stats) {
+      msg += `📊 All-time low: ${product.currency}${data.stats.allTimeLow.toFixed(2)}\n`;
+    }
+    if (data?.dealScore && !data.dealScore.isNew) {
+      msg += `⭐ Deal Score: ${data.dealScore.score}/10 (${data.dealScore.label})\n`;
+    }
+    msg += `\n🔗 ${product.url}\n`;
+    msg += `\nFound with Aura Browser 👻\nDownload Aura for free price tracking!`;
+
+    await Share.share({ message: msg });
+  }, [cardDataMap]);
+
   const formatPrice = (price: number, currency?: string) => `${currency || '$'}${price.toFixed(2)}`;
 
   const renderSparkline = (data: number[], color: string) => {
@@ -111,7 +208,6 @@ export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => voi
     const width = 80;
     const height = 28;
     const stepX = width / (data.length - 1);
-    // Build SVG-like path using Views (since we're avoiding SVG deps for this component)
     return (
       <View style={{ width, height, flexDirection: 'row', alignItems: 'flex-end' }}>
         {data.map((val, i) => (
@@ -139,10 +235,17 @@ export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => voi
     return (
       <TouchableOpacity
         key={product.id}
-        style={styles.productCard}
+        style={[styles.productCard, data?.isFlashSale && styles.flashSaleCard]}
         onPress={() => handleProductPress(product)}
         activeOpacity={0.8}
       >
+        {/* Flash Sale Badge */}
+        {data?.isFlashSale && (
+          <Animated.View style={[styles.flashSaleBadge, { transform: [{ scale: pulseAnim }] }]}>
+            <Text style={styles.flashSaleText}>⚡ FLASH SALE</Text>
+          </Animated.View>
+        )}
+
         <View style={styles.cardHeader}>
           <View style={styles.cardLeft}>
             {product.imageUrl ? (
@@ -178,14 +281,30 @@ export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => voi
           )}
         </View>
 
+        {/* Recommendation Line */}
+        {data?.recommendation ? (
+          <View style={styles.recLine}>
+            <Ionicons name="bulb-outline" size={12} color={ORANGE} />
+            <Text style={styles.recLineText} numberOfLines={1}>{data.recommendation}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.cardFooter}>
+          <TouchableOpacity
+            style={styles.shareBtn}
+            onPress={(e) => { e.stopPropagation?.(); handleShareDeal(product); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="share-outline" size={14} color={CYAN} />
+            <Text style={styles.shareBtnText}>Share Deal</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.stopBtn}
             onPress={(e) => { e.stopPropagation?.(); handleStopTracking(product.id); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Ionicons name="trash-outline" size={14} color={RED} />
-            <Text style={styles.stopBtnText}>Stop Tracking</Text>
+            <Text style={styles.stopBtnText}>Stop</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -204,25 +323,45 @@ export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => voi
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Savings Summary */}
+        {/* Savings Summary Cards */}
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
             <Ionicons name="pricetags" size={18} color={CYAN} />
-            <Text style={styles.summaryValue}>{trackedProducts.length}</Text>
+            <AnimatedCounter value={trackedProducts.length} prefix="" color="#fff" />
             <Text style={styles.summaryLabel}>Tracked</Text>
           </View>
           <View style={[styles.summaryCard, styles.summaryCardHighlight]}>
             <Ionicons name="wallet" size={18} color={GREEN} />
-            <Text style={[styles.summaryValue, { color: GREEN }]}>${totalSavings.toFixed(0)}</Text>
+            <AnimatedCounter value={totalSavings} prefix="$" color={GREEN} />
             <Text style={styles.summaryLabel}>Saved</Text>
           </View>
           <View style={styles.summaryCard}>
             <Ionicons name="trending-down" size={18} color={ORANGE} />
-            <Text style={styles.summaryValue}>{priceDropCount}</Text>
+            <AnimatedCounter value={priceDropCount} prefix="" color="#fff" />
             <Text style={styles.summaryLabel}>Drops</Text>
           </View>
         </View>
 
+        {/* Best Deal Ever */}
+        {bestDeal && (
+          <View style={styles.bestDealBar}>
+            <Ionicons name="trophy" size={14} color="#FFD700" />
+            <Text style={styles.bestDealText}>
+              Best deal: Saved ${bestDeal.savedAmount.toFixed(0)} on {bestDeal.productTitle.substring(0, 30)}...
+            </Text>
+          </View>
+        )}
+
+        {/* Flash Sale Alert */}
+        {flashSaleCount > 0 && (
+          <Animated.View style={[styles.flashAlert, { transform: [{ scale: pulseAnim }] }]}>
+            <Text style={styles.flashAlertText}>
+              ⚡ {flashSaleCount} Flash Sale{flashSaleCount > 1 ? 's' : ''} detected!
+            </Text>
+          </Animated.View>
+        )}
+
+        {/* Motivational Message */}
         {totalSavings > 0 && (
           <View style={styles.motivationBar}>
             <Ionicons name="sparkles" size={14} color={CYAN} />
@@ -233,16 +372,17 @@ export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => voi
         {/* Filter Tabs */}
         <View style={styles.filterRow}>
           {[
-            { key: 'all' as FilterTab, label: 'All' },
-            { key: 'drops' as FilterTab, label: 'Price Drops' },
-            { key: 'watching' as FilterTab, label: 'Watching' },
-            { key: 'best' as FilterTab, label: 'Best Deals' },
+            { key: 'all' as FilterTab, label: 'All', icon: 'list-outline' },
+            { key: 'drops' as FilterTab, label: 'Price Drops', icon: 'trending-down-outline' },
+            { key: 'watching' as FilterTab, label: 'Watching', icon: 'eye-outline' },
+            { key: 'best' as FilterTab, label: 'Best Deals', icon: 'star-outline' },
           ].map(tab => (
             <TouchableOpacity
               key={tab.key}
               style={[styles.filterTab, activeFilter === tab.key && styles.filterTabActive]}
               onPress={() => { Haptics.selectionAsync(); setActiveFilter(tab.key); }}
             >
+              <Ionicons name={tab.icon as any} size={12} color={activeFilter === tab.key ? CYAN : '#888'} />
               <Text style={[styles.filterTabText, activeFilter === tab.key && styles.filterTabTextActive]}>{tab.label}</Text>
             </TouchableOpacity>
           ))}
@@ -252,13 +392,31 @@ export const PriceTrackerScreen: React.FC<{ visible: boolean; onClose: () => voi
         <ScrollView style={styles.productList} showsVerticalScrollIndicator={false}>
           {filteredProducts.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="pricetag-outline" size={48} color="#333" />
+              <View style={styles.emptyIcon}>
+                <Ionicons name="pricetag-outline" size={48} color="#333" />
+              </View>
               <Text style={styles.emptyTitle}>
                 {activeFilter === 'all' ? 'No products tracked yet' : 'No products match this filter'}
               </Text>
               <Text style={styles.emptySubtitle}>
                 {activeFilter === 'all' ? 'Visit any shopping site and Aura will detect prices automatically' : 'Try a different filter'}
               </Text>
+              {activeFilter === 'all' && (
+                <View style={styles.emptyTips}>
+                  <View style={styles.tipRow}>
+                    <Ionicons name="checkmark-circle" size={14} color={GREEN} />
+                    <Text style={styles.tipText}>Works on Amazon, Walmart, Best Buy & more</Text>
+                  </View>
+                  <View style={styles.tipRow}>
+                    <Ionicons name="checkmark-circle" size={14} color={GREEN} />
+                    <Text style={styles.tipText}>Auto-detects product pages</Text>
+                  </View>
+                  <View style={styles.tipRow}>
+                    <Ionicons name="checkmark-circle" size={14} color={GREEN} />
+                    <Text style={styles.tipText}>100% private — all data stays on your device</Text>
+                  </View>
+                </View>
+              )}
             </View>
           ) : (
             filteredProducts.map(p => renderProductCard(p))
@@ -328,11 +486,47 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.5,
   },
+  bestDealBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#FFD70010',
+    borderWidth: 1,
+    borderColor: '#FFD70022',
+    gap: 8,
+  },
+  bestDealText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFD700',
+    flex: 1,
+  },
+  flashAlert: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: RED + '15',
+    borderWidth: 1,
+    borderColor: RED + '44',
+    alignItems: 'center',
+  },
+  flashAlertText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: RED,
+    letterSpacing: 0.5,
+  },
   motivationBar: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
@@ -350,12 +544,15 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 14,
     paddingBottom: 8,
     gap: 8,
   },
   filterTab: {
-    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
     backgroundColor: CARD_BG,
@@ -366,7 +563,7 @@ const styles = StyleSheet.create({
     borderColor: CYAN + '44',
   },
   filterTabText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#888',
   },
@@ -385,6 +582,26 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
+  },
+  flashSaleCard: {
+    borderColor: RED + '44',
+    backgroundColor: RED + '08',
+  },
+  flashSaleBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: RED,
+    zIndex: 10,
+  },
+  flashSaleText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -456,13 +673,38 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     justifyContent: 'flex-end',
   },
+  recLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.04)',
+  },
+  recLineText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#aaa',
+    flex: 1,
+  },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    marginTop: 8,
+    gap: 12,
+  },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  shareBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: CYAN,
   },
   stopBtn: {
     flexDirection: 'row',
@@ -480,11 +722,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 60,
   },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: CARD_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#555',
-    marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 13,
@@ -492,5 +742,19 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  emptyTips: {
+    marginTop: 24,
+    gap: 10,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tipText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
   },
 });

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { priceTrackerDB, TrackedProduct, PriceHistoryEntry, SavingsRecord } from '../services/PriceTrackerDB';
 import { priceAnalysisService, DealScore, BuyRecommendation, PriceStats } from '../services/PriceAnalysisService';
+import { priceNotificationService } from '../services/PriceNotificationService';
 
 interface DetectedProduct {
   title: string;
@@ -88,9 +89,35 @@ export const usePriceTrackerStore = create<PriceTrackerState>((set, get) => ({
     // Check if already tracked
     const existing = await priceTrackerDB.getProductByUrl(product.url);
     if (existing) {
-      // Update current price
+      // Update current price + notify on price drops
       if (existing.currentPrice !== product.price) {
+        const previousPrice = existing.currentPrice;
         await priceTrackerDB.addPriceEntry(existing.id, product.price, product.currency);
+
+        // Price drop notification
+        if (product.price < previousPrice) {
+          const dropPercent = ((previousPrice - product.price) / previousPrice) * 100;
+          if (dropPercent >= 30) {
+            // Flash sale!
+            priceNotificationService.notifyFlashSale(
+              existing.title, product.price, previousPrice, product.currency, dropPercent, product.url
+            );
+          } else if (dropPercent >= 5) {
+            priceNotificationService.notifyPriceDrop(
+              existing.title, product.price, previousPrice, product.currency, product.url
+            );
+          }
+
+          // Record savings
+          await priceTrackerDB.addSaving({
+            productId: existing.id,
+            productTitle: existing.title,
+            savedAmount: previousPrice - product.price,
+            originalPrice: previousPrice,
+            dealPrice: product.price,
+            timestamp: Date.now(),
+          });
+        }
       }
       const updatedProduct = await priceTrackerDB.getProduct(existing.id);
       const history = await priceTrackerDB.getProductHistory(existing.id);
@@ -225,6 +252,8 @@ export const usePriceTrackerStore = create<PriceTrackerState>((set, get) => ({
   initialize: async () => {
     await get().loadTrackedProducts();
     await get().loadStats();
+    // Initialize notifications (no-op on web)
+    priceNotificationService.initialize();
   },
 }));
 
