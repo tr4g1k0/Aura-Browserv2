@@ -12,6 +12,7 @@ import {
   Pressable,
   Alert,
   KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -407,28 +408,18 @@ const QuickLinkOrb: React.FC<{
 };
 
 // ============================================================
-// ADD BUTTON ORB - Electric Cyan glowing circle
+// ADD BUTTON ORB - Dashed border with transparent background
 // ============================================================
 const AddButtonOrb: React.FC<{
   index: number;
   onPress: () => void;
 }> = ({ index, onPress }) => {
   const scale = useSharedValue(0);
-  const glowPulse = useSharedValue(0);
 
   useEffect(() => {
     scale.value = withDelay(
       index * 80 + 500,
       withSpring(1, { damping: 14, stiffness: 120 })
-    );
-    
-    glowPulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
     );
   }, []);
 
@@ -437,17 +428,8 @@ const AddButtonOrb: React.FC<{
     opacity: scale.value,
   }));
 
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(glowPulse.value, [0, 1], [0.3, 0.6]),
-    transform: [{ scale: interpolate(glowPulse.value, [0, 1], [1, 1.1]) }],
-  }));
-
-  const isWeb = Platform.OS === 'web';
-
   return (
     <Animated.View style={[styles.orbWrapper, animatedStyle]}>
-      <Animated.View style={[styles.addOrbGlow, glowStyle]} />
-      
       <TouchableOpacity
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -456,23 +438,12 @@ const AddButtonOrb: React.FC<{
         activeOpacity={0.8}
         style={styles.orbTouchable}
       >
-        {isWeb ? (
-          <View style={styles.addOrbTile}>
-            <View style={styles.addOrbHighlight} />
-            <View style={styles.addOrbIconContainer}>
-              <Ionicons name="add" size={32} color={ELECTRIC_CYAN} />
-            </View>
-            <Text style={styles.addOrbLabel}>Add</Text>
+        <View style={styles.addOrbTile}>
+          <View style={styles.addOrbIconContainer}>
+            <Ionicons name="add" size={28} color="rgba(255, 255, 255, 0.6)" />
           </View>
-        ) : (
-          <BlurView tint="dark" intensity={30} style={styles.addOrbTile}>
-            <View style={styles.addOrbHighlight} />
-            <View style={styles.addOrbIconContainer}>
-              <Ionicons name="add" size={32} color={ELECTRIC_CYAN} />
-            </View>
-            <Text style={styles.addOrbLabel}>Add</Text>
-          </BlurView>
-        )}
+          <Text style={styles.addOrbLabel}>Add</Text>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -1197,7 +1168,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, on
           style={styles.quickLinksSection}
         >
           <Text style={styles.sectionLabel}>QUICK ACCESS</Text>
-          <View style={styles.orbsGrid}>
+          <ScrollView
+            horizontal={true}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickLinksScrollContent}
+            style={styles.quickLinksScroll}
+          >
             {quickLinks.map((link, index) => (
               <QuickLinkOrb
                 key={link.id}
@@ -1211,7 +1187,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, on
               index={quickLinks.length}
               onPress={() => setAddModalVisible(true)}
             />
-          </View>
+          </ScrollView>
         </Animated.View>
 
         {/* Spacer to push dock to bottom */}
@@ -1419,6 +1395,15 @@ const styles = StyleSheet.create({
     letterSpacing: 2.5,
     marginBottom: 20,
   },
+  quickLinksScroll: {
+    width: '100%',
+  },
+  quickLinksScrollContent: {
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    gap: 16,
+  },
+  // Keep orbsGrid for backwards compatibility but no longer used
   orbsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1497,8 +1482,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 28,
-    backgroundColor: ELECTRIC_CYAN,
-    opacity: 0.3,
+    backgroundColor: 'transparent',
+    opacity: 0,
   },
   addOrbTile: {
     width: 76,
@@ -1506,9 +1491,10 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 255, 255, 0.06)',
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 255, 0.25)',
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     overflow: 'hidden',
     position: 'relative',
   },
@@ -1517,14 +1503,14 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 1,
-    backgroundColor: 'rgba(0, 255, 255, 0.3)',
+    height: 0,
+    backgroundColor: 'transparent',
   },
   addOrbIconContainer: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0, 255, 255, 0.1)',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
@@ -1532,7 +1518,7 @@ const styles = StyleSheet.create({
   addOrbLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: ELECTRIC_CYAN,
+    color: 'rgba(255, 255, 255, 0.5)',
   },
 
   // ============== FLOATING ISLAND DOCK ==============
