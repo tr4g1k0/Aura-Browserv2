@@ -273,8 +273,23 @@ export default function BrowserScreen() {
         addCachedPage({ url: data.url, html: data.html.substring(0, 50000), timestamp: Date.now() });
         predictiveCacheService.set(data.url, data.html, 'text/html');
       }
-      if (data.type === 'PREDICTIVE_LINKS') {
-        predictiveCacheService.prefetchMultiple(data.links);
+      if (data.type === 'PREDICTIVE_LINKS' && data.links) {
+        // Enhanced predictive prefetching with smart scoring
+        // Get history URLs for cross-reference (boost visited pages)
+        const historyUrls = useBrowserStore.getState().history?.map(h => h.url) || [];
+        predictiveCacheService.setVisitedUrls(historyUrls);
+        
+        // Process extracted links with full scoring
+        const enhancedLinks = data.links.map((link: any) => ({
+          url: link.url,
+          score: link.score || 0,
+          text: link.text || '',
+          isAboveFold: link.isAboveFold || false,
+          isMainContent: link.isMainContent || false,
+          isVisited: historyUrls.some(h => h.includes(new URL(link.url).hostname)),
+        }));
+        
+        predictiveCacheService.prefetchPredictedLinks(enhancedLinks);
       }
       if (data.type === 'AD_BLOCK_COUNT') {
         if (data.adsBlocked > 0) incrementAds(data.adsBlocked);
@@ -425,8 +440,16 @@ export default function BrowserScreen() {
                 style={styles.webview}
                 onNavigationStateChange={(navState: any) => navigation.handleNavigationStateChange(navState, webViewRef)}
                 onShouldStartLoadWithRequest={webViewEngine.handleShouldStartLoad}
-                onLoadStart={() => setLoading(true)}
-                onLoadEnd={webViewEngine.handleLoadEnd}
+                onLoadStart={() => {
+                  setLoading(true);
+                  // Notify predictive cache to pause prefetching during active page load
+                  predictiveCacheService.setPageLoading(true);
+                }}
+                onLoadEnd={() => {
+                  webViewEngine.handleLoadEnd();
+                  // Resume predictive prefetching after page load completes
+                  predictiveCacheService.setPageLoading(false);
+                }}
                 onMessage={handleWebViewMessage}
                 injectedJavaScript={webViewEngine.getInjectedScript()}
                 javaScriptEnabled

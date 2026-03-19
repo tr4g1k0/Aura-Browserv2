@@ -178,6 +178,24 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - Hermes JS engine enabled (`jsEngine: "hermes"` in app.json)
 - Babel config with production console removal
 
+### 9. Link Prefetching (Smart Predictive Cache) ✅ COMPLETE
+- **Network Detection**: Uses `@react-native-community/netinfo` to detect WiFi vs mobile data
+- **Battery Check**: Uses `expo-battery` to check battery > 20%
+- **Smart Link Extraction**: Injected JS extracts top 5 links based on:
+  - Above-the-fold position (visible without scrolling)
+  - Main content area (not header/footer)
+  - Previously visited pages (cross-referenced with history)
+  - Link prominence scoring algorithm
+- **Background Prefetching**: Fetches HTML of predicted links silently
+- **Instant Loading**: Serves cached HTML when user taps prefetched link
+- **Smart Conditions**:
+  - Only prefetches on WiFi (saves mobile data)
+  - Only when battery > 20%
+  - Only when browser is idle (not loading)
+  - Max 5 concurrent prefetches
+  - Cancel all prefetches on navigation
+- **Cache Policy**: 5-minute TTL, max 5 pages, 20MB limit
+
 ### Key Performance Services
 - `/app/frontend/src/services/StartupOptimizer.ts` - Batch startup loading
 - `/app/frontend/src/services/WebViewPrewarmer.ts` - WebView pre-warming
