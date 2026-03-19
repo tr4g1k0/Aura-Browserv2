@@ -19,9 +19,9 @@ import { useBrowserStore, HistoryEntry, Bookmark } from '../src/store/browserSto
 import { semanticHistoryService } from '../src/services/SemanticHistoryService';
 
 interface LibraryScreenProps {
-  visible: boolean;
-  onClose: () => void;
-  onNavigate: (url: string) => void;
+  visible?: boolean;
+  onClose?: () => void;
+  onNavigate?: (url: string) => void;
 }
 
 type TabType = 'bookmarks' | 'history';
@@ -93,8 +93,8 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
 
   const handleItemPress = (url: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onNavigate(url);
-    onClose();
+    onNavigate?.(url);
+    onClose?.();
   };
 
   const handleRemoveHistoryItem = (timestamp: number) => {
@@ -291,7 +291,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
             style={styles.closeButton}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onClose();
+              onClose?.();
             }}
           >
             <Ionicons name="close" size={24} color="#FFF" />
