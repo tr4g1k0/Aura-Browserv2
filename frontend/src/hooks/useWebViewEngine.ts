@@ -130,6 +130,23 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
       `;
     }
 
+    // Force dark web mode
+    if (userSettings.forceDarkWeb) {
+      scripts += `
+        (function() {
+          try {
+            var darkStyle = document.createElement('style');
+            darkStyle.id = 'aura-force-dark';
+            darkStyle.innerHTML = 'html { filter: invert(1) hue-rotate(180deg) !important; } img, video, canvas, svg, [style*="background-image"] { filter: invert(1) hue-rotate(180deg) !important; }';
+            document.head.appendChild(darkStyle);
+            console.log('[ForceDark] Dark mode filter applied');
+          } catch(e) {
+            console.log('[ForceDark] Error:', e);
+          }
+        })();
+      `;
+    }
+
     // Unified context menu + selection interceptor
     scripts += `
       (function() {
@@ -199,7 +216,7 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
     `;
     
     return scripts || 'true;';
-  }, [userSettings.aggressiveAdBlocking, userSettings.doNotTrack, userSettings.forceZoom, visionAISelectors, vpnScript]);
+  }, [userSettings.aggressiveAdBlocking, userSettings.doNotTrack, userSettings.forceZoom, userSettings.forceDarkWeb, visionAISelectors, vpnScript]);
 
   const handleShouldStartLoad = useCallback((event: any): boolean => {
     const { url } = event;

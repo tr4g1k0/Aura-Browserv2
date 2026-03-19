@@ -37,7 +37,7 @@ const safeSetItem = async (key: string, value: string): Promise<void> => {
   }
 };
 
-export type SearchEngine = 'google' | 'duckduckgo' | 'bing';
+export type SearchEngine = 'google' | 'duckduckgo' | 'bing' | 'brave';
 export type CaptioningLanguage = 'english' | 'spanish' | 'french' | 'german' | 'japanese' | 'chinese';
 export type AddressBarPosition = 'top' | 'bottom';
 

@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the Aura Browser app after a major refactor of index.tsx (broken into hooks + components). Backend health check and code structure verification required."
+user_problem_statement: "Test the Aura Browser Settings screen redesign and functionality. Focus on backend health verification and code structure verification for the new settings implementation."
 
 backend:
   - task: "Aura Browser Health Check Endpoint"
@@ -123,6 +123,21 @@ backend:
         agent: "testing"
         comment: "✅ AURA Shield verification: GET /api/health returns {'status': 'healthy', 'service': 'Aura Browser API'}. Response time: 197ms (100% success rate). Endpoint working perfectly."
 
+  - task: "Aura Browser Settings Backend Health Check"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Testing backend health endpoint for Settings screen redesign and functionality verification"
+      - working: true
+        agent: "testing"
+        comment: "✅ Backend health check passed: GET /api/health returns {'status': 'healthy', 'service': 'Aura Browser API'}. Response time: 243ms (100% success rate). Backend API fully operational for Settings screen functionality."
+
 frontend:
   - task: "Mobile User-Agent Constants"
     implemented: true
@@ -138,6 +153,111 @@ frontend:
       - working: true
         agent: "testing"
         comment: "✅ MOBILE_USER_AGENT constant properly defined (line 86): 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'"
+
+  - task: "Settings Screen Dark Theme Implementation"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/settings.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Code verification: Settings screen dark theme implementation with AURA colors"
+      - working: true
+        agent: "testing"
+        comment: "✅ Settings screen dark theme verified: Container backgroundColor '#0a0a0f' (line 306), 3 GlassCard sections implemented (ENGINE & AI, PRIVACY & SECURITY, DISPLAY & ACCESSIBILITY), proper AURA color scheme with ELECTRIC_CYAN (#00FFFF), DANGER_RED (#FF4466), glassmorphic design with backdrop filters"
+
+  - task: "Settings Modal Options Implementation"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/settings.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Code verification: Modal selectors for search engine and theme options"
+      - working: true
+        agent: "testing"
+        comment: "✅ Modal options verified: Search Engine modal has 4 options (google, duckduckgo, brave, bing) on lines 277-280, Theme modal has 3 options (dark, light, system) on lines 292-294, proper data-testids for all modal options"
+
+  - task: "Settings Functionality Integration"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/settings.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Code verification: Settings functionality and burn data implementation"
+      - working: true
+        agent: "testing"
+        comment: "✅ Settings functionality verified: handleBurnData calls clearBrowsingData + store.clearHistory + store.clearCachedPages (lines 83-87), all toggles call updateSetting from useSettings() hook (line 116), proper async storage integration and confirmation dialogs"
+
+  - task: "Browser Settings Hook Enhancement"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/hooks/useBrowserSettings.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Code verification: SearchEngine type includes 'brave' and new forceDarkWeb/forceZoom settings"
+      - working: true
+        agent: "testing"
+        comment: "✅ Browser settings hook verified: SearchEngine type includes 'brave' (line 40), new forceDarkWeb and forceZoom settings added (lines 73-74), proper default values set (lines 110-111), complete BrowserSettings interface updated"
+
+  - task: "URL Parser Brave Search Engine Support"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/utils/urlParser.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Code verification: SEARCH_ENGINE_URLS includes brave search URL"
+      - working: true
+        agent: "testing"
+        comment: "✅ URL parser verified: SEARCH_ENGINE_URLS includes brave: 'https://search.brave.com/search?q=' (line 10), proper integration with SearchEngine type from useBrowserSettings"
+
+  - task: "Force Dark Web Feature Implementation"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/hooks/useWebViewEngine.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Code verification: forceDarkWeb CSS injection script with invert filter"
+      - working: true
+        agent: "testing"
+        comment: "✅ Force Dark Web feature verified: forceDarkWeb injection script exists (lines 134-148), CSS filter 'invert(1) hue-rotate(180deg)' applied to html element, images/videos counter-inverted, getInjectedScript dependency includes userSettings.forceDarkWeb (line 219)"
+
+  - task: "Theme Provider AURA Integration"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/_layout.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Code verification: ThemeProvider wraps Stack with AuraDarkTheme background"
+      - working: true
+        agent: "testing"
+        comment: "✅ Theme provider verified: ThemeProvider wraps Stack (line 29), AuraDarkTheme has background '#0a0a0f' (line 16), complete AURA color scheme with primary '#00FFFF' and proper navigation theme integration"
 
   - task: "WebView Mobile User-Agent Configuration"
     implemented: true
@@ -994,3 +1114,7 @@ agent_communication:
     message: "AURA BROWSER REFACTOR VERIFICATION COMPLETE: ✅ Backend Health: GET /api/health working correctly. ✅ Code Structure: All 7 hooks + 4 components exist and export correctly. ✅ Import/Usage: All hooks imported and called, all components used in JSX. ✅ Feature Preservation: All 14 WebView message handlers + 9 key functions + 5 hook return values preserved. ✅ Code Quality: No duplicate imports, index.tsx reduced from 2855 to 545 lines (81% reduction). Major refactor successful - all functionality preserved while achieving significant code organization improvement."
   - agent: "testing"
     message: "AURA BROWSER BOTTOM BAR FIXES VERIFICATION COMPLETE: ✅ Backend Health: GET /api/health working (219ms response). ✅ All 5 bottom bar fixes verified: (1) Absolute positioning overlay approach implemented, (2) Auto-hide translateY animation (200px slide distance), (3) UnifiedTopBar compact design (30px URL bar, 32px nav row), (4) NewTabPage dock absolute positioning (44px height, no bottom radius), (5) HTML backgroundColor #0D0D0D. All code changes match review request specifications perfectly. Bottom bar now properly overlays WebView with smooth auto-hide animations."
+  - agent: "testing"
+    message: "Starting new test cycle: Aura Browser Settings screen redesign and functionality testing. Main focus areas: (1) Backend health verification, (2) Code verification checks for settings implementation. Note: Frontend UI testing not performed due to system limitations - focusing on backend components only."
+  - agent: "testing"
+    message: "AURA BROWSER SETTINGS TESTING COMPLETE: ✅ Backend Health: GET /api/health returns {'status': 'healthy', 'service': 'Aura Browser API'} with 243ms response time (100% success rate). ✅ Code Verification: All 6 implementation points verified: (1) Settings screen dark theme with #0a0a0f background and 3 GlassCard sections, (2) Modal options (4 search engines, 3 themes), (3) Settings functionality with proper burn data implementation, (4) SearchEngine type includes 'brave', (5) Force Dark Web CSS injection (invert+hue-rotate filters), (6) AuraDarkTheme integration. All specifications from review request match code implementation perfectly."

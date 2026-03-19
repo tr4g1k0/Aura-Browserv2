@@ -684,6 +684,24 @@ const FloatingIslandDock: React.FC<{
   const focusScale = useSharedValue(1);
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  // Keyboard awareness: move dock above keyboard when it opens
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardOffset(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardOffset(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handleFocus = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -736,7 +754,7 @@ const FloatingIslandDock: React.FC<{
       entering={FadeInUp.delay(600).duration(500).springify()}
       style={[
         styles.floatingDockContainer,
-        { marginBottom: Math.max(insets.bottom, 20) + 10 }
+        { bottom: keyboardOffset > 0 ? keyboardOffset - insets.bottom : 0 }
       ]}
     >
       <Animated.View style={[styles.floatingDockWrapper, animatedStyle]}>
@@ -1332,7 +1350,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     justifyContent: 'space-between',
-    paddingBottom: 0,
+    paddingBottom: 100,
   },
 
   // ============== BRANDING ==============

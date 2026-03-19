@@ -7,56 +7,70 @@ import {
   TouchableOpacity,
   Switch,
   Platform,
-  Dimensions,
   Alert,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useSettings } from '../src/context/SettingsContext';
 import { SearchEngine } from '../src/hooks/useBrowserSettings';
+import { useBrowserStore } from '../src/store/browserStore';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// Premium Glossy Color Palette
 const ELECTRIC_CYAN = '#00FFFF';
-const DANGER_RED = '#FF4444';
-const TEXT_DARK = '#1A1A1A';
-const TEXT_SECONDARY = '#666666';
-const TEXT_MUTED = '#999999';
+const DANGER_RED = '#FF4466';
+const DEEP_BG = '#0a0a0f';
+const CARD_BG = 'rgba(255,255,255,0.05)';
+const CARD_BORDER = 'rgba(255,255,255,0.1)';
+const TEXT_PRIMARY = '#FFFFFF';
+const TEXT_SECONDARY = 'rgba(255,255,255,0.6)';
+const TEXT_MUTED = 'rgba(255,255,255,0.35)';
+const DIVIDER_COLOR = 'rgba(255,255,255,0.06)';
 
-// Search Engine Display Names
-const SEARCH_ENGINE_NAMES: Record<SearchEngine, string> = {
+const SEARCH_ENGINE_NAMES: Record<string, string> = {
   google: 'Google',
   duckduckgo: 'DuckDuckGo',
+  brave: 'Brave',
   bing: 'Bing',
 };
 
-/**
- * Premium Settings Screen - Glossy Glassmorphic Design
- * 
- * NOW WIRED TO GLOBAL CONTEXT:
- * - All settings persist to AsyncStorage
- * - Changes reflect immediately across the app
- * - Burn button clears browsing data
- */
+const THEME_NAMES: Record<string, string> = {
+  system: 'System Default',
+  light: 'Light',
+  dark: 'Dark',
+};
+
+const FONT = Platform.select({
+  ios: { fontFamily: 'System' },
+  android: { fontFamily: 'Roboto' },
+  web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+});
+
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  
-  // GLOBAL SETTINGS CONTEXT - Wired to AsyncStorage
   const { settings, updateSetting, clearBrowsingData, isLoading } = useSettings();
-
-  // Modal states for selectors
   const [showSearchEngineModal, setShowSearchEngineModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
 
-  // ============================================================
-  // HANDLERS
-  // ============================================================
-  
+  // Force dark background on Expo Router wrappers (web only)
+  React.useEffect(() => {
+    if (Platform.OS === 'web') {
+      setTimeout(() => {
+        try {
+          const allDivs = document.querySelectorAll('div');
+          const lightBgs = ['rgb(242, 242, 242)', 'rgb(245, 247, 250)', 'rgb(255, 255, 255)', 'rgb(248, 248, 248)'];
+          allDivs.forEach((div: any) => {
+            const bg = window.getComputedStyle(div).backgroundColor;
+            if (lightBgs.includes(bg)) div.style.backgroundColor = '#0a0a0f';
+          });
+        } catch (e) { /* non-critical */ }
+      }, 50);
+    }
+  }, []);
+
   const handleBack = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
@@ -64,66 +78,42 @@ export default function SettingsScreen() {
 
   const handleBurnData = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    
-    // Confirm before burning
-    if (Platform.OS === 'web') {
-      if (window.confirm('This will permanently delete all browsing history, cache, and cookies. Continue?')) {
-        await performBurn();
+    const doBurn = async () => {
+      try {
+        await clearBrowsingData();
+        // Also clear browser store history and cached pages
+        const store = useBrowserStore.getState();
+        if (store.clearHistory) store.clearHistory();
+        if (store.clearCachedPages) store.clearCachedPages();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        if (Platform.OS === 'web') {
+          alert('All browsing data has been incinerated.');
+        } else {
+          Alert.alert('Data Burned', 'All browsing data has been incinerated.');
+        }
+      } catch (error) {
+        console.error('[Settings] Burn failed:', error);
+        Alert.alert('Error', 'Failed to burn data.');
       }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Permanently delete all history, cache, and cookies?')) await doBurn();
     } else {
       Alert.alert(
         'Burn Browsing Data',
-        'This will permanently delete all browsing history, cache, and cookies. This action cannot be undone.',
+        'This will permanently delete all browsing history, cache, and cookies. This cannot be undone.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Burn Everything', 
-            style: 'destructive',
-            onPress: performBurn
-          },
+          { text: 'Burn Everything', style: 'destructive', onPress: doBurn },
         ]
       );
     }
   };
 
-  const performBurn = async () => {
-    try {
-      await clearBrowsingData();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      if (Platform.OS === 'web') {
-        alert('All browsing data has been burned. You have a clean slate.');
-      } else {
-        Alert.alert('Success', 'All browsing data has been burned. You have a clean slate.');
-      }
-    } catch (error) {
-      console.error('[Settings] Failed to burn data:', error);
-      if (Platform.OS === 'web') {
-        alert('Failed to burn browsing data. Please try again.');
-      } else {
-        Alert.alert('Error', 'Failed to burn browsing data. Please try again.');
-      }
-    }
-  };
-
-  const handleSearchEnginePress = () => {
+  const handleToggle = (key: keyof typeof settings, val: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowSearchEngineModal(true);
-  };
-
-  const handleThemePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Theme is currently fixed to dark mode
-    if (Platform.OS === 'web') {
-      alert('Theme is currently set to Dark Mode for optimal viewing.');
-    } else {
-      Alert.alert('App Theme', 'Theme is currently set to Dark Mode for optimal viewing.');
-    }
-  };
-
-  const handleToggle = (key: keyof typeof settings, currentValue: boolean) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updateSetting(key, !currentValue);
+    updateSetting(key, !val);
   };
 
   const handleSearchEngineChange = (engine: SearchEngine) => {
@@ -132,249 +122,190 @@ export default function SettingsScreen() {
     setShowSearchEngineModal(false);
   };
 
-  // ============================================================
-  // GLASSMORPHIC CARD COMPONENT
-  // ============================================================
-  
-  const GlossyCard: React.FC<{ children: React.ReactNode; title: string }> = ({ children, title }) => (
-    <View style={styles.cardOuterContainer}>
-      <LinearGradient
-        colors={['rgba(255,255,255,0.85)', 'rgba(255,255,255,0.95)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.cardGradient}
-      >
-        <View style={styles.reflectiveEdge} />
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{title}</Text>
-          {children}
-        </View>
-      </LinearGradient>
+  const handleThemeChange = (theme: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    updateSetting('darkMode', theme !== 'light');
+    setShowThemeModal(false);
+  };
+
+  // ── Glassmorphic Card ──
+  const GlassCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <View style={styles.card} data-testid={`settings-card-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <View style={styles.cardGlow} />
+      <Text style={styles.cardTitle}>{title}</Text>
+      {children}
     </View>
   );
 
-  // ============================================================
-  // RENDER HELPERS
-  // ============================================================
-
-  const renderSwitchRow = (
-    label: string,
-    settingKey: keyof typeof settings,
-    subtitle?: string
-  ) => {
-    const value = settings[settingKey] as boolean;
+  // ── Switch Row ──
+  const SwitchRow = ({ label, settingKey, subtitle }: { label: string; settingKey: keyof typeof settings; subtitle?: string }) => {
+    const val = settings[settingKey] as boolean;
     return (
       <View style={styles.row}>
-        <View style={styles.rowTextContainer}>
+        <View style={styles.rowText}>
           <Text style={styles.rowLabel}>{label}</Text>
-          {subtitle && <Text style={styles.rowSubtitle}>{subtitle}</Text>}
+          {subtitle && <Text style={styles.rowSub}>{subtitle}</Text>}
         </View>
-        <View style={styles.switchContainer}>
-          <Switch
-            value={value}
-            onValueChange={() => handleToggle(settingKey, value)}
-            trackColor={{ false: 'rgba(0,0,0,0.1)', true: ELECTRIC_CYAN }}
-            thumbColor={value ? '#FFFFFF' : '#F8F8F8'}
-            ios_backgroundColor="rgba(0,0,0,0.1)"
-            style={styles.switch}
-          />
-          {value && <View style={styles.switchSpecular} pointerEvents="none" />}
-        </View>
+        <Switch
+          value={val}
+          onValueChange={() => handleToggle(settingKey, val)}
+          trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,255,0.5)' }}
+          thumbColor={val ? ELECTRIC_CYAN : 'rgba(255,255,255,0.6)'}
+          ios_backgroundColor="rgba(255,255,255,0.12)"
+          data-testid={`toggle-${settingKey}`}
+        />
       </View>
     );
   };
 
-  const renderChevronRow = (
-    label: string,
-    value: string,
-    onPress: () => void
-  ) => (
+  // ── Chevron Row ──
+  const ChevronRow = ({ label, value, onPress }: { label: string; value: string; onPress: () => void }) => (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.rowTextContainer}>
-        <Text style={styles.rowLabel}>{label}</Text>
-      </View>
-      <View style={styles.chevronContainer}>
-        <Text style={styles.chevronValue}>{value}</Text>
-        <Ionicons name="chevron-forward" size={18} color={TEXT_MUTED} />
+      <Text style={styles.rowLabel}>{label}</Text>
+      <View style={styles.chevron}>
+        <Text style={styles.chevronVal}>{value}</Text>
+        <Ionicons name="chevron-forward" size={16} color={TEXT_MUTED} />
       </View>
     </TouchableOpacity>
   );
 
-  // ============================================================
-  // SEARCH ENGINE SELECTOR MODAL
-  // ============================================================
-  
-  const renderSearchEngineModal = () => {
-    if (!showSearchEngineModal) return null;
-    
-    return (
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.modalBackdrop} 
-          onPress={() => setShowSearchEngineModal(false)}
-          activeOpacity={1}
-        />
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Default Search Engine</Text>
-          
-          {(['google', 'duckduckgo', 'bing'] as SearchEngine[]).map((engine) => (
+  // ── Selection Modal ──
+  const SelectionModal = ({ visible, onClose, title, options, selected, onSelect }: {
+    visible: boolean; onClose: () => void; title: string;
+    options: { key: string; label: string }[]; selected: string;
+    onSelect: (key: string) => void;
+  }) => (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={styles.modalContent} onPress={e => e.stopPropagation()}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          {options.map(opt => (
             <TouchableOpacity
-              key={engine}
-              style={[
-                styles.modalOption,
-                settings.defaultSearchEngine === engine && styles.modalOptionActive
-              ]}
-              onPress={() => handleSearchEngineChange(engine)}
+              key={opt.key}
+              style={[styles.modalOpt, selected === opt.key && styles.modalOptActive]}
+              onPress={() => onSelect(opt.key)}
+              data-testid={`modal-option-${opt.key}`}
             >
-              <Text style={[
-                styles.modalOptionText,
-                settings.defaultSearchEngine === engine && styles.modalOptionTextActive
-              ]}>
-                {SEARCH_ENGINE_NAMES[engine]}
-              </Text>
-              {settings.defaultSearchEngine === engine && (
-                <Ionicons name="checkmark-circle" size={22} color={ELECTRIC_CYAN} />
-              )}
+              <Text style={[styles.modalOptText, selected === opt.key && styles.modalOptTextActive]}>{opt.label}</Text>
+              {selected === opt.key && <Ionicons name="checkmark-circle" size={20} color={ELECTRIC_CYAN} />}
             </TouchableOpacity>
           ))}
-          
-          <TouchableOpacity
-            style={styles.modalCloseButton}
-            onPress={() => setShowSearchEngineModal(false)}
-          >
+          <TouchableOpacity style={styles.modalClose} onPress={onClose}>
             <Text style={styles.modalCloseText}>Cancel</Text>
           </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  // ============================================================
-  // MAIN RENDER
-  // ============================================================
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <Text style={styles.loadingText}>Loading settings...</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: TEXT_SECONDARY, fontSize: 16, ...FONT }}>Loading settings...</Text>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      {/* Glossy Radial Background */}
-      <LinearGradient
-        colors={['#E8ECF0', '#F5F7FA', '#FFFFFF', '#F0F4F8']}
-        locations={[0, 0.3, 0.7, 1]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+  const currentTheme = settings.darkMode ? 'dark' : 'light';
 
+  return (
+    <View style={styles.container} data-testid="settings-container">
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <View style={styles.backButtonGlass}>
-            <Ionicons name="arrow-back" size={22} color={TEXT_DARK} />
-          </View>
+        <TouchableOpacity onPress={handleBack} style={styles.backBtn} data-testid="settings-back-btn">
+          <Ionicons name="arrow-back" size={22} color={TEXT_PRIMARY} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
-        <View style={styles.headerSpacer} />
+        <View style={{ width: 44 }} />
       </View>
 
       <ScrollView
-        style={styles.scrollView}
+        style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ============================================================ */}
-        {/* CARD 1: ENGINE & AI */}
-        {/* ============================================================ */}
-        <GlossyCard title="Engine & AI">
-          {renderChevronRow(
-            'Default Search Engine', 
-            SEARCH_ENGINE_NAMES[settings.defaultSearchEngine], 
-            handleSearchEnginePress
-          )}
+        {/* ENGINE & AI */}
+        <GlassCard title="ENGINE & AI">
+          <ChevronRow
+            label="Default Search Engine"
+            value={SEARCH_ENGINE_NAMES[settings.defaultSearchEngine] || settings.defaultSearchEngine}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearchEngineModal(true); }}
+          />
           <View style={styles.divider} />
-          {renderSwitchRow('Local AI Assistant', 'strictLocalAI')}
-        </GlossyCard>
+          <SwitchRow label="Local AI Assistant" settingKey="strictLocalAI" subtitle="Enable AI features in nav bar" />
+        </GlassCard>
 
-        {/* ============================================================ */}
-        {/* CARD 2: PRIVACY & SECURITY */}
-        {/* ============================================================ */}
-        <GlossyCard title="Privacy & Security">
-          {renderSwitchRow('Ad & Tracker Shield', 'aggressiveAdBlocking')}
+        {/* PRIVACY & SECURITY */}
+        <GlassCard title="PRIVACY & SECURITY">
+          <SwitchRow label="Ad & Tracker Shield" settingKey="aggressiveAdBlocking" subtitle="Block ads and trackers on all sites" />
           <View style={styles.divider} />
-          {renderSwitchRow('Strict Do Not Track', 'doNotTrack')}
+          <SwitchRow label="Strict Do Not Track" settingKey="doNotTrack" subtitle="Send DNT:1 header with all requests" />
           <View style={styles.divider} />
-          
-          {/* Burn Browsing Data - Glossy Danger Button */}
           <TouchableOpacity
-            style={styles.dangerButton}
+            style={styles.burnBtn}
             onPress={handleBurnData}
             activeOpacity={0.8}
+            data-testid="burn-data-btn"
           >
-            <LinearGradient
-              colors={['rgba(255,68,68,0.15)', 'rgba(255,68,68,0.25)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={styles.dangerButtonGradient}
-            >
-              <Ionicons name="flame" size={20} color={DANGER_RED} />
-              <Text style={styles.dangerButtonText}>Burn Browsing Data</Text>
-            </LinearGradient>
+            <Ionicons name="flame" size={20} color={DANGER_RED} />
+            <Text style={styles.burnText}>Burn Browsing Data</Text>
           </TouchableOpacity>
-        </GlossyCard>
+        </GlassCard>
 
-        {/* ============================================================ */}
-        {/* CARD 3: DISPLAY & ACCESSIBILITY */}
-        {/* ============================================================ */}
-        <GlossyCard title="Display & Accessibility">
-          {renderChevronRow('App Theme', 'System Default', handleThemePress)}
+        {/* DISPLAY & ACCESSIBILITY */}
+        <GlassCard title="DISPLAY & ACCESSIBILITY">
+          <ChevronRow
+            label="App Theme"
+            value={THEME_NAMES[currentTheme] || 'Dark'}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowThemeModal(true); }}
+          />
           <View style={styles.divider} />
-          {renderSwitchRow(
-            'Force Dark Web',
-            'forceDarkWeb',
-            'Attempts to force dark mode on all sites'
-          )}
+          <SwitchRow label="Force Dark Web" settingKey="forceDarkWeb" subtitle="Force dark mode on all websites" />
           <View style={styles.divider} />
-          {renderSwitchRow(
-            'Force Enable Zoom',
-            'forceZoom',
-            'Override sites that block pinch-to-zoom'
-          )}
-        </GlossyCard>
+          <SwitchRow label="Force Enable Zoom" settingKey="forceZoom" subtitle="Override sites that block pinch-to-zoom" />
+        </GlassCard>
 
-        {/* Version Footer */}
-        <Text style={styles.versionText}>Aura Browser v1.0</Text>
+        <Text style={styles.version}>Aura Browser v1.0</Text>
       </ScrollView>
 
       {/* Search Engine Modal */}
-      {renderSearchEngineModal()}
+      <SelectionModal
+        visible={showSearchEngineModal}
+        onClose={() => setShowSearchEngineModal(false)}
+        title="Default Search Engine"
+        options={[
+          { key: 'google', label: 'Google' },
+          { key: 'duckduckgo', label: 'DuckDuckGo' },
+          { key: 'brave', label: 'Brave' },
+          { key: 'bing', label: 'Bing' },
+        ]}
+        selected={settings.defaultSearchEngine}
+        onSelect={(key) => handleSearchEngineChange(key as SearchEngine)}
+      />
+
+      {/* Theme Modal */}
+      <SelectionModal
+        visible={showThemeModal}
+        onClose={() => setShowThemeModal(false)}
+        title="App Theme"
+        options={[
+          { key: 'dark', label: 'Dark' },
+          { key: 'light', label: 'Light' },
+          { key: 'system', label: 'System Default' },
+        ]}
+        selected={currentTheme}
+        onSelect={handleThemeChange}
+      />
     </View>
   );
 }
 
-// ============================================================
-// GLOSSY GLASSMORPHIC STYLES
-// ============================================================
-
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: DEEP_BG,
+    zIndex: 1,
   },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: TEXT_SECONDARY,
-  },
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -382,306 +313,185 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
-  backButton: {
+  backBtn: {
     width: 44,
     height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backButtonGlass: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,1)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: TEXT_DARK,
+    color: TEXT_PRIMARY,
     letterSpacing: 0.3,
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+    ...FONT,
   },
-  headerSpacer: {
-    width: 44,
-  },
-  // Scroll View
-  scrollView: {
-    flex: 1,
-  },
+  scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
   },
-  // Card Styles
-  cardOuterContainer: {
+  // Card
+  card: {
     marginBottom: 20,
     borderRadius: 20,
+    backgroundColor: CARD_BG,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    padding: 20,
+    position: 'relative',
+    overflow: 'hidden',
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-      },
-      android: {
-        elevation: 8,
-      },
+      web: { backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any,
     }),
   },
-  cardGradient: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderTopColor: 'rgba(255,255,255,1)',
-    borderLeftColor: 'rgba(255,255,255,1)',
-    borderRightWidth: 0.5,
-    borderBottomWidth: 0.5,
-    borderRightColor: 'rgba(0,0,0,0.05)',
-    borderBottomColor: 'rgba(0,0,0,0.05)',
-  },
-  reflectiveEdge: {
+  cardGlow: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    top: 0, left: 0, right: 0,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-  },
-  cardContent: {
-    padding: 20,
+    backgroundColor: 'rgba(0,255,255,0.15)',
   },
   cardTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: ELECTRIC_CYAN,
     letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 16,
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+    ...FONT,
   },
-  // Row Styles
+  // Rows
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    minHeight: 52,
+    minHeight: 50,
   },
-  rowTextContainer: {
+  rowText: {
     flex: 1,
     marginRight: 12,
   },
   rowLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
-    color: TEXT_DARK,
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+    color: TEXT_PRIMARY,
+    ...FONT,
   },
-  rowSubtitle: {
-    fontSize: 13,
+  rowSub: {
+    fontSize: 12,
     color: TEXT_SECONDARY,
-    marginTop: 4,
-    lineHeight: 18,
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+    marginTop: 3,
+    lineHeight: 16,
+    ...FONT,
   },
-  // Switch Container
-  switchContainer: {
-    position: 'relative',
-  },
-  switch: {
-    transform: [{ scale: 0.95 }],
-  },
-  switchSpecular: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 7 : 4,
-    right: Platform.OS === 'ios' ? 8 : 6,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#FFF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 2,
-      },
-    }),
-  },
-  // Chevron Row
-  chevronContainer: {
+  chevron: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  chevronValue: {
-    fontSize: 15,
+  chevronVal: {
+    fontSize: 14,
     color: TEXT_SECONDARY,
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+    ...FONT,
   },
-  // Divider
   divider: {
     height: 1,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    marginVertical: 4,
+    backgroundColor: DIVIDER_COLOR,
+    marginVertical: 2,
   },
-  // Danger Button
-  dangerButton: {
-    marginTop: 12,
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,68,68,0.3)',
-  },
-  dangerButtonGradient: {
+  // Burn button
+  burnBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 12,
     paddingVertical: 14,
-    paddingHorizontal: 20,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,68,102,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,68,102,0.25)',
     gap: 10,
+    ...Platform.select({
+      web: { boxShadow: '0 0 20px rgba(255,68,102,0.15)' } as any,
+      ios: { shadowColor: DANGER_RED, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 12 },
+    }),
   },
-  dangerButtonText: {
-    fontSize: 16,
+  burnText: {
+    fontSize: 15,
     fontWeight: '600',
     color: DANGER_RED,
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+    ...FONT,
   },
   // Modal
   modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    backgroundColor: '#FFF',
+    backgroundColor: '#141418',
     borderRadius: 20,
     padding: 24,
     width: '85%',
     maxWidth: 340,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2,
-        shadowRadius: 20,
-      },
-      android: {
-        elevation: 10,
-      },
-    }),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: TEXT_DARK,
+    color: TEXT_PRIMARY,
     textAlign: 'center',
     marginBottom: 20,
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+    ...FONT,
   },
-  modalOption: {
+  modalOpt: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: 'rgba(0,0,0,0.03)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  modalOptionActive: {
+  modalOptActive: {
     backgroundColor: 'rgba(0,255,255,0.1)',
     borderWidth: 1,
-    borderColor: ELECTRIC_CYAN,
+    borderColor: 'rgba(0,255,255,0.3)',
   },
-  modalOptionText: {
-    fontSize: 16,
-    color: TEXT_DARK,
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+  modalOptText: {
+    fontSize: 15,
+    color: TEXT_PRIMARY,
+    ...FONT,
   },
-  modalOptionTextActive: {
+  modalOptTextActive: {
     fontWeight: '600',
-    color: TEXT_DARK,
+    color: ELECTRIC_CYAN,
   },
-  modalCloseButton: {
+  modalClose: {
     marginTop: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
   modalCloseText: {
-    fontSize: 16,
+    fontSize: 15,
     color: TEXT_SECONDARY,
     fontWeight: '500',
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+    ...FONT,
   },
-  // Version
-  versionText: {
+  version: {
     textAlign: 'center',
     fontSize: 12,
     color: TEXT_MUTED,
     marginTop: 20,
     letterSpacing: 0.5,
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
+    ...FONT,
   },
 });
