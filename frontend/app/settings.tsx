@@ -20,6 +20,7 @@ import { SearchEngine } from '../src/hooks/useBrowserSettings';
 import { useBrowserStore } from '../src/store/browserStore';
 import { useKidsModeStore } from '../src/store/useKidsModeStore';
 import { useGhostModeStore } from '../src/store/useGhostModeStore';
+import { usePriceTrackerStore } from '../src/store/usePriceTrackerStore';
 
 const ELECTRIC_CYAN = '#00FFFF';
 const DANGER_RED = '#FF4466';
@@ -94,6 +95,8 @@ export default function SettingsScreen() {
         const store = useBrowserStore.getState();
         if (store.clearHistory) store.clearHistory();
         if (store.clearCachedPages) store.clearCachedPages();
+        // Clear price tracking data
+        await usePriceTrackerStore.getState().clearAll();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         if (Platform.OS === 'web') {
           alert('All browsing data has been incinerated.');

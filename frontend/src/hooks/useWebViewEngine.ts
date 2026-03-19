@@ -24,6 +24,7 @@ import { useKidsModeStore } from '../store/useKidsModeStore';
 import { kidsContentFilter } from '../services/KidsContentFilter';
 import { useGhostModeStore } from '../store/useGhostModeStore';
 import { ghostPrivacyEngine } from '../services/GhostModePrivacyEngine';
+import { productDetectionScript, checkoutDetectionScript, getDealScoreInjectionScript } from '../services/ProductDetectionService';
 
 interface WebViewEngineDeps {
   userSettings: {
@@ -394,6 +395,15 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
         webViewRef.current?.injectJavaScript(pageContextExtractionScript);
       }, 3000);
     }
+
+    // Price Tracker: Product detection + checkout detection
+    if (activeTab?.url && !isGhostMode) {
+      setTimeout(() => {
+        webViewRef.current?.injectJavaScript(productDetectionScript);
+        webViewRef.current?.injectJavaScript(checkoutDetectionScript);
+        console.log('[PriceTracker] Detection scripts injected');
+      }, 1500);
+    }
   }, [userSettings.aggressiveAdBlocking, userSettings.aiHistoryEnabled, settings.predictiveCachingEnabled, visionAISelectors, cachedPageSource, setCachedPageSource, setIsCacheHit, activeTab?.scrollY, activeTab?.url, isGhostMode, webViewRef, setLoading]);
 
   return {
@@ -403,5 +413,9 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
     getInjectedScript,
     handleShouldStartLoad,
     handleLoadEnd,
+    injectDealScoreBadge: useCallback((score: number, label: string, isNew: boolean) => {
+      const script = getDealScoreInjectionScript(score, label, isNew);
+      webViewRef.current?.injectJavaScript(script);
+    }, [webViewRef]),
   };
 }

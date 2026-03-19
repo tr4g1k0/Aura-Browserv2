@@ -50,6 +50,7 @@ interface BrowserMenuProps {
   onAISummarize?: () => void;
   onKidsMode?: () => void;
   onGhostMode?: () => void;
+  onPriceTracker?: () => void;
 }
 
 /**
@@ -79,6 +80,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onAISummarize,
   onKidsMode,
   onGhostMode,
+  onPriceTracker,
 }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -476,6 +478,15 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               icon="skull-outline"
               label="Ghost Mode"
               onPress={handleGhostMode}
+            />
+            <MenuRow
+              icon="pricetag-outline"
+              label="Price Tracker"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onClose();
+                onPriceTracker?.();
+              }}
             />
           </View>
         </LinearGradient>

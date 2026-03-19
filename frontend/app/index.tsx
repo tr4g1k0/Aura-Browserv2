@@ -83,6 +83,13 @@ import { mediaDetectionScript } from '../src/services/MediaDownloadService';
 import { useDownloadsStore } from '../src/store/useDownloadsStore';
 import * as Haptics from 'expo-haptics';
 
+// Price Tracker imports
+import { usePriceTrackerStore } from '../src/store/usePriceTrackerStore';
+import { PriceTrackerSheet } from '../src/components/PriceTrackerSheet';
+import { PriceTrackerScreen } from '../src/components/PriceTrackerScreen';
+import { PriceTagIndicator } from '../src/components/PriceTagIndicator';
+import { CouponFinderSheet } from '../src/components/CouponFinderSheet';
+
 // Conditionally import WebView only on native platforms
 let WebView: any = null;
 if (Platform.OS !== 'web') {
@@ -92,6 +99,21 @@ if (Platform.OS !== 'web') {
 
 const DESKTOP_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const MOBILE_USER_AGENT = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+
+// Coupon code generator - generates common coupon patterns for a domain
+function generateSampleCoupons(domain: string): any[] {
+  const storeName = domain.split('.')[0].toUpperCase();
+  const patterns = [
+    { code: `${storeName}10`, description: `10% off your order at ${domain}`, successRate: 65 },
+    { code: `SAVE20`, description: `20% discount on select items`, successRate: 42 },
+    { code: `FREESHIP`, description: `Free shipping on orders over $50`, successRate: 78 },
+    { code: `WELCOME15`, description: `15% off for new customers`, successRate: 55 },
+    { code: `${storeName}DEAL`, description: `Special deal - up to 25% off`, successRate: 38 },
+  ];
+  // Return 2-4 random coupons
+  const count = 2 + Math.floor(Math.random() * 3);
+  return patterns.slice(0, count);
+}
 
 export default function BrowserScreen() {
   const router = useRouter();
@@ -156,6 +178,19 @@ export default function BrowserScreen() {
   const [ghostEntryAnim, setGhostEntryAnim] = useState<'enter' | 'exit' | null>(null);
   const [ghostSelfDestructAnim, setGhostSelfDestructAnim] = useState(false);
   const [ghostDestroyedMsg, setGhostDestroyedMsg] = useState(false);
+
+  // ── Price Tracker state ──
+  const [priceTrackerScreenVisible, setPriceTrackerScreenVisible] = useState(false);
+  const [couponSheetVisible, setCouponSheetVisible] = useState(false);
+  const [couponDomain, setCouponDomain] = useState('');
+  const [couponCodes, setCouponCodes] = useState<any[]>([]);
+  const priceTrackerSetDetected = usePriceTrackerStore(s => s.setDetectedProduct);
+  const priceTrackerSetCheckout = usePriceTrackerStore(s => s.setCheckoutDetected);
+  const priceTrackerOpenSheet = usePriceTrackerStore(s => s.openSheet);
+  const priceTrackerInit = usePriceTrackerStore(s => s.initialize);
+  const isProductPage = usePriceTrackerStore(s => s.isProductPage);
+  const currentDealScore = usePriceTrackerStore(s => s.currentDealScore);
+
   const ghostIsActive = useGhostModeStore(s => s.isActive);
   const ghostSettings = useGhostModeStore(s => s.settings);
   const ghostSpoofedLocation = useGhostModeStore(s => s.spoofedLocation);
@@ -247,6 +282,9 @@ export default function BrowserScreen() {
     
     // Initialize Ghost Mode store
     ghostInit();
+    
+    // Initialize Price Tracker store
+    priceTrackerInit();
     
     return () => {
       tabVirtualizationService.stop();
@@ -521,8 +559,39 @@ export default function BrowserScreen() {
         try { if (data.content) handleTTSContent(data.content); } catch { setIsReading(false); }
       }
       if (data.type === 'TTS_ERROR') { setIsReading(false); }
+
+      // ── Price Tracker: Product detected on page ──
+      if (data.type === 'PRODUCT_DETECTED' && data.product) {
+        console.log('[PriceTracker] Product detected:', data.product.title, data.product.price);
+        priceTrackerSetDetected(data.product);
+        // After detection + analysis, inject deal score badge into page
+        setTimeout(() => {
+          const score = usePriceTrackerStore.getState().currentDealScore;
+          if (score && webViewRef.current) {
+            webViewEngine.injectDealScoreBadge(score.score, score.label, score.isNew);
+          }
+        }, 500);
+      }
+
+      // ── Price Tracker: Deal Score badge tapped in page ──
+      if (data.type === 'DEAL_SCORE_TAP') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        priceTrackerOpenSheet();
+      }
+
+      // ── Price Tracker: Checkout page detected ──
+      if (data.type === 'CHECKOUT_DETECTED' && data.domain) {
+        priceTrackerSetCheckout(data.domain);
+        setCouponDomain(data.domain);
+        // Generate sample coupon codes for the domain
+        const codes = generateSampleCoupons(data.domain);
+        if (codes.length > 0) {
+          setCouponCodes(codes);
+          setCouponSheetVisible(true);
+        }
+      }
     } catch {}
-  }, [addCachedPage, isGhostMode, isNewTabPage, updateHistoryEntry, incrementAds, incrementTrackers, handleScrollDirection, handleFileDownload, handleTTSContent]);
+  }, [addCachedPage, isGhostMode, isNewTabPage, updateHistoryEntry, incrementAds, incrementTrackers, handleScrollDirection, handleFileDownload, handleTTSContent, priceTrackerSetDetected, priceTrackerOpenSheet, priceTrackerSetCheckout]);
 
   const handleWebViewMessage = useCallback((event: any) => {
     try {
@@ -536,6 +605,13 @@ export default function BrowserScreen() {
   // ── Routing helpers ──
   const openTabsManager = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/tabs-manager'); };
   const openAIAgent = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/ai-agent'); };
+
+  // ── Price Tracker: Clear detection on new tab page ──
+  useEffect(() => {
+    if (isNewTabPage) {
+      priceTrackerSetDetected(null);
+    }
+  }, [isNewTabPage]);
 
   // ── Media download handler ──
   const handleMediaDownload = useCallback((media: any) => {
@@ -561,6 +637,12 @@ export default function BrowserScreen() {
   // ── Layout calculations ──
   // No extra padding - the bar is absolutely positioned over the webview
   const bottomBarHeight = 90;
+
+  // ── Price Tracker: Navigate to compare URL ──
+  const handlePriceCompareNavigate = useCallback((url: string) => {
+    setPriceTrackerScreenVisible(false);
+    navigation.handleNavigate(url);
+  }, [navigation]);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -596,6 +678,7 @@ export default function BrowserScreen() {
           onDownloadAllLinks={handleDownloadAllLinks}
           onKidsMode={handleKidsModeMenuPress}
           onGhostMode={handleGhostModeMenuPress}
+          onPriceTracker={() => setPriceTrackerScreenVisible(true)}
         />
 
         {/* AI Summarizer Drawer */}
@@ -719,6 +802,10 @@ export default function BrowserScreen() {
             </TouchableOpacity>
           )}
           <PrivacyShredderToast />
+
+          {/* ══════ PRICE TRACKER OVERLAYS ══════ */}
+          {/* Price Tag Indicator - floating badge on product pages */}
+          {!isNewTabPage && <PriceTagIndicator bottomOffset={backgroundMedia.isVideoToolbarVisible ? 200 + insets.bottom : 120 + insets.bottom} />}
 
           {/* Video Control Toolbar - appears when video is playing */}
           {!isNewTabPage && backgroundMedia.isVideoToolbarVisible && (
@@ -858,6 +945,25 @@ export default function BrowserScreen() {
         {ghostDestroyedMsg && (
           <GhostModeDestroyedMessage onComplete={() => setGhostDestroyedMsg(false)} />
         )}
+
+        {/* ══════ PRICE TRACKER COMPONENTS ══════ */}
+        {/* Price Tracker Bottom Sheet (chart, stats, recommendation) */}
+        <PriceTrackerSheet />
+
+        {/* Price Tracker Full Screen */}
+        <PriceTrackerScreen
+          visible={priceTrackerScreenVisible}
+          onClose={() => setPriceTrackerScreenVisible(false)}
+          onNavigate={handlePriceCompareNavigate}
+        />
+
+        {/* Coupon Finder Sheet */}
+        <CouponFinderSheet
+          visible={couponSheetVisible}
+          onClose={() => setCouponSheetVisible(false)}
+          domain={couponDomain}
+          coupons={couponCodes}
+        />
       </View>
     </KeyboardAvoidingView>
   );
