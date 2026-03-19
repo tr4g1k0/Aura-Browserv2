@@ -446,6 +446,9 @@ export default function BrowserScreen() {
   
   // Browser Menu (3-dot menu) state
   const [menuVisible, setMenuVisible] = useState(false);
+
+  // Downloads Modal state
+  const [downloadsModalVisible, setDownloadsModalVisible] = useState(false);
   
   // Find in Page state
   const [isFindModeActive, setIsFindModeActive] = useState(false);
@@ -746,7 +749,7 @@ export default function BrowserScreen() {
     setDownloadProgress(0);
 
     // Download and share the file
-    await downloadManager.downloadAndShare(downloadUrl, (status, progress, filename, error) => {
+    const result = await downloadManager.downloadAndShare(downloadUrl, (status, progress, filename, error) => {
       if (filename) {
         setDownloadFilename(filename);
       }
@@ -772,6 +775,11 @@ export default function BrowserScreen() {
           break;
       }
     });
+
+    // Persist completed download to the Downloads list
+    if (result.success && result.localUri && result.filename) {
+      addDownloadToList(result.filename, result.localUri);
+    }
 
     return true;
   }, []);
@@ -1852,6 +1860,7 @@ export default function BrowserScreen() {
         onFindInPage={handleOpenFindInPage}
         onBurnSite={handleBurnSite}
         onAISummarize={handleAISummarize}
+        onOpenDownloads={() => setDownloadsModalVisible(true)}
       />
 
       {/* ============================================================ */}
@@ -2141,6 +2150,12 @@ export default function BrowserScreen() {
           filename={downloadFilename}
           progress={downloadProgress}
           onDismiss={dismissDownloadToast}
+        />
+
+        {/* Downloads Manager Modal */}
+        <DownloadsModal
+          visible={downloadsModalVisible}
+          onClose={() => setDownloadsModalVisible(false)}
         />
 
         {/* TTS Floating Control Bar */}

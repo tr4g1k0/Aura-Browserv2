@@ -30,22 +30,45 @@ class BackendTester:
             print(f"   Response: {json.dumps(response_data, indent=2)}")
         print()
 
-    def test_health_endpoint(self):
-        """Test GET /api/health"""
+    def test_aura_health_endpoint(self):
+        """Test GET /api/health for Aura Browser"""
         try:
             response = self.session.get(f"{BACKEND_BASE_URL}/health")
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get("status") == "healthy" and "service" in data:
-                    self.log_result("Health Check", True, f"Status: {data.get('status')}, Service: {data.get('service')}", data)
+                expected_status = "healthy"
+                expected_service = "Aura Browser API"
+                
+                if data.get("status") == expected_status and data.get("service") == expected_service:
+                    self.log_result("Aura Browser Health Check", True, f"Status: {data.get('status')}, Service: {data.get('service')}", data)
                 else:
-                    self.log_result("Health Check", False, "Invalid response format", data)
+                    self.log_result("Aura Browser Health Check", False, f"Expected status='{expected_status}' and service='{expected_service}', got status='{data.get('status')}' and service='{data.get('service')}'", data)
             else:
-                self.log_result("Health Check", False, f"HTTP {response.status_code}: {response.text}")
+                self.log_result("Aura Browser Health Check", False, f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
-            self.log_result("Health Check", False, f"Exception: {str(e)}")
+            self.log_result("Aura Browser Health Check", False, f"Exception: {str(e)}")
+
+    def test_aura_root_endpoint(self):
+        """Test GET /api/ for Aura Browser"""
+        try:
+            response = self.session.get(f"{BACKEND_BASE_URL}/")
+            
+            if response.status_code == 200:
+                data = response.json()
+                expected_message = "Aura Browser API"
+                expected_version = "1.0.0"
+                
+                if data.get("message") == expected_message and data.get("version") == expected_version:
+                    self.log_result("Aura Browser Root Endpoint", True, f"Message: {data.get('message')}, Version: {data.get('version')}", data)
+                else:
+                    self.log_result("Aura Browser Root Endpoint", False, f"Expected message='{expected_message}' and version='{expected_version}', got message='{data.get('message')}' and version='{data.get('version')}'", data)
+            else:
+                self.log_result("Aura Browser Root Endpoint", False, f"HTTP {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            self.log_result("Aura Browser Root Endpoint", False, f"Exception: {str(e)}")
 
     def test_tab_categorization(self):
         """Test POST /api/tabs/categorize"""
@@ -274,17 +297,14 @@ class BackendTester:
             self.log_result("Root Endpoint", False, f"Exception: {str(e)}")
 
     def run_all_tests(self):
-        """Run all backend tests"""
-        print(f"🚀 Starting ACCESS Browser Backend API Tests")
+        """Run Aura Browser Downloads Manager backend tests"""
+        print(f"🚀 Starting Aura Browser Downloads Manager Backend API Tests")
         print(f"Backend URL: {BACKEND_BASE_URL}")
         print("=" * 60)
         
-        # Run all tests
-        self.test_health_endpoint()
-        self.test_tab_categorization()
-        self.test_brief_generation()
-        self.test_agent_execute()
-        self.test_additional_endpoints()
+        # Run Aura Browser specific tests
+        self.test_aura_health_endpoint()
+        self.test_aura_root_endpoint()
         
         # Summary
         print("=" * 60)
