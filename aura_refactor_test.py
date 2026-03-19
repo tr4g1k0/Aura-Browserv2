@@ -11,7 +11,7 @@ import sys
 import time
 
 # Get backend URL from environment
-BACKEND_URL = "https://privacy-browser-opt.preview.emergentagent.com/api"
+BACKEND_URL = "https://fork-handoff-summary.preview.emergentagent.com/api"
 
 class AuraRefactorTester:
     def __init__(self):

@@ -25,7 +25,7 @@ from typing import Dict, List, Tuple
 import sys
 
 # Test configuration
-BACKEND_URL = "https://privacy-browser-opt.preview.emergentagent.com/api"
+BACKEND_URL = "https://fork-handoff-summary.preview.emergentagent.com/api"
 HEALTH_ENDPOINT = f"{BACKEND_URL}/health"
 EXPECTED_HEALTH_RESPONSE = {"status": "healthy", "service": "Aura Browser API"}
 

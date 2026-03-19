@@ -19,7 +19,9 @@
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Enable ambient sound detection for accessibility",
         "NSSpeechRecognitionUsageDescription": "Enable live captioning for media content",
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": [
+          "audio"
+        ],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         }
@@ -73,7 +75,8 @@
           "enableFileSharing": true
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
