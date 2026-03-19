@@ -59,10 +59,16 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 
 ### Image Context Menu (Feb 2026) ✅
 - Custom AI-ready long-press context menu replacing default browser menu for images
-- JS interceptor in WebView catches `contextmenu` on `<img>` tags (3-level parent walk)
 - Animated bottom sheet with Aura aesthetic: image preview, URL display, drag handle
 - Actions: Download Securely, Copy Image URL, Share Image, Aura Vision (Extract Text — Coming Soon)
 - Backdrop tap to dismiss, spring animation, haptic feedback
+
+### Text Selection Menu (Feb 2026) ✅
+- Custom AI-powered text selection menu replacing default system popup
+- Unified JS interceptor: suppresses native callout via `-webkit-touch-callout: none`, single contextmenu listener handles both images (IMAGE_LONG_PRESS) and text (TEXT_LONG_PRESS)
+- Animated bottom sheet with selected text preview (truncated, italic)
+- 2x2 tools grid: Explain (AI Coming Soon), Summarize (AI Coming Soon), Secure Search (DuckDuckGo), Copy (Clipboard)
+- Backdrop tap dismisses and clears state
 
 ### Settings
 - Premium glossy glassmorphic design
