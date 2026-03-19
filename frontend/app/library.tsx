@@ -93,8 +93,8 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
 
   const handleItemPress = (url: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onNavigate?.(url);
-    onClose?.();
+    if (typeof onNavigate === 'function') onNavigate(url);
+    if (typeof onClose === 'function') onClose();
   };
 
   const handleRemoveHistoryItem = (timestamp: number) => {
@@ -282,7 +282,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={() => { if (typeof onClose === 'function') onClose(); }}
     >
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header */}
@@ -291,7 +291,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
             style={styles.closeButton}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onClose?.();
+              if (typeof onClose === 'function') onClose();
             }}
           >
             <Ionicons name="close" size={24} color="#FFF" />
