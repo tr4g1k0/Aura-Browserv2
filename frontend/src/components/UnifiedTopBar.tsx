@@ -247,7 +247,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
         >
           <Ionicons 
             name={isNewTabPage ? "search" : "home-outline"} 
-            size={22} 
+            size={20} 
             color={isNewTabPage ? colors.accent : INACTIVE_GRAY} 
           />
         </TouchableOpacity>
@@ -261,7 +261,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
           }}
           activeOpacity={0.7}
         >
-          <Ionicons name="library-outline" size={22} color={INACTIVE_GRAY} />
+          <Ionicons name="library-outline" size={20} color={INACTIVE_GRAY} />
         </TouchableOpacity>
 
         {/* 3. AI Agent - CENTER, LARGER, DISTINCT ACCENT */}
@@ -273,7 +273,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
           }}
           activeOpacity={0.7}
         >
-          <Ionicons name="sparkles" size={26} color={AI_GOLD} />
+          <Ionicons name="sparkles" size={22} color={AI_GOLD} />
         </TouchableOpacity>
 
         {/* 4. Tabs Counter */}
@@ -351,20 +351,20 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   contentWrapper: {
-    paddingBottom: 8,      // Reduced from 12 for slimmer bar
-    paddingHorizontal: 12, // Reduced from 16 for tighter layout
+    paddingBottom: 4,
+    paddingHorizontal: 10,
   },
   // URL Bar Row
   urlBarRow: {
-    marginBottom: 8,       // Reduced from 12 for slimmer bar
+    marginBottom: 4,
   },
   urlBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1A1A1A',
     borderRadius: 10,
-    height: 38,            // Reduced from 40 for slimmer bar
-    paddingHorizontal: 10, // Reduced from 12 for tighter layout
+    height: 34,
+    paddingHorizontal: 8,
   },
   urlBarFocused: {
     backgroundColor: '#222',
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     color: '#FFF',
-    fontSize: 15,
+    fontSize: 13,
     height: '100%',
     ...Platform.select({
       ios: { fontFamily: 'System' },
@@ -402,27 +402,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-evenly',
-    paddingVertical: 2,    // Reduced from 4 for slimmer bar
+    paddingVertical: 0,
+    height: 36,
   },
   // Standard nav icons - NO background, clean floating glyphs
   navIcon: {
-    width: 44,             // Reduced from 48
-    height: 38,            // Reduced from 44
+    width: 40,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   // Center AI icon - Slightly larger touch target
   navIconCenter: {
-    width: 52,             // Reduced from 56
-    height: 42,            // Reduced from 48
+    width: 46,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
   // Tab counter square
   tabSquare: {
-    width: 22,
-    height: 22,
-    borderRadius: 5,
+    width: 20,
+    height: 20,
+    borderRadius: 4,
     borderWidth: 1.5,
     borderColor: INACTIVE_GRAY,
     alignItems: 'center',

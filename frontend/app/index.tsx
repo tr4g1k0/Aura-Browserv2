@@ -561,6 +561,57 @@ export default function BrowserScreen() {
     previousTabIdRef.current = activeTab?.id || null;
   }, [activeTab?.id, saveTabScrollPosition]);
 
+  // ============================================================================
+  // AUTO-HIDE BOTTOM BAR ON SCROLL
+  // ============================================================================
+  const barTranslateY = useRef(new Animated.Value(0)).current;
+  const lastScrollYRef = useRef(0);
+  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isBarHiddenRef = useRef(false);
+
+  const showBar = useCallback(() => {
+    if (!isBarHiddenRef.current) return;
+    isBarHiddenRef.current = false;
+    Animated.timing(barTranslateY, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [barTranslateY]);
+
+  const hideBar = useCallback(() => {
+    if (isBarHiddenRef.current) return;
+    isBarHiddenRef.current = true;
+    Animated.timing(barTranslateY, {
+      toValue: 120,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [barTranslateY]);
+
+  const handleScrollDirection = useCallback((scrollY: number) => {
+    const delta = scrollY - lastScrollYRef.current;
+    const isAtTop = scrollY <= 5;
+
+    // Clear idle timer
+    if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+
+    if (isAtTop) {
+      showBar();
+    } else if (delta > 8) {
+      // Scrolling DOWN — hide bar
+      hideBar();
+    } else if (delta < -8) {
+      // Scrolling UP — show bar
+      showBar();
+    }
+
+    // Show bar after 1s idle
+    scrollIdleTimerRef.current = setTimeout(() => showBar(), 1000);
+
+    lastScrollYRef.current = scrollY;
+  }, [showBar, hideBar]);
+
   // Load persisted state on mount
   useEffect(() => {
     loadPersistedState();
@@ -632,9 +683,10 @@ export default function BrowserScreen() {
   const handleGoHome = useCallback(() => {
     if (activeTab) {
       updateTab(activeTab.id, { url: '', title: 'New Tab' });
+      showBar(); // Always show bar on home
       console.log('[Browser] Navigated to home');
     }
-  }, [activeTab, updateTab]);
+  }, [activeTab, updateTab, showBar]);
 
   const handleNavigate = useCallback((input: string) => {
     if (!input.trim()) return;
@@ -1036,6 +1088,10 @@ export default function BrowserScreen() {
       // Tab Virtualization: Track scroll position
       if (data.type === 'SCROLL_POSITION') {
         currentScrollYRef.current = data.scrollY || 0;
+        // Drive auto-hide bottom bar animation
+        if (!isNewTabPage) {
+          handleScrollDirection(data.scrollY || 0);
+        }
         return;
       }
       
@@ -1989,6 +2045,7 @@ export default function BrowserScreen() {
             transform: [{ translateY: browserViewTranslateY }],
           }}
         >
+          <Animated.View style={{ transform: [{ translateY: isNewTabPage ? 0 : barTranslateY }] }}>
           <UnifiedTopBar
             onNavigate={handleNavigate}
             onHomePress={handleGoHome}
@@ -2000,6 +2057,7 @@ export default function BrowserScreen() {
             currentUrl={activeTab?.url || ''}
             currentTitle={activeTab?.title || ''}
           />
+          </Animated.View>
         </Animated.View>
       )}
 
