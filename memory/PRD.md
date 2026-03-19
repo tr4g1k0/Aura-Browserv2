@@ -57,6 +57,13 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - **Background Download Notifications**: `DownloadNotificationBanner` — persistent floating banner when downloads are active and modal is closed, shows aggregate progress, tap to open modal, auto-dismisses on completion
 - **Auto-Categorization**: Files automatically sorted into 5 folders (Documents, Images, Media, Archives, Other) based on extension. Group-by-Category view with collapsible section headers, category badges on each file row, backfill for legacy items
 
+### Image Context Menu (Feb 2026) ✅
+- Custom AI-ready long-press context menu replacing default browser menu for images
+- JS interceptor in WebView catches `contextmenu` on `<img>` tags (3-level parent walk)
+- Animated bottom sheet with Aura aesthetic: image preview, URL display, drag handle
+- Actions: Download Securely, Copy Image URL, Share Image, Aura Vision (Extract Text — Coming Soon)
+- Backdrop tap to dismiss, spring animation, haptic feedback
+
 ### Settings
 - Premium glossy glassmorphic design
 - Sections: Shield & Privacy, AI & Accessibility, System
