@@ -48,6 +48,7 @@ interface BrowserMenuProps {
   onFindInPage?: () => void;
   onBurnSite?: () => void;
   onAISummarize?: () => void;
+  onKidsMode?: () => void;
 }
 
 /**
@@ -75,6 +76,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onFindInPage,
   onBurnSite,
   onAISummarize,
+  onKidsMode,
 }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -210,6 +212,13 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     
     // Then navigate to settings
     router.push('/settings');
+  };
+
+  const handleKidsMode = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    console.log('[Menu] Kids Mode pressed');
+    onClose();
+    onKidsMode?.();
   };
 
   // ============================================================
@@ -447,6 +456,12 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               icon="settings-outline"
               label="Settings"
               onPress={handleSettings}
+            />
+            <MenuRow
+              emoji="🛡️"
+              icon=""
+              label="Kids Mode"
+              onPress={handleKidsMode}
             />
           </View>
         </LinearGradient>

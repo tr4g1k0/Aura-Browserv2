@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useSettings } from '../src/context/SettingsContext';
 import { SearchEngine } from '../src/hooks/useBrowserSettings';
 import { useBrowserStore } from '../src/store/browserStore';
+import { useKidsModeStore } from '../src/store/useKidsModeStore';
 
 const ELECTRIC_CYAN = '#00FFFF';
 const DANGER_RED = '#FF4466';
@@ -54,6 +55,9 @@ export default function SettingsScreen() {
   const { settings, updateSetting, clearBrowsingData, isLoading } = useSettings();
   const [showSearchEngineModal, setShowSearchEngineModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
+  
+  const kidsModeIsActive = useKidsModeStore(s => s.isActive);
+  const kidsModeConfig = useKidsModeStore(s => s.config);
 
   // Force dark background on Expo Router wrappers (web only)
   React.useEffect(() => {
@@ -263,6 +267,43 @@ export default function SettingsScreen() {
           <SwitchRow label="Force Dark Web" settingKey="forceDarkWeb" subtitle="Force dark mode on all websites" />
           <View style={styles.divider} />
           <SwitchRow label="Force Enable Zoom" settingKey="forceZoom" subtitle="Override sites that block pinch-to-zoom" />
+        </GlassCard>
+
+        {/* KIDS MODE */}
+        <GlassCard title="KIDS MODE">
+          <View style={styles.row}>
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>Kids Mode</Text>
+              <Text style={styles.rowSub}>
+                {kidsModeIsActive ? 'Active' : kidsModeConfig.isSetup ? 'Configured' : 'Not set up'}
+                {kidsModeConfig.childName ? ` - ${kidsModeConfig.childName}` : ''}
+              </Text>
+            </View>
+            <View style={[styles.kidsBadge, kidsModeIsActive && styles.kidsBadgeActive]} data-testid="kids-mode-settings-status">
+              <Ionicons name="shield-checkmark" size={16} color={kidsModeIsActive ? '#38ef7d' : TEXT_MUTED} />
+              <Text style={[styles.kidsBadgeText, kidsModeIsActive && { color: '#38ef7d' }]}>
+                {kidsModeIsActive ? 'ON' : 'OFF'}
+              </Text>
+            </View>
+          </View>
+          {kidsModeConfig.isSetup && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>Age Group</Text>
+                <Text style={[styles.chevronVal, { textTransform: 'capitalize' }]}>
+                  {kidsModeConfig.ageGroup === 'little-kids' ? 'Little Kids (4-7)' : kidsModeConfig.ageGroup === 'kids' ? 'Kids (8-12)' : 'Teens (13-17)'}
+                </Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>Time Limit</Text>
+                <Text style={styles.chevronVal}>
+                  {kidsModeConfig.timeLimit === 'unlimited' ? 'No limit' : kidsModeConfig.timeLimit === 30 ? '30 min' : kidsModeConfig.timeLimit === 60 ? '1 hour' : '2 hours'}
+                </Text>
+              </View>
+            </>
+          )}
         </GlassCard>
 
         <Text style={styles.version}>Aura Browser v1.0</Text>
@@ -492,6 +533,24 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
     marginTop: 20,
     letterSpacing: 0.5,
+    ...FONT,
+  },
+  kidsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  kidsBadgeActive: {
+    backgroundColor: 'rgba(56,239,125,0.15)',
+  },
+  kidsBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: TEXT_MUTED,
     ...FONT,
   },
 });

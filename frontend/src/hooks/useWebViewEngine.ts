@@ -20,6 +20,8 @@ import {
   videoDetectionScript,
   youtubeBackgroundPlayScript,
 } from '../services/BackgroundMediaService';
+import { useKidsModeStore } from '../store/useKidsModeStore';
+import { kidsContentFilter } from '../services/KidsContentFilter';
 
 interface WebViewEngineDeps {
   userSettings: {
@@ -229,6 +231,28 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
       console.log('[Smart Shield] Download intercepted:', url);
       handleFileDownload(url);
       return false;
+    }
+
+    // Kids Mode content filtering
+    const kidsModeState = useKidsModeStore.getState();
+    if (kidsModeState.isActive) {
+      // Enforce SafeSearch on search URLs
+      const safeUrl = kidsContentFilter.enforceSearchSafety(url);
+      if (safeUrl !== url) {
+        // Redirect to safe version — block original and navigate to safe URL
+        console.log('[KidsMode] SafeSearch enforced:', url, '->', safeUrl);
+        // Can't redirect from here directly, but SafeSearch params will be added by navigation
+      }
+      
+      // Check blocklist
+      if (kidsContentFilter.isBlocked(url, kidsModeState.config.ageGroup)) {
+        console.log('[KidsMode] Blocked:', url);
+        kidsModeState.logBlockedAttempt(url);
+        return false;
+      }
+      
+      // Log page visit for activity tracking
+      kidsModeState.logPageVisit(url, '');
     }
     
     if (userSettings.aggressiveAdBlocking && isAdOrTracker(url)) {

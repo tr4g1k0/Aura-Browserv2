@@ -57,6 +57,13 @@ import { CaptionPill } from '../src/components/CaptionPill';
 import { DownloadNotificationBanner } from '../src/components/DownloadNotificationBanner';
 import { AuraActionPill } from '../src/components/AuraActionPill';
 import { TTSControlBar } from '../src/components/TTSControlBar';
+import { KidsModeBrowser } from '../src/components/KidsModeBrowser';
+import { KidsModeTimeUp } from '../src/components/KidsModeTimeUp';
+import { KidsModeExitModal } from '../src/components/KidsModeExitModal';
+import { KidsModeParentDashboard } from '../src/components/KidsModeParentDashboard';
+import { KidsModeSetupModal } from '../src/components/KidsModeSetupModal';
+import { useKidsModeStore } from '../src/store/useKidsModeStore';
+import { kidsContentFilter } from '../src/services/KidsContentFilter';
 import { ttsService, contentExtractionScript } from '../src/services/TextToSpeechService';
 import { predictiveCacheService } from '../src/services/PredictiveCacheService';
 import { semanticHistoryService, PageContext } from '../src/services/SemanticHistoryService';
@@ -117,6 +124,22 @@ export default function BrowserScreen() {
   const [detectedMedia, setDetectedMedia] = useState<any[]>([]);
   const activeDownloadsCount = useDownloadsStore((s) => Object.keys(s.activeDownloads).length);
   const completedDownloadsCount = useDownloadsStore((s) => s.completedCount);
+
+  // ── Kids Mode state ──
+  const [kidsModeSetupVisible, setKidsModeSetupVisible] = useState(false);
+  const [kidsModeExitVisible, setKidsModeExitVisible] = useState(false);
+  const [kidsModeParentVisible, setKidsModeParentVisible] = useState(false);
+  const kidsModeIsActive = useKidsModeStore(s => s.isActive);
+  const kidsModeConfig = useKidsModeStore(s => s.config);
+  const kidsModeTimeLimitReached = useKidsModeStore(s => s.isTimeLimitReached);
+  const kidsModeInitialize = useKidsModeStore(s => s.initialize);
+  const kidsModeActivate = useKidsModeStore(s => s.activateKidsMode);
+  const kidsModeStartSession = useKidsModeStore(s => s.startSession);
+  const kidsModeEndSession = useKidsModeStore(s => s.endSession);
+  const kidsModeLogPageVisit = useKidsModeStore(s => s.logPageVisit);
+  const kidsModeLogBlocked = useKidsModeStore(s => s.logBlockedAttempt);
+  const kidsModeTodayUsage = useKidsModeStore(s => s.todayUsageMinutes);
+  const kidsModeSessionStart = useKidsModeStore(s => s.sessionStartTime);
 
   // ── Extracted hooks ──
   const { barTranslateY, showBar, hideBar, handleScrollDirection } = useAutoHideBar();
@@ -196,6 +219,9 @@ export default function BrowserScreen() {
     
     // Start tab virtualization service
     tabVirtualizationService.start();
+    
+    // Initialize Kids Mode store
+    kidsModeInitialize();
     
     return () => {
       tabVirtualizationService.stop();
@@ -277,6 +303,64 @@ export default function BrowserScreen() {
     `);
     Alert.alert('Site Data Incinerated', 'All cookies, localStorage, and sessionStorage have been cleared.');
   }, [activeTab?.url]);
+
+  // ── Kids Mode handlers ──
+  const handleKidsModeMenuPress = useCallback(() => {
+    if (kidsModeConfig.isSetup) {
+      // Already set up, activate directly
+      kidsModeActivate();
+      kidsModeStartSession();
+      // Update content filter with custom lists
+      kidsContentFilter.setCustomSites(kidsModeConfig.customBlockedSites, kidsModeConfig.customAllowedSites);
+    } else {
+      setKidsModeSetupVisible(true);
+    }
+  }, [kidsModeConfig, kidsModeActivate, kidsModeStartSession]);
+
+  const handleKidsModeSetupComplete = useCallback(() => {
+    setKidsModeSetupVisible(false);
+    kidsModeActivate();
+    kidsModeStartSession();
+    const currentConfig = useKidsModeStore.getState().config;
+    kidsContentFilter.setCustomSites(currentConfig.customBlockedSites, currentConfig.customAllowedSites);
+  }, [kidsModeActivate, kidsModeStartSession]);
+
+  const handleKidsModeExit = useCallback(() => {
+    setKidsModeExitVisible(false);
+    kidsModeEndSession();
+  }, [kidsModeEndSession]);
+
+  const handleKidsModeNavigate = useCallback((url: string) => {
+    // Enforce SafeSearch
+    const safeUrl = kidsContentFilter.enforceSearchSafety(url);
+    
+    // Check if blocked
+    if (kidsContentFilter.isBlocked(safeUrl, kidsModeConfig.ageGroup)) {
+      kidsModeLogBlocked(safeUrl);
+      // Show blocked page in WebView
+      Alert.alert('Site Blocked', 'This website isn\'t available in Kids Mode.');
+      return;
+    }
+
+    // Log activity
+    kidsModeLogPageVisit(safeUrl, '');
+    navigation.handleNavigate(safeUrl);
+  }, [kidsModeConfig.ageGroup, kidsModeLogBlocked, kidsModeLogPageVisit, navigation]);
+
+  // Kids Mode time limit check
+  useEffect(() => {
+    if (!kidsModeIsActive || kidsModeConfig.timeLimit === 'unlimited') return;
+    const checkInterval = setInterval(() => {
+      let totalMins = kidsModeTodayUsage;
+      if (kidsModeSessionStart) {
+        totalMins += Math.floor((Date.now() - kidsModeSessionStart) / 60000);
+      }
+      if (totalMins >= kidsModeConfig.timeLimit) {
+        useKidsModeStore.setState({ isTimeLimitReached: true });
+      }
+    }, 30000); // Check every 30 seconds
+    return () => clearInterval(checkInterval);
+  }, [kidsModeIsActive, kidsModeConfig.timeLimit, kidsModeTodayUsage, kidsModeSessionStart]);
 
   // ── WebView message handler (dispatcher) ──
   const handleMessage = useCallback((event: any) => {
@@ -440,6 +524,7 @@ export default function BrowserScreen() {
           onAISummarize={() => handleAISummarize(() => setMenuVisible(false))}
           onOpenDownloads={() => setDownloadsModalVisible(true)}
           onDownloadAllLinks={handleDownloadAllLinks}
+          onKidsMode={handleKidsModeMenuPress}
         />
 
         {/* AI Summarizer Drawer */}
@@ -622,6 +707,43 @@ export default function BrowserScreen() {
           visible={downloadProgressSheetVisible || activeDownloadsCount > 0}
           onClose={() => setDownloadProgressSheetVisible(false)}
           onOpenDownloads={() => setDownloadsModalVisible(true)}
+        />
+
+        {/* ══════ KIDS MODE OVERLAY ══════ */}
+        {kidsModeIsActive && !kidsModeTimeLimitReached && (
+          <View style={StyleSheet.absoluteFill} data-testid="kids-mode-overlay">
+            <KidsModeBrowser
+              onNavigate={handleKidsModeNavigate}
+              onShowExitModal={() => setKidsModeExitVisible(true)}
+            />
+          </View>
+        )}
+
+        {/* Kids Mode Time Up Screen */}
+        {kidsModeIsActive && kidsModeTimeLimitReached && (
+          <View style={StyleSheet.absoluteFill} data-testid="kids-time-up-overlay">
+            <KidsModeTimeUp
+              childName={kidsModeConfig.childName}
+              onExitRequest={() => setKidsModeExitVisible(true)}
+            />
+          </View>
+        )}
+
+        {/* Kids Mode Modals */}
+        <KidsModeSetupModal
+          visible={kidsModeSetupVisible}
+          onClose={() => setKidsModeSetupVisible(false)}
+          onSetupComplete={handleKidsModeSetupComplete}
+        />
+        <KidsModeExitModal
+          visible={kidsModeExitVisible}
+          onClose={() => setKidsModeExitVisible(false)}
+          onExit={handleKidsModeExit}
+          onParentDashboard={() => { setKidsModeExitVisible(false); setKidsModeParentVisible(true); }}
+        />
+        <KidsModeParentDashboard
+          visible={kidsModeParentVisible}
+          onClose={() => setKidsModeParentVisible(false)}
         />
       </View>
     </KeyboardAvoidingView>
