@@ -1,79 +1,140 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Aura Browser Image Context Menu Feature
-Tests the health endpoint as specified in the review request.
+Aura Browser Text Selection Menu - Backend API Testing Suite
+Tests the backend health endpoint required for the Text Selection Menu feature.
 """
 
 import requests
 import sys
 import os
+import json
+from typing import Dict, Any, Optional
+import time
 
-# Get backend URL from environment
-BACKEND_URL = None
-frontend_env_path = '/app/frontend/.env'
+# Get backend URL from frontend .env file
+def get_backend_url() -> str:
+    """Extract backend URL from frontend .env file"""
+    try:
+        with open('/app/frontend/.env', 'r') as f:
+            for line in f:
+                if line.startswith('EXPO_PUBLIC_BACKEND_URL='):
+                    url = line.split('=', 1)[1].strip()
+                    return url.rstrip('/') + '/api'
+        
+        # Fallback
+        return 'https://aura-downloads.preview.emergentagent.com/api'
+    except Exception as e:
+        print(f"Error reading .env file: {e}")
+        return 'https://aura-downloads.preview.emergentagent.com/api'
 
-if os.path.exists(frontend_env_path):
-    with open(frontend_env_path, 'r') as f:
-        for line in f:
-            if line.startswith('EXPO_PUBLIC_BACKEND_URL='):
-                BACKEND_URL = line.split('=', 1)[1].strip()
-                break
+BACKEND_URL = get_backend_url()
 
-if not BACKEND_URL:
-    print("❌ EXPO_PUBLIC_BACKEND_URL not found in frontend/.env")
-    sys.exit(1)
+class TestResults:
+    def __init__(self):
+        self.tests_run = 0
+        self.tests_passed = 0
+        self.tests_failed = 0
+        self.failures = []
+        
+    def run_test(self, test_name: str, test_func):
+        """Run a single test and track results"""
+        self.tests_run += 1
+        print(f"\n🧪 Testing: {test_name}")
+        
+        try:
+            result = test_func()
+            if result:
+                print(f"✅ PASSED: {test_name}")
+                self.tests_passed += 1
+                return True
+            else:
+                print(f"❌ FAILED: {test_name}")
+                self.tests_failed += 1
+                self.failures.append(test_name)
+                return False
+        except Exception as e:
+            print(f"❌ ERROR in {test_name}: {str(e)}")
+            self.tests_failed += 1
+            self.failures.append(f"{test_name} - {str(e)}")
+            return False
+    
+    def print_summary(self):
+        """Print test summary"""
+        print(f"\n" + "="*60)
+        print(f"🧪 BACKEND API TEST SUMMARY")
+        print(f"="*60)
+        print(f"Tests Run: {self.tests_run}")
+        print(f"✅ Passed: {self.tests_passed}")
+        print(f"❌ Failed: {self.tests_failed}")
+        
+        if self.failures:
+            print(f"\n❌ FAILURES:")
+            for failure in self.failures:
+                print(f"  - {failure}")
+        
+        success_rate = (self.tests_passed / self.tests_run) * 100 if self.tests_run > 0 else 0
+        print(f"\n📊 Success Rate: {success_rate:.1f}%")
+        
+        if self.tests_failed == 0:
+            print(f"🎉 ALL TESTS PASSED! Backend is ready for Text Selection Menu feature.")
+        else:
+            print(f"⚠️  Some tests failed. Please fix issues before proceeding.")
 
-# Backend API base URL 
-API_BASE_URL = f"{BACKEND_URL}/api"
-print(f"🔗 Testing backend at: {API_BASE_URL}")
-
+# Test functions
 def test_health_endpoint():
     """Test GET /api/health endpoint"""
     try:
-        response = requests.get(f"{API_BASE_URL}/health", timeout=10)
+        print(f"   URL: {BACKEND_URL}/health")
+        response = requests.get(f"{BACKEND_URL}/health", timeout=10)
         
-        if response.status_code == 200:
-            data = response.json()
-            if (data.get('status') == 'healthy' and 
-                data.get('service') == 'Aura Browser API'):
-                print("✅ GET /api/health - Correct Aura Browser response")
-                return True
-            else:
-                print(f"❌ GET /api/health - Unexpected response: {data}")
-                return False
-        else:
-            print(f"❌ GET /api/health - Status {response.status_code}")
+        print(f"   Status Code: {response.status_code}")
+        
+        if response.status_code != 200:
+            print(f"   Expected 200, got {response.status_code}")
             return False
-            
+        
+        data = response.json()
+        print(f"   Response: {data}")
+        
+        # Verify response structure
+        if not isinstance(data, dict):
+            print(f"   Response is not a dictionary")
+            return False
+        
+        if data.get('status') != 'healthy':
+            print(f"   Expected status 'healthy', got '{data.get('status')}'")
+            return False
+        
+        if data.get('service') != 'Aura Browser API':
+            print(f"   Expected service 'Aura Browser API', got '{data.get('service')}'")
+            return False
+        
+        print(f"   ✓ Health check returns correct status and service name")
+        return True
+        
     except requests.exceptions.RequestException as e:
-        print(f"❌ GET /api/health - Request failed: {e}")
+        print(f"   Network error: {e}")
+        return False
+    except json.JSONDecodeError as e:
+        print(f"   JSON decode error: {e}")
         return False
 
-def main():
-    """Run backend API tests"""
-    print("=" * 60)
-    print("🧪 AURA BROWSER IMAGE CONTEXT MENU - BACKEND API TESTING")
-    print("=" * 60)
+def run_backend_tests():
+    """Run all backend API tests"""
+    print(f"🚀 AURA BROWSER TEXT SELECTION MENU - BACKEND API TESTING")
+    print(f"Backend URL: {BACKEND_URL}")
+    print(f"="*60)
     
-    # Test backend endpoints
-    health_result = test_health_endpoint()
+    results = TestResults()
     
-    print("\n" + "=" * 60)
-    print("📊 BACKEND TEST RESULTS:")
-    print("=" * 60)
+    # Test the health endpoint (required for Text Selection Menu)
+    results.run_test("Health Check Endpoint", test_health_endpoint)
     
-    total_tests = 1
-    passed_tests = sum([health_result])
+    # Print summary
+    results.print_summary()
     
-    print(f"✅ Health endpoint: {'PASS' if health_result else 'FAIL'}")
-    print(f"\n🎯 Backend API Results: {passed_tests}/{total_tests} tests passed")
-    
-    if passed_tests == total_tests:
-        print("🎉 All backend API tests PASSED")
-        return 0
-    else:
-        print("❌ Some backend API tests FAILED")
-        return 1
+    return results.tests_failed == 0
 
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == '__main__':
+    success = run_backend_tests()
+    sys.exit(0 if success else 1)

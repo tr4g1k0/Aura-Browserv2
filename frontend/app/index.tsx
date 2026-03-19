@@ -36,6 +36,7 @@ import { QuickConverseView } from '../src/components/QuickConverseView';
 import { DownloadsModal, addDownloadToList } from '../src/components/DownloadsModal';
 import { DownloadNotificationBanner } from '../src/components/DownloadNotificationBanner';
 import { ImageContextMenu } from '../src/components/ImageContextMenu';
+import { TextSelectionMenu } from '../src/components/TextSelectionMenu';
 import { useDownloadsStore } from '../src/store/useDownloadsStore';
 import { useAmbientAwareness } from '../src/hooks/useAmbientAwareness';
 import { usePrivacy } from '../src/context/PrivacyContext';
@@ -456,6 +457,10 @@ export default function BrowserScreen() {
   // Image Context Menu state
   const [selectedImageUrl, setSelectedImageUrl] = useState('');
   const [isImageMenuVisible, setIsImageMenuVisible] = useState(false);
+
+  // Text Selection Menu state
+  const [selectedText, setSelectedText] = useState('');
+  const [isTextMenuVisible, setIsTextMenuVisible] = useState(false);
   
   // Find in Page state
   const [isFindModeActive, setIsFindModeActive] = useState(false);
@@ -1079,6 +1084,16 @@ export default function BrowserScreen() {
         if (data.src) {
           setSelectedImageUrl(data.src);
           setIsImageMenuVisible(true);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+      }
+
+      // Handle Text Selection Long-Press Menu
+      if (data.type === 'TEXT_LONG_PRESS') {
+        console.log('[Browser] Text long-press:', data.text?.substring(0, 50));
+        if (data.text && data.text.trim().length > 0) {
+          setSelectedText(data.text.trim());
+          setIsTextMenuVisible(true);
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
       }
@@ -1821,15 +1836,22 @@ export default function BrowserScreen() {
     }
 
     // ============================================================================
-    // IMAGE LONG-PRESS CONTEXT MENU INTERCEPTOR
-    // Intercepts contextmenu on <img> tags to show Aura custom menu
+    // UNIFIED CONTEXT MENU INTERCEPTOR
+    // Handles both image long-press and text selection long-press
+    // Suppresses the native callout while keeping text highlighting
     // ============================================================================
     scripts += `
       (function() {
         try {
+          // Suppress native touch-callout but keep text selection highlighting
+          var style = document.createElement('style');
+          style.innerHTML = 'body { -webkit-touch-callout: none; }';
+          document.head.appendChild(style);
+
           window.addEventListener('contextmenu', function(e) {
+            // === IMAGE HANDLER ===
+            // Walk up the DOM to find a nearby <img> (handles wrapped images)
             var el = e.target;
-            // Walk up the DOM to find an <img> (handles wrapped images)
             var depth = 0;
             while (el && el.tagName !== 'IMG' && depth < 3) {
               el = el.parentElement;
@@ -1842,11 +1864,22 @@ export default function BrowserScreen() {
                 type: 'IMAGE_LONG_PRESS',
                 src: el.src
               }));
+              return;
+            }
+
+            // === TEXT SELECTION HANDLER ===
+            var selectedText = window.getSelection().toString().trim();
+            if (selectedText.length > 0 && e.target.tagName !== 'IMG') {
+              e.preventDefault();
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'TEXT_LONG_PRESS',
+                text: selectedText
+              }));
             }
           }, true);
-          console.log('[Aura] Image context menu interceptor active');
+          console.log('[Aura] Unified context menu interceptor active');
         } catch(e) {
-          console.log('[Aura] Error setting up image interceptor:', e);
+          console.log('[Aura] Error setting up context interceptor:', e);
         }
       })();
     `;
@@ -2281,6 +2314,18 @@ export default function BrowserScreen() {
           imageUrl={selectedImageUrl}
           onClose={() => setIsImageMenuVisible(false)}
           onDownload={handleFileDownload}
+        />
+
+        {/* Text Selection Context Menu */}
+        <TextSelectionMenu
+          visible={isTextMenuVisible}
+          selectedText={selectedText}
+          onClose={() => { setIsTextMenuVisible(false); setSelectedText(''); }}
+          onNavigate={(url) => {
+            if (activeTab && webViewRef.current) {
+              updateTab(activeTab.id, { url });
+            }
+          }}
         />
 
         {/* TTS Floating Control Bar */}
