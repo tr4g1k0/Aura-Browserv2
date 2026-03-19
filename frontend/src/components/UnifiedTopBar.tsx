@@ -27,6 +27,7 @@ const INACTIVE_GRAY = '#888888';
 
 interface UnifiedTopBarProps {
   onNavigate: (url: string) => void;
+  onHomePress?: () => void;
   onTabsPress: () => void;
   onSettingsPress: () => void;
   onAccessibilityPress: () => void;
@@ -59,6 +60,7 @@ interface UnifiedTopBarProps {
  */
 export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   onNavigate,
+  onHomePress,
   onTabsPress,
   onSettingsPress,
   onAccessibilityPress,
@@ -237,8 +239,8 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
               // Focus the search bar
               inputRef.current?.focus();
             } else {
-              // Navigate to home/new tab - use empty string to show HomeScreen
-              onNavigate('');
+              // Navigate to home/new tab
+              onHomePress?.();
             }
           }}
           activeOpacity={0.7}

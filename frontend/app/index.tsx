@@ -626,6 +626,16 @@ export default function BrowserScreen() {
   // Navigation throttle — minimum 500ms between consecutive navigations
   const lastNavigationTimeRef = useRef<number>(0);
 
+  /**
+   * Go Home — immediately clears the active tab URL to show the Aura home screen
+   */
+  const handleGoHome = useCallback(() => {
+    if (activeTab) {
+      updateTab(activeTab.id, { url: '', title: 'New Tab' });
+      console.log('[Browser] Navigated to home');
+    }
+  }, [activeTab, updateTab]);
+
   const handleNavigate = useCallback((input: string) => {
     if (!input.trim()) return;
     
@@ -1981,6 +1991,7 @@ export default function BrowserScreen() {
         >
           <UnifiedTopBar
             onNavigate={handleNavigate}
+            onHomePress={handleGoHome}
             onTabsPress={openTabsManager}
             onSettingsPress={() => setMenuVisible(true)}
             onAccessibilityPress={() => setAccessibilityModalVisible(true)}
