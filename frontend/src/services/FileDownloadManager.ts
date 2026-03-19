@@ -33,6 +33,51 @@ const DOWNLOAD_CONTENT_TYPES = [
   'video/',
 ];
 
+// ============================================================
+// AUTO-CATEGORIZATION
+// ============================================================
+export type DownloadCategory = 'Documents' | 'Images' | 'Media' | 'Archives' | 'Other';
+
+const CATEGORY_FOLDER_MAP: Record<DownloadCategory, string[]> = {
+  Documents: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'csv', 'json', 'xml'],
+  Images: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'heic'],
+  Media: ['mp3', 'wav', 'aac', 'flac', 'ogg', 'm4a', 'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'],
+  Archives: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2'],
+  Other: ['apk', 'ipa', 'dmg', 'exe'],
+};
+
+const CATEGORY_ICONS: Record<DownloadCategory, string> = {
+  Documents: 'document-text',
+  Images: 'image',
+  Media: 'musical-notes',
+  Archives: 'archive',
+  Other: 'ellipsis-horizontal-circle',
+};
+
+const CATEGORY_COLORS: Record<DownloadCategory, string> = {
+  Documents: '#3B82F6',
+  Images: '#8B5CF6',
+  Media: '#EC4899',
+  Archives: '#6366F1',
+  Other: '#6B7280',
+};
+
+/**
+ * Determine the download category for a filename based on its extension.
+ */
+export function getCategoryForFile(filename: string): DownloadCategory {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  for (const [category, exts] of Object.entries(CATEGORY_FOLDER_MAP)) {
+    if (exts.includes(ext)) return category as DownloadCategory;
+  }
+  return 'Other';
+}
+
+export { CATEGORY_ICONS, CATEGORY_COLORS };
+
+// ============================================================
+// TYPES
+// ============================================================
 export interface DownloadProgress {
   totalBytesWritten: number;
   totalBytesExpectedToWrite: number;
@@ -43,6 +88,7 @@ export interface DownloadResult {
   success: boolean;
   localUri?: string;
   filename?: string;
+  category?: DownloadCategory;
   error?: string;
 }
 
@@ -53,17 +99,37 @@ export type DownloadStatusCallback = (
   error?: string
 ) => void;
 
-/**
- * FileDownloadManager - Handles secure file downloads in the browser
- * 
- * Features:
- * - Detects downloadable URLs by extension and content type
- * - Downloads files to app's document directory
- * - Reports progress for UI feedback
- * - Triggers native sharing for saving files
- */
+// ============================================================
+// FILE DOWNLOAD MANAGER
+// ============================================================
 class FileDownloadManager {
   private activeDownloads: Map<string, FileSystem.DownloadResumable> = new Map();
+  private directoriesReady = false;
+
+  /**
+   * Ensure category subdirectories exist under documentDirectory.
+   * Called once lazily on first download.
+   */
+  private async ensureCategoryDirectories(): Promise<void> {
+    if (this.directoriesReady || Platform.OS === 'web') return;
+    const base = FileSystem.documentDirectory;
+    if (!base) return;
+
+    const folders: DownloadCategory[] = ['Documents', 'Images', 'Media', 'Archives', 'Other'];
+    for (const folder of folders) {
+      const dirUri = `${base}${folder}/`;
+      try {
+        const info = await FileSystem.getInfoAsync(dirUri);
+        if (!info.exists) {
+          await FileSystem.makeDirectoryAsync(dirUri, { intermediates: true });
+          console.log(`[DownloadManager] Created category folder: ${folder}/`);
+        }
+      } catch (e) {
+        console.warn(`[DownloadManager] Could not create folder ${folder}:`, e);
+      }
+    }
+    this.directoriesReady = true;
+  }
 
   /**
    * Check if a URL should trigger a download based on its extension
@@ -72,20 +138,11 @@ class FileDownloadManager {
     try {
       const urlObj = new URL(url);
       const pathname = urlObj.pathname.toLowerCase();
-      
-      // Check for file extensions
       for (const ext of DOWNLOADABLE_EXTENSIONS) {
-        if (pathname.endsWith(ext)) {
-          return true;
-        }
+        if (pathname.endsWith(ext)) return true;
       }
-
-      // Check for download query parameters
       const params = urlObj.searchParams;
-      if (params.has('download') || params.has('dl')) {
-        return true;
-      }
-
+      if (params.has('download') || params.has('dl')) return true;
       return false;
     } catch {
       return false;
@@ -96,33 +153,24 @@ class FileDownloadManager {
    * Extract filename from URL or Content-Disposition header
    */
   extractFilename(url: string, contentDisposition?: string): string {
-    // Try to extract from Content-Disposition header first
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
       if (filenameMatch && filenameMatch[1]) {
         return filenameMatch[1].replace(/['"]/g, '');
       }
     }
-
-    // Extract from URL path
     try {
       const urlObj = new URL(url);
-      const pathname = urlObj.pathname;
-      const segments = pathname.split('/').filter(Boolean);
-      
+      const segments = urlObj.pathname.split('/').filter(Boolean);
       if (segments.length > 0) {
-        const lastSegment = segments[segments.length - 1];
-        // Decode URI component and sanitize
-        return decodeURIComponent(lastSegment).replace(/[<>:"/\\|?*]/g, '_');
+        return decodeURIComponent(segments[segments.length - 1]).replace(/[<>:"/\\|?*]/g, '_');
       }
     } catch {}
-
-    // Fallback to timestamp-based filename
     return `download_${Date.now()}`;
   }
 
   /**
-   * Get file extension from filename or URL
+   * Get file extension from filename
    */
   getFileExtension(filename: string): string {
     const match = filename.match(/\.[a-zA-Z0-9]+$/);
@@ -130,20 +178,34 @@ class FileDownloadManager {
   }
 
   /**
-   * Download a file from URL with progress tracking
+   * Build the local URI for a file, routed to its category subfolder.
+   */
+  private buildCategoryUri(filename: string): { uri: string; category: DownloadCategory } {
+    const category = getCategoryForFile(filename);
+    const base = FileSystem.documentDirectory;
+    return {
+      uri: `${base}${category}/${filename}`,
+      category,
+    };
+  }
+
+  /**
+   * Download a file from URL with progress tracking.
+   * Files are auto-categorised into subdirectories.
    */
   async downloadFile(
     url: string,
     onStatusChange?: DownloadStatusCallback
   ): Promise<DownloadResult> {
-    const filename = this.extractFilename(url);
-    const localUri = `${FileSystem.documentDirectory}${filename}`;
+    await this.ensureCategoryDirectories();
 
-    console.log(`[DownloadManager] Starting download: ${filename}`);
+    const filename = this.extractFilename(url);
+    const { uri: localUri, category } = this.buildCategoryUri(filename);
+
+    console.log(`[DownloadManager] Starting download: ${filename} -> ${category}/`);
     onStatusChange?.('starting', 0, filename);
 
     try {
-      // Create download resumable for progress tracking
       const downloadResumable = FileSystem.createDownloadResumable(
         url,
         localUri,
@@ -152,42 +214,26 @@ class FileDownloadManager {
           const progress = downloadProgress.totalBytesExpectedToWrite > 0
             ? Math.round((downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite) * 100)
             : 0;
-          
           onStatusChange?.('downloading', progress, filename);
         }
       );
 
-      // Store for potential cancellation
       this.activeDownloads.set(url, downloadResumable);
-
-      // Start download
       const result = await downloadResumable.downloadAsync();
-
-      // Clean up
       this.activeDownloads.delete(url);
 
       if (result?.uri) {
-        console.log(`[DownloadManager] Download complete: ${result.uri}`);
+        console.log(`[DownloadManager] Download complete: ${result.uri} [${category}]`);
         onStatusChange?.('complete', 100, filename);
-
-        return {
-          success: true,
-          localUri: result.uri,
-          filename,
-        };
+        return { success: true, localUri: result.uri, filename, category };
       } else {
         throw new Error('Download failed - no URI returned');
       }
     } catch (error: any) {
       console.error(`[DownloadManager] Download error:`, error);
       this.activeDownloads.delete(url);
-      
       onStatusChange?.('error', 0, filename, error.message || 'Download failed');
-
-      return {
-        success: false,
-        error: error.message || 'Download failed',
-      };
+      return { success: false, error: error.message || 'Download failed' };
     }
   }
 
@@ -212,20 +258,16 @@ class FileDownloadManager {
    */
   async shareFile(localUri: string): Promise<boolean> {
     try {
-      // Check if sharing is available
       const isAvailable = await Sharing.isAvailableAsync();
-      
       if (!isAvailable) {
         console.warn('[DownloadManager] Sharing not available on this device');
         return false;
       }
-
       await Sharing.shareAsync(localUri, {
         mimeType: this.getMimeType(localUri),
         dialogTitle: 'Save or Share File',
-        UTI: this.getUTI(localUri), // iOS-specific
+        UTI: this.getUTI(localUri),
       });
-
       console.log(`[DownloadManager] File shared successfully: ${localUri}`);
       return true;
     } catch (error: any) {
@@ -242,26 +284,18 @@ class FileDownloadManager {
     onStatusChange?: DownloadStatusCallback
   ): Promise<DownloadResult> {
     const result = await this.downloadFile(url, onStatusChange);
-
     if (result.success && result.localUri) {
-      // Small delay for UX before sharing
       await new Promise(resolve => setTimeout(resolve, 500));
-      
       const shared = await this.shareFile(result.localUri);
       if (!shared) {
         console.warn('[DownloadManager] Sharing not available, file saved locally');
       }
     }
-
     return result;
   }
 
-  /**
-   * Get MIME type based on file extension
-   */
   private getMimeType(filename: string): string {
     const ext = this.getFileExtension(filename).toLowerCase();
-    
     const mimeTypes: Record<string, string> = {
       '.pdf': 'application/pdf',
       '.doc': 'application/msword',
@@ -270,68 +304,45 @@ class FileDownloadManager {
       '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       '.ppt': 'application/vnd.ms-powerpoint',
       '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      '.txt': 'text/plain',
-      '.csv': 'text/csv',
-      '.json': 'application/json',
-      '.xml': 'application/xml',
+      '.txt': 'text/plain', '.csv': 'text/csv',
+      '.json': 'application/json', '.xml': 'application/xml',
       '.zip': 'application/zip',
       '.rar': 'application/x-rar-compressed',
       '.7z': 'application/x-7z-compressed',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.svg': 'image/svg+xml',
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav',
-      '.mp4': 'video/mp4',
-      '.mov': 'video/quicktime',
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+      '.png': 'image/png', '.gif': 'image/gif',
+      '.webp': 'image/webp', '.svg': 'image/svg+xml',
+      '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
+      '.mp4': 'video/mp4', '.mov': 'video/quicktime',
       '.avi': 'video/x-msvideo',
     };
-
     return mimeTypes[ext] || 'application/octet-stream';
   }
 
-  /**
-   * Get UTI (Uniform Type Identifier) for iOS
-   */
   private getUTI(filename: string): string {
     const ext = this.getFileExtension(filename).toLowerCase();
-    
     const utis: Record<string, string> = {
       '.pdf': 'com.adobe.pdf',
       '.doc': 'com.microsoft.word.doc',
       '.docx': 'org.openxmlformats.wordprocessingml.document',
       '.xls': 'com.microsoft.excel.xls',
       '.xlsx': 'org.openxmlformats.spreadsheetml.sheet',
-      '.jpg': 'public.jpeg',
-      '.jpeg': 'public.jpeg',
-      '.png': 'public.png',
-      '.gif': 'com.compuserve.gif',
-      '.mp3': 'public.mp3',
-      '.mp4': 'public.mpeg-4',
+      '.jpg': 'public.jpeg', '.jpeg': 'public.jpeg',
+      '.png': 'public.png', '.gif': 'com.compuserve.gif',
+      '.mp3': 'public.mp3', '.mp4': 'public.mpeg-4',
       '.zip': 'public.zip-archive',
     };
-
     return utis[ext] || 'public.data';
   }
 
-  /**
-   * Check file info at local path
-   */
   async getFileInfo(localUri: string): Promise<FileSystem.FileInfo | null> {
     try {
-      const info = await FileSystem.getInfoAsync(localUri);
-      return info;
+      return await FileSystem.getInfoAsync(localUri);
     } catch {
       return null;
     }
   }
 
-  /**
-   * Delete a downloaded file
-   */
   async deleteFile(localUri: string): Promise<boolean> {
     try {
       await FileSystem.deleteAsync(localUri, { idempotent: true });
@@ -343,16 +354,11 @@ class FileDownloadManager {
     }
   }
 
-  /**
-   * List all downloaded files
-   */
   async listDownloads(): Promise<string[]> {
     try {
       const directory = FileSystem.documentDirectory;
       if (!directory) return [];
-      
-      const files = await FileSystem.readDirectoryAsync(directory);
-      return files;
+      return await FileSystem.readDirectoryAsync(directory);
     } catch {
       return [];
     }

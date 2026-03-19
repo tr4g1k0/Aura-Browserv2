@@ -6,8 +6,8 @@
  * - Search bar to filter by filename
  * - Filter chips by file type (All, Docs, Images, Audio, Video, Archives)
  * - Batch select mode for bulk delete
- * - Tap to open/share files
- * - Delete individual files
+ * - AUTO-CATEGORIZATION: Group-by-Category view with collapsible section headers
+ * - Tap to open/share files, delete individual/bulk
  * - Aura aesthetic (deep indigo background)
  */
 
@@ -18,6 +18,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  SectionList,
   Modal,
   Platform,
   Alert,
@@ -31,15 +32,21 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, { 
-  FadeIn, 
+import Animated, {
+  FadeIn,
   FadeInDown,
   FadeOut,
   Layout,
 } from 'react-native-reanimated';
 import { useDownloadsStore, ActiveDownload } from '../store/useDownloadsStore';
+import {
+  getCategoryForFile,
+  DownloadCategory,
+  CATEGORY_ICONS,
+  CATEGORY_COLORS,
+} from '../services/FileDownloadManager';
 
-// Colors - Aura Aesthetic
+// Colors
 const DEEP_INDIGO = '#0A0A0F';
 const CARD_DARK = '#141419';
 const CARD_ACTIVE = '#1A1A24';
@@ -52,10 +59,9 @@ const SEARCH_BG = '#1C1C26';
 const CHIP_BG = '#1C1C26';
 const CHIP_ACTIVE_BG = 'rgba(0, 242, 255, 0.15)';
 
-// Storage key for downloads list
 const DOWNLOADS_STORAGE_KEY = '@aura_downloads_list';
 
-// Download item interface
+// Download item interface — now includes category
 export interface DownloadItem {
   id: string;
   filename: string;
@@ -63,6 +69,7 @@ export interface DownloadItem {
   date: string;
   size?: number;
   mimeType?: string;
+  category?: DownloadCategory;
 }
 
 interface DownloadsModalProps {
@@ -70,7 +77,7 @@ interface DownloadsModalProps {
   onClose: () => void;
 }
 
-// File type categories for filter
+// File type filter categories
 type FileCategory = 'all' | 'documents' | 'images' | 'audio' | 'video' | 'archives';
 
 const FILE_CATEGORIES: { key: FileCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -91,7 +98,9 @@ const CATEGORY_EXTENSIONS: Record<FileCategory, string[]> = {
   archives: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2'],
 };
 
-// Get file icon based on extension
+// ============================================================
+// UTILS
+// ============================================================
 const getFileIcon = (filename: string): keyof typeof Ionicons.glyphMap => {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -107,7 +116,6 @@ const getFileIcon = (filename: string): keyof typeof Ionicons.glyphMap => {
   return iconMap[ext] || 'document';
 };
 
-// Get file color based on type
 const getFileColor = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   const colorMap: Record<string, string> = {
@@ -139,16 +147,8 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-const getFileCategory = (filename: string): FileCategory => {
-  const ext = filename.split('.').pop()?.toLowerCase() || '';
-  for (const [cat, exts] of Object.entries(CATEGORY_EXTENSIONS)) {
-    if (cat !== 'all' && exts.includes(ext)) return cat as FileCategory;
-  }
-  return 'documents'; // fallback
-};
-
 // ============================================================
-// ACTIVE DOWNLOAD ROW — shows live progress
+// ACTIVE DOWNLOAD ROW
 // ============================================================
 const ActiveDownloadRow: React.FC<{ item: ActiveDownload }> = ({ item }) => {
   const icon = getFileIcon(item.filename);
@@ -196,9 +196,11 @@ const DownloadItemRow: React.FC<{
   isSelected: boolean;
   isBatchMode: boolean;
   onToggleSelect: () => void;
-}> = ({ item, onPress, onDelete, isSelected, isBatchMode, onToggleSelect }) => {
+  showCategory?: boolean;
+}> = ({ item, onPress, onDelete, isSelected, isBatchMode, onToggleSelect, showCategory }) => {
   const icon = getFileIcon(item.filename);
   const iconColor = getFileColor(item.filename);
+  const cat = item.category || getCategoryForFile(item.filename);
 
   return (
     <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)} layout={Layout.springify()}>
@@ -224,6 +226,14 @@ const DownloadItemRow: React.FC<{
         <View style={styles.fileInfo}>
           <Text style={styles.fileName} numberOfLines={1}>{item.filename}</Text>
           <View style={styles.fileMeta}>
+            {showCategory && (
+              <>
+                <View style={[styles.categoryBadge, { backgroundColor: `${CATEGORY_COLORS[cat]}20` }]}>
+                  <Text style={[styles.categoryBadgeText, { color: CATEGORY_COLORS[cat] }]}>{cat}</Text>
+                </View>
+                <Text style={styles.metaDot}>•</Text>
+              </>
+            )}
             <Text style={styles.fileDate}>{formatDate(item.date)}</Text>
             {item.size ? (
               <>
@@ -244,6 +254,36 @@ const DownloadItemRow: React.FC<{
         )}
       </TouchableOpacity>
     </Animated.View>
+  );
+};
+
+// ============================================================
+// CATEGORY SECTION HEADER (for grouped view)
+// ============================================================
+const CategorySectionHeader: React.FC<{
+  category: DownloadCategory;
+  count: number;
+  collapsed: boolean;
+  onToggle: () => void;
+}> = ({ category, count, collapsed, onToggle }) => {
+  const color = CATEGORY_COLORS[category];
+  const icon = CATEGORY_ICONS[category] as keyof typeof Ionicons.glyphMap;
+  return (
+    <TouchableOpacity style={styles.sectionHeader} onPress={onToggle} activeOpacity={0.7} data-testid={`category-header-${category}`}>
+      <View style={[styles.sectionHeaderIcon, { backgroundColor: `${color}18` }]}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <Text style={styles.sectionHeaderTitle}>{category}</Text>
+      <View style={styles.sectionHeaderRight}>
+        <Text style={[styles.sectionHeaderCount, { color }]}>{count}</Text>
+        <Ionicons
+          name={collapsed ? 'chevron-forward' : 'chevron-down'}
+          size={16}
+          color={TEXT_MUTED}
+          style={{ marginLeft: 4 }}
+        />
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -271,6 +311,10 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = ({ visible, onClose
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FileCategory>('all');
 
+  // View mode: list (flat) or grouped (by category)
+  const [isGrouped, setIsGrouped] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<DownloadCategory>>(new Set());
+
   // Batch select
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -296,6 +340,20 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = ({ visible, onClose
     return list;
   }, [downloads, searchQuery, activeFilter]);
 
+  // Grouped sections for SectionList
+  const groupedSections = useMemo(() => {
+    const groups: Record<DownloadCategory, DownloadItem[]> = {
+      Documents: [], Images: [], Media: [], Archives: [], Other: [],
+    };
+    for (const item of filteredDownloads) {
+      const cat = item.category || getCategoryForFile(item.filename);
+      groups[cat].push(item);
+    }
+    return (Object.entries(groups) as [DownloadCategory, DownloadItem[]][])
+      .filter(([, items]) => items.length > 0)
+      .map(([cat, items]) => ({ title: cat, data: collapsedCategories.has(cat) ? [] : items, count: items.length }));
+  }, [filteredDownloads, collapsedCategories]);
+
   const hasFilter = searchQuery.trim().length > 0 || activeFilter !== 'all';
 
   // Load downloads from storage
@@ -309,7 +367,9 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = ({ visible, onClose
           try {
             const info = await FileSystem.getInfoAsync(item.uri);
             if (info.exists) {
-              validDownloads.push({ ...item, size: info.size });
+              // Backfill category for legacy items that don't have it
+              const category = item.category || getCategoryForFile(item.filename);
+              validDownloads.push({ ...item, size: info.size, category });
             }
           } catch {
             // File gone, skip
@@ -457,10 +517,19 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = ({ visible, onClose
     setSelectedIds(new Set());
   }, []);
 
+  const toggleCategoryCollapse = useCallback((cat: DownloadCategory) => {
+    Haptics.selectionAsync();
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  }, []);
+
   // ============================================================
-  // RENDER
+  // RENDER HELPERS
   // ============================================================
-  const renderHeader = () => (
+  const renderListHeader = () => (
     <>
       {/* Active Downloads Section */}
       {activeList.length > 0 && (
@@ -489,23 +558,33 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = ({ visible, onClose
         )}
       </View>
 
-      {/* Filter Chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-        {FILE_CATEGORIES.map((cat) => {
-          const isActive = activeFilter === cat.key;
-          return (
-            <TouchableOpacity
-              key={cat.key}
-              style={[styles.chip, isActive && styles.chipActive]}
-              onPress={() => setActiveFilter(cat.key)}
-              data-testid={`filter-chip-${cat.key}`}
-            >
-              <Ionicons name={cat.icon} size={14} color={isActive ? AURA_BLUE : TEXT_MUTED} style={{ marginRight: 4 }} />
-              <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{cat.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* Filter Chips + Group Toggle */}
+      <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+          {FILE_CATEGORIES.map((cat) => {
+            const isActive = activeFilter === cat.key;
+            return (
+              <TouchableOpacity
+                key={cat.key}
+                style={[styles.chip, isActive && styles.chipActive]}
+                onPress={() => setActiveFilter(cat.key)}
+                data-testid={`filter-chip-${cat.key}`}
+              >
+                <Ionicons name={cat.icon} size={14} color={isActive ? AURA_BLUE : TEXT_MUTED} style={{ marginRight: 4 }} />
+                <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{cat.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        {/* Group toggle */}
+        <TouchableOpacity
+          style={[styles.groupToggle, isGrouped && styles.groupToggleActive]}
+          onPress={() => { Haptics.selectionAsync(); setIsGrouped(!isGrouped); }}
+          data-testid="toggle-group-view"
+        >
+          <Ionicons name={isGrouped ? 'folder-open' : 'folder-outline'} size={16} color={isGrouped ? AURA_BLUE : TEXT_MUTED} />
+        </TouchableOpacity>
+      </View>
 
       {/* Count / Batch bar */}
       {filteredDownloads.length > 0 && (
@@ -523,6 +602,7 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = ({ visible, onClose
           ) : (
             <Text style={styles.countText}>
               {filteredDownloads.length} {filteredDownloads.length === 1 ? 'file' : 'files'}
+              {isGrouped ? ` in ${groupedSections.length} ${groupedSections.length === 1 ? 'category' : 'categories'}` : ''}
             </Text>
           )}
         </View>
@@ -530,6 +610,21 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = ({ visible, onClose
     </>
   );
 
+  const renderItem = ({ item }: { item: DownloadItem }) => (
+    <DownloadItemRow
+      item={item}
+      onPress={() => handleOpenFile(item)}
+      onDelete={() => handleDeleteFile(item)}
+      isSelected={selectedIds.has(item.id)}
+      isBatchMode={isBatchMode}
+      onToggleSelect={() => toggleSelect(item.id)}
+      showCategory={!isGrouped}
+    />
+  );
+
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -555,22 +650,36 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = ({ visible, onClose
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={AURA_BLUE} />
           </View>
+        ) : isGrouped && filteredDownloads.length > 0 ? (
+          /* ——— GROUPED VIEW (SectionList) ——— */
+          <SectionList
+            sections={groupedSections}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={renderListHeader}
+            ListEmptyComponent={<EmptyState hasFilter={hasFilter} />}
+            renderSectionHeader={({ section }) => (
+              <CategorySectionHeader
+                category={section.title as DownloadCategory}
+                count={section.count}
+                collapsed={collapsedCategories.has(section.title as DownloadCategory)}
+                onToggle={() => toggleCategoryCollapse(section.title as DownloadCategory)}
+              />
+            )}
+            renderItem={renderItem}
+            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
+            showsVerticalScrollIndicator={false}
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            stickySectionHeadersEnabled={false}
+          />
         ) : (
+          /* ——— FLAT VIEW (FlatList) ——— */
           <FlatList
             data={filteredDownloads}
             keyExtractor={(item) => item.id}
-            ListHeaderComponent={renderHeader}
+            ListHeaderComponent={renderListHeader}
             ListEmptyComponent={<EmptyState hasFilter={hasFilter} />}
-            renderItem={({ item }) => (
-              <DownloadItemRow
-                item={item}
-                onPress={() => handleOpenFile(item)}
-                onDelete={() => handleDeleteFile(item)}
-                isSelected={selectedIds.has(item.id)}
-                isBatchMode={isBatchMode}
-                onToggleSelect={() => toggleSelect(item.id)}
-              />
-            )}
+            renderItem={renderItem}
             contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
             showsVerticalScrollIndicator={false}
             refreshing={isRefreshing}
@@ -589,15 +698,17 @@ export const addDownloadToList = async (filename: string, uri: string, size?: nu
   try {
     const stored = await AsyncStorage.getItem(DOWNLOADS_STORAGE_KEY);
     const downloads: DownloadItem[] = stored ? JSON.parse(stored) : [];
+    const category = getCategoryForFile(filename);
     const newItem: DownloadItem = {
       id: `download_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       filename, uri,
       date: new Date().toISOString(),
       size,
+      category,
     };
     downloads.unshift(newItem);
-    await AsyncStorage.setItem(DOWNLOADS_STORAGE_KEY, JSON.stringify(downloads.slice(0, 100)));
-    console.log('[DownloadsManager] Added download to list:', filename);
+    await AsyncStorage.setItem(DOWNLOADS_STORAGE_KEY, JSON.stringify(downloads.slice(0, 200)));
+    console.log(`[DownloadsManager] Added download to list: ${filename} [${category}]`);
   } catch (error) {
     console.error('[DownloadsManager] Failed to add download:', error);
   }
@@ -644,8 +755,9 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 15, color: TEXT_WHITE, padding: 0, ...FONT_FAMILY },
 
-  // Filter chips
-  chipsRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
+  // Filter chips row with group toggle
+  filterRow: { flexDirection: 'row', alignItems: 'center', paddingRight: 8 },
+  chipsRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, flexGrow: 1 },
   chip: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: CHIP_BG, borderRadius: 20,
@@ -655,6 +767,14 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: CHIP_ACTIVE_BG, borderColor: AURA_BLUE },
   chipText: { fontSize: 12, fontWeight: '600', color: TEXT_MUTED, ...FONT_FAMILY },
   chipTextActive: { color: AURA_BLUE },
+
+  // Group toggle
+  groupToggle: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: CHIP_BG, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'transparent',
+  },
+  groupToggleActive: { backgroundColor: CHIP_ACTIVE_BG, borderColor: AURA_BLUE },
 
   // Count / batch bar
   countRow: { paddingHorizontal: 20, paddingVertical: 8 },
@@ -677,6 +797,23 @@ const styles = StyleSheet.create({
   },
   progressBarFill: { height: '100%', backgroundColor: AURA_BLUE, borderRadius: 2 },
 
+  // Section header (grouped view)
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 4, marginTop: 8, marginBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  sectionHeaderIcon: {
+    width: 28, height: 28, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center', marginRight: 10,
+  },
+  sectionHeaderTitle: {
+    flex: 1, fontSize: 14, fontWeight: '700', color: TEXT_WHITE,
+    letterSpacing: 0.5, ...FONT_FAMILY,
+  },
+  sectionHeaderRight: { flexDirection: 'row', alignItems: 'center' },
+  sectionHeaderCount: { fontSize: 13, fontWeight: '700' },
+
   // Loading
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
@@ -697,10 +834,16 @@ const styles = StyleSheet.create({
   },
   fileInfo: { flex: 1, marginRight: 12 },
   fileName: { fontSize: 15, fontWeight: '600', color: TEXT_WHITE, marginBottom: 4, ...FONT_FAMILY },
-  fileMeta: { flexDirection: 'row', alignItems: 'center' },
+  fileMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   fileDate: { fontSize: 12, color: TEXT_MUTED },
   metaDot: { fontSize: 12, color: TEXT_MUTED, marginHorizontal: 6 },
   fileSize: { fontSize: 12, color: TEXT_MUTED },
+  categoryBadge: {
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  },
+  categoryBadgeText: {
+    fontSize: 10, fontWeight: '700', letterSpacing: 0.5,
+  },
   deleteButton: {
     width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
     borderRadius: 20, backgroundColor: 'rgba(239,68,68,0.1)',
