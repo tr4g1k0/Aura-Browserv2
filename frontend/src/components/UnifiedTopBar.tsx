@@ -237,8 +237,8 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
               // Focus the search bar
               inputRef.current?.focus();
             } else {
-              // Navigate to home/new tab
-              onNavigate('about:newtab');
+              // Navigate to home/new tab - use empty string to show HomeScreen
+              onNavigate('');
             }
           }}
           activeOpacity={0.7}

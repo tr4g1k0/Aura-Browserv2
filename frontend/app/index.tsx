@@ -271,8 +271,7 @@ export default function BrowserScreen() {
   const isNewTabPage = !activeTab?.url || 
                        activeTab.url === 'about:blank' || 
                        activeTab.url === 'about:newtab' ||
-                       activeTab.url === '' ||
-                       activeTab.url === 'https://www.google.com';
+                       activeTab.url === '';
 
   // ============================================================
   // SLIDE & FADE TRANSITION ANIMATION

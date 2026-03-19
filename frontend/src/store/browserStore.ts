@@ -171,7 +171,7 @@ interface BrowserState {
   persistState: () => Promise<void>;
 }
 
-const DEFAULT_URL = 'https://www.google.com';
+const DEFAULT_URL = ''; // Empty string triggers NewTabPage instead of Google
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
