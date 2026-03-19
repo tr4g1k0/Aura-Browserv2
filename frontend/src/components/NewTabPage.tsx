@@ -450,6 +450,57 @@ const AddButtonOrb: React.FC<{
 };
 
 // ============================================================
+// PRIVACY METRICS DASHBOARD - Glassmorphic Monolith
+// ============================================================
+const PrivacyMetricsDashboard: React.FC = () => {
+  // Hardcoded metrics for UI lockdown - will be wired to privacy engine later
+  const metrics = {
+    trackersBlocked: '1,492',
+    adsStopped: '384',
+    connectionStatus: 'Encrypted',
+  };
+
+  return (
+    <Animated.View 
+      entering={FadeIn.delay(400).duration(600)}
+      style={styles.metricsDashboard}
+    >
+      {/* Header - Status Indicator */}
+      <View style={styles.metricsHeader}>
+        <View style={styles.statusIndicator}>
+          <View style={styles.statusDotGlow} />
+          <View style={styles.statusDot} />
+        </View>
+        <Text style={styles.statusText}>AURA SHIELD ACTIVE</Text>
+      </View>
+
+      {/* Metrics Grid */}
+      <View style={styles.metricsGrid}>
+        {/* Column 1: Trackers Blocked */}
+        <View style={styles.metricColumn}>
+          <Text style={styles.metricValue}>{metrics.trackersBlocked}</Text>
+          <Text style={styles.metricLabel}>Trackers Blocked</Text>
+        </View>
+
+        {/* Column 2: Ads Stopped */}
+        <View style={styles.metricColumn}>
+          <Text style={styles.metricValue}>{metrics.adsStopped}</Text>
+          <Text style={styles.metricLabel}>Ads Stopped</Text>
+        </View>
+
+        {/* Column 3: Connection Status */}
+        <View style={styles.metricColumn}>
+          <Text style={[styles.metricValue, styles.metricValueCyan]}>
+            {metrics.connectionStatus}
+          </Text>
+          <Text style={styles.metricLabel}>Connection</Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
+
+// ============================================================
 // QR SCANNER MODAL
 // ============================================================
 const QRScannerModal: React.FC<{
@@ -1190,6 +1241,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, on
           </ScrollView>
         </Animated.View>
 
+        {/* PRIVACY METRICS DASHBOARD - Glassmorphic Monolith */}
+        <PrivacyMetricsDashboard />
+
         {/* Spacer to push dock to bottom */}
         <View style={styles.flexSpacer} />
 
@@ -1519,6 +1573,100 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.5)',
+  },
+
+  // ============== PRIVACY METRICS DASHBOARD ==============
+  metricsDashboard: {
+    alignSelf: 'center',
+    width: '90%',
+    marginTop: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 24,
+  },
+  metricsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusIndicator: {
+    width: 10,
+    height: 10,
+    marginRight: 10,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDotGlow: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: SHIELD_GREEN,
+    opacity: 0.4,
+    ...Platform.select({
+      ios: {
+        shadowColor: SHIELD_GREEN,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 6,
+      },
+      web: {
+        boxShadow: `0 0 10px ${SHIELD_GREEN}`,
+      },
+    }),
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: SHIELD_GREEN,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: '#666',
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  metricColumn: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  metricValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 6,
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
+  },
+  metricValueCyan: {
+    color: AURA_BLUE,
+  },
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#666',
+    textAlign: 'center',
+    ...Platform.select({
+      ios: { fontFamily: 'System' },
+      android: { fontFamily: 'Roboto' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+    }),
   },
 
   // ============== FLOATING ISLAND DOCK ==============
