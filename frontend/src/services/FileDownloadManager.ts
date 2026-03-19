@@ -4,6 +4,10 @@ import { Platform } from 'react-native';
 import { downloadNotificationService } from './DownloadNotificationService';
 import { resumableDownloadService, DownloadRecord } from './ResumableDownloadService';
 
+// Type aliases for expo-file-system legacy API
+const documentDirectory = (FileSystem as any).documentDirectory as string | null;
+type DownloadResumable = any;
+
 // Common downloadable file extensions
 const DOWNLOADABLE_EXTENSIONS = [
   // Documents
@@ -105,7 +109,7 @@ export type DownloadStatusCallback = (
 // FILE DOWNLOAD MANAGER
 // ============================================================
 class FileDownloadManager {
-  private activeDownloads: Map<string, FileSystem.DownloadResumable> = new Map();
+  private activeDownloads: Map<string, DownloadResumable> = new Map();
   private directoriesReady = false;
   private isInitialized = false;
 
@@ -138,7 +142,7 @@ class FileDownloadManager {
    */
   private async ensureCategoryDirectories(): Promise<void> {
     if (this.directoriesReady || Platform.OS === 'web') return;
-    const base = FileSystem.documentDirectory;
+    const base = documentDirectory;
     if (!base) return;
 
     const folders: DownloadCategory[] = ['Documents', 'Images', 'Media', 'Archives', 'Other'];
@@ -208,7 +212,7 @@ class FileDownloadManager {
    */
   private buildCategoryUri(filename: string): { uri: string; category: DownloadCategory } {
     const category = getCategoryForFile(filename);
-    const base = FileSystem.documentDirectory;
+    const base = documentDirectory;
     return {
       uri: `${base}${category}/${filename}`,
       category,
@@ -382,7 +386,7 @@ class FileDownloadManager {
 
   async listDownloads(): Promise<string[]> {
     try {
-      const directory = FileSystem.documentDirectory;
+      const directory = documentDirectory;
       if (!directory) return [];
       return await FileSystem.readDirectoryAsync(directory);
     } catch {

@@ -23,6 +23,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AURA_BLUE = '#00F2FF';  // Official Aura accent color
 const AURA_BLUE_GLOW = 'rgba(0, 242, 255, 0.3)';
 const DANGER_RED = '#FF4444';
+const CYAN = '#00FFFF';
 const TEXT_DARK = '#1A1A1A';
 const TEXT_SECONDARY = '#555555';
 const GOLD = '#FFD700';
@@ -302,7 +303,8 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     onPress: () => void;
     isDanger?: boolean;
     emoji?: string;
-  }> = ({ icon, label, onPress, isDanger = false, emoji }) => (
+    isActive?: boolean;
+  }> = ({ icon, label, onPress, isDanger = false, emoji, isActive = false }) => (
     <TouchableOpacity
       style={styles.menuRow}
       onPress={onPress}
@@ -318,7 +320,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
           <Ionicons
             name={icon as any}
             size={18}
-            color={isDanger ? DANGER_RED : TEXT_SECONDARY}
+            color={isDanger ? DANGER_RED : isActive ? CYAN : TEXT_SECONDARY}
           />
         )}
       </View>

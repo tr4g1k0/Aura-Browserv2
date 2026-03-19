@@ -129,7 +129,7 @@ class PredictiveCacheService {
   private networkState: NetInfoState | null = null;
   private batteryLevel: number = 1;
   private networkUnsubscribe: (() => void) | null = null;
-  private batterySubscription: Battery.BatteryLevelUpdateListener | null = null;
+  private batterySubscription: any = null;
 
   constructor() {
     this.initializeMonitoring();

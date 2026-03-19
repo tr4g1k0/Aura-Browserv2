@@ -141,7 +141,7 @@ export const LiveCaptionsOverlay: React.FC<LiveCaptionsOverlayProps> = ({
   // Auto-scroll to end when new words arrive
   useEffect(() => {
     if (scrollViewRef.current && words.length > 0) {
-      scrollViewRef.current.scrollToEnd({ animated: true });
+      scrollViewRef.current?.scrollToEnd({ animated: true });
     }
   }, [words.length]);
 

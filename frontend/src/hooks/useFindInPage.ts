@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 export function useFindInPage(webViewRef: RefObject<any>) {
   const [isFindModeActive, setIsFindModeActive] = useState(false);
   const [findText, setFindText] = useState('');
-  const findInputRef = useRef<TextInput>(null);
+  const findInputRef = useRef<TextInput | null>(null);
 
   const handleOpenFindInPage = useCallback(() => {
     console.log('[Find in Page] Opening search bar');

@@ -11,7 +11,7 @@ export function useAISummarize(
   const [aiSummaryText, setAiSummaryText] = useState('');
   const [isCopied, setIsCopied] = useState(false);
 
-  const AI_API_KEY = '';
+  const AI_API_KEY: string = '';
 
   const extractTextScript = `
     try {

@@ -418,7 +418,7 @@ export default function BrowserScreen() {
       if (kidsModeSessionStart) {
         totalMins += Math.floor((Date.now() - kidsModeSessionStart) / 60000);
       }
-      if (totalMins >= kidsModeConfig.timeLimit) {
+      if (totalMins >= (kidsModeConfig.timeLimit as number)) {
         useKidsModeStore.setState({ isTimeLimitReached: true });
       }
     }, 30000); // Check every 30 seconds

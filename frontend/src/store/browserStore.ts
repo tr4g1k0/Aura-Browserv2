@@ -57,6 +57,7 @@ export interface BrowserSettings {
   liveCaptioningEnabled: boolean;
   ambientAwarenessEnabled: boolean;
   predictiveCachingEnabled: boolean;
+  quickConverseEnabled: boolean;
 }
 
 export interface CachedPage {

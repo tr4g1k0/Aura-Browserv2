@@ -97,7 +97,7 @@ const GhostModeEntryAnimationComponent: React.FC<Props> = ({ mode, onComplete })
   );
 };
 
-const DissolveParticle = ({ angle, dissolve }: { angle: number; dissolve: Animated.SharedValue<number> }) => {
+const DissolveParticle = ({ angle, dissolve }: { angle: number; dissolve: any }) => {
   const style = useAnimatedStyle(() => {
     const dist = interpolate(dissolve.value, [0, 1], [0, 120]);
     return {

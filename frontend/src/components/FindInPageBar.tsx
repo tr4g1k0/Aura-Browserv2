@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 interface FindInPageBarProps {
   findText: string;
   setFindText: (text: string) => void;
-  findInputRef: React.RefObject<TextInput>;
+  findInputRef: React.RefObject<TextInput | null>;
   onFindNext: () => void;
   onClose: () => void;
 }

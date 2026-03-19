@@ -863,8 +863,7 @@ const styles = StyleSheet.create({
       android: { fontFamily: 'Roboto' },
       web: { 
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        outlineStyle: 'none',
-      },
+      } as any,
     }),
   },
   clearButton: {

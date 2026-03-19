@@ -232,7 +232,7 @@ export const PrivacyManifestModal: React.FC<PrivacyManifestModalProps> = ({
             {/* Agent Memory Section */}
             <View style={styles.memorySection}>
               <View style={styles.memorySectionHeader}>
-                <Ionicons name="brain-outline" size={20} color="#EC4899" />
+                <Ionicons name="analytics-outline" size={20} color="#EC4899" />
                 <Text style={styles.memorySectionTitle}>Agent Memory</Text>
               </View>
               

@@ -14,6 +14,11 @@ import * as FileSystem from 'expo-file-system';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import { downloadNotificationService } from './DownloadNotificationService';
 
+// Type aliases for expo-file-system legacy API
+const documentDirectory = (FileSystem as any).documentDirectory as string | null;
+type DownloadResumable = any;
+type DownloadProgressData = { totalBytesWritten: number; totalBytesExpectedToWrite: number };
+
 // Safe AsyncStorage import
 let AsyncStorage: any = null;
 try {
@@ -60,7 +65,7 @@ export interface DownloadProgress {
 
 const STORAGE_KEY = '@aura_download_records';
 const SAVE_INTERVAL = 5000; // Save progress every 5 seconds
-const DOWNLOADS_DIR = `${FileSystem.documentDirectory}downloads/`;
+const DOWNLOADS_DIR = `${documentDirectory}downloads/`;
 
 // ============================================================================
 // SERVICE
@@ -68,7 +73,7 @@ const DOWNLOADS_DIR = `${FileSystem.documentDirectory}downloads/`;
 
 class ResumableDownloadService {
   private downloadRecords: Map<string, DownloadRecord> = new Map();
-  private activeDownloads: Map<string, FileSystem.DownloadResumable> = new Map();
+  private activeDownloads: Map<string, DownloadResumable> = new Map();
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> = new Map();
   private saveTimeout: NodeJS.Timeout | null = null;
   private networkUnsubscribe: (() => void) | null = null;
@@ -319,7 +324,7 @@ class ResumableDownloadService {
       }
 
       // Create download callback
-      const callback = (progress: FileSystem.DownloadProgressData) => {
+      const callback = (progress: DownloadProgressData) => {
         this.handleProgress(record.id, progress);
       };
 
@@ -369,7 +374,7 @@ class ResumableDownloadService {
    */
   private handleProgress(
     downloadId: string,
-    progress: FileSystem.DownloadProgressData
+    progress: DownloadProgressData
   ): void {
     const record = this.downloadRecords.get(downloadId);
     if (!record) return;

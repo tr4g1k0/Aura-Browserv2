@@ -616,6 +616,14 @@ const QRScannerModal: React.FC<{ visible: boolean; onClose: () => void; onScan: 
 // ================================================================
 // MAIN PAGE COMPONENT
 // ================================================================
+interface NewTabPageProps {
+  onNavigate: (url: string) => void;
+  onSearch: (query: string) => void;
+  onOpenMenu?: () => void;
+  onAISummarize?: () => void;
+  onAccessibility?: () => void;
+}
+
 const NewTabPageComponent: React.FC<NewTabPageProps> = ({
   onNavigate, onSearch, onOpenMenu, onAISummarize, onAccessibility,
 }) => {
@@ -635,14 +643,6 @@ const NewTabPageComponent: React.FC<NewTabPageProps> = ({
       Alert.alert('Delete Shortcut', `Delete "${link.title}"?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); removeQuickLink(link.id); } }]);
     }
   }, [removeQuickLink]);
-
-  interface NewTabPageProps {
-    onNavigate: (url: string) => void;
-    onSearch: (query: string) => void;
-    onOpenMenu?: () => void;
-    onAISummarize?: () => void;
-    onAccessibility?: () => void;
-  }
 
   return (
     <View style={s.container} data-testid="home-screen">

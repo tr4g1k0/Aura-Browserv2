@@ -1,22 +1,26 @@
 // Model Download Manager
 // Handles downloading, caching, and managing ONNX model files
 
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ModelConfig, ModelDownloadProgress, ModelStatus } from './types';
 import { MODEL_REGISTRY, getModelById } from './models.config';
 
-const MODELS_DIRECTORY = `${FileSystem.documentDirectory}models/`;
+const MODELS_DIRECTORY = Platform.OS === 'web' ? '' : `${(FileSystem as any).documentDirectory || ''}models/`;
 
 export class ModelDownloadManager {
   private downloadCallbacks: Map<string, ((progress: ModelDownloadProgress) => void)[]> = new Map();
   private modelStatus: Map<string, ModelStatus> = new Map();
-  private activeDownloads: Map<string, FileSystem.DownloadResumable> = new Map();
+  private activeDownloads: Map<string, any> = new Map();
 
   constructor() {
-    this.initializeModelsDirectory();
+    if (Platform.OS !== 'web') {
+      this.initializeModelsDirectory();
+    }
   }
 
   private async initializeModelsDirectory(): Promise<void> {
+    if (Platform.OS === 'web') return;
     try {
       const dirInfo = await FileSystem.getInfoAsync(MODELS_DIRECTORY);
       if (!dirInfo.exists) {

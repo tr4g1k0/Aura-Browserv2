@@ -58,7 +58,7 @@ export function useBrowserNavigation(deps: NavigationDeps) {
     }
     lastNavigationTimeRef.current = now;
     
-    const parsedUrl = parseUrlInput(input, userSettings.defaultSearchEngine);
+    const parsedUrl = parseUrlInput(input, userSettings.defaultSearchEngine as any);
     
     if (parsedUrl && activeTab) {
       console.log(`[Browser] Navigating to: ${parsedUrl}`);

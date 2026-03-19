@@ -44,6 +44,9 @@ const createMockTabs = (): Tab[] => [
     isActive: false,
     canGoBack: true,
     canGoForward: false,
+    scrollY: 0,
+    lastActiveTime: Date.now() - 300000,
+    isDesktopMode: false,
   },
   {
     id: generateId(),
@@ -52,6 +55,9 @@ const createMockTabs = (): Tab[] => [
     isActive: false,
     canGoBack: true,
     canGoForward: false,
+    scrollY: 0,
+    lastActiveTime: Date.now() - 600000,
+    isDesktopMode: false,
   },
   {
     id: generateId(),
@@ -60,6 +66,9 @@ const createMockTabs = (): Tab[] => [
     isActive: false,
     canGoBack: true,
     canGoForward: false,
+    scrollY: 0,
+    lastActiveTime: Date.now() - 900000,
+    isDesktopMode: false,
   },
   {
     id: generateId(),
@@ -68,6 +77,9 @@ const createMockTabs = (): Tab[] => [
     isActive: false,
     canGoBack: true,
     canGoForward: false,
+    scrollY: 0,
+    lastActiveTime: Date.now() - 1200000,
+    isDesktopMode: false,
   },
   {
     id: generateId(),
@@ -76,6 +88,9 @@ const createMockTabs = (): Tab[] => [
     isActive: true,
     canGoBack: true,
     canGoForward: false,
+    scrollY: 0,
+    lastActiveTime: Date.now(),
+    isDesktopMode: false,
   },
   {
     id: generateId(),
@@ -84,6 +99,9 @@ const createMockTabs = (): Tab[] => [
     isActive: false,
     canGoBack: true,
     canGoForward: false,
+    scrollY: 0,
+    lastActiveTime: Date.now() - 1500000,
+    isDesktopMode: false,
   },
   {
     id: generateId(),
@@ -92,6 +110,9 @@ const createMockTabs = (): Tab[] => [
     isActive: false,
     canGoBack: true,
     canGoForward: false,
+    scrollY: 0,
+    lastActiveTime: Date.now() - 1800000,
+    isDesktopMode: false,
   },
   {
     id: generateId(),
@@ -100,6 +121,9 @@ const createMockTabs = (): Tab[] => [
     isActive: false,
     canGoBack: true,
     canGoForward: false,
+    scrollY: 0,
+    lastActiveTime: Date.now() - 2100000,
+    isDesktopMode: false,
   },
 ];
 
@@ -193,6 +217,9 @@ export default function TabsManagerScreen() {
             isActive: true,
             canGoBack: false,
             canGoForward: false,
+            scrollY: 0,
+            lastActiveTime: Date.now(),
+            isDesktopMode: false,
           };
           return [newTab];
         }
@@ -246,6 +273,9 @@ export default function TabsManagerScreen() {
         isActive: true,
         canGoBack: false,
         canGoForward: false,
+        scrollY: 0,
+        lastActiveTime: Date.now(),
+        isDesktopMode: false,
       };
       setDisplayedTabs(prev => [
         ...prev.map(t => ({ ...t, isActive: false })),

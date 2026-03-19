@@ -398,11 +398,11 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#FFF',
     fontSize: 15,
-    height: '100%',
+    height: 40,
     ...Platform.select({
       web: {
         outlineStyle: 'none',
-      },
+      } as any,
     }),
   },
   clearButton: {

@@ -316,7 +316,7 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
           `;
           
           if (webViewRef?.current) {
-            webViewRef.current.injectJavaScript(clearCookiesScript);
+            webViewRef.current?.injectJavaScript(clearCookiesScript);
           }
           console.log('[Privacy Shredder] Cookies/Storage cleared via JS injection');
         } catch (e) {
@@ -363,7 +363,7 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
       // the previous website might be using to stay alive
       if (webViewRef?.current) {
         try {
-          webViewRef.current.injectJavaScript('window.location.href = "about:blank"; true;');
+          webViewRef.current?.injectJavaScript('window.location.href = "about:blank"; true;');
           console.log('[Privacy Shredder] Step 1: WebView reset to about:blank');
         } catch (e) {
           console.warn('[Privacy Shredder] about:blank warning:', e);
@@ -396,7 +396,7 @@ export const PrivacyShredder: React.FC<PrivacyShredderProps> = ({
           await new Promise(resolve => setTimeout(resolve, 50));
           
           // Force navigation to home
-          webViewRef.current.injectJavaScript(`window.location.href = "${HOME_URL}"; true;`);
+          webViewRef.current?.injectJavaScript(`window.location.href = "${HOME_URL}"; true;`);
           console.log('[Privacy Shredder] Step 3: WebView force navigated to HOME_URL');
         } catch (e) {
           console.warn('[Privacy Shredder] WebView navigate warning:', e);

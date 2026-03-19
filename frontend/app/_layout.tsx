@@ -8,6 +8,7 @@ import { ThemeProvider, DarkTheme } from '@react-navigation/native';
 import { AIProvider } from '../src/context/AIContext';
 import { SettingsProvider } from '../src/context/SettingsContext';
 import { PrivacyProvider } from '../src/context/PrivacyContext';
+import { AuraErrorBoundary } from '../src/components/AuraErrorBoundary';
 
 const AuraDarkTheme = {
   ...DarkTheme,
@@ -25,6 +26,7 @@ const AuraDarkTheme = {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.container}>
+      <AuraErrorBoundary>
       <SafeAreaProvider>
         <ThemeProvider value={AuraDarkTheme}>
           <SettingsProvider>
@@ -74,6 +76,7 @@ export default function RootLayout() {
           </SettingsProvider>
         </ThemeProvider>
       </SafeAreaProvider>
+      </AuraErrorBoundary>
     </GestureHandlerRootView>
   );
 }
