@@ -115,5 +115,8 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - **(P3) Downloads Storage Insights**: Visual chart of storage by category
 - **(P3) Cloud Sync**: Backup/sync for bookmarks and download history
 
-## Refactoring Needs
-- `index.tsx` is 2800+ lines — should extract WebView message handling, modal states, and hooks into separate files
+## Refactoring Completed (Feb 2026)
+- `index.tsx` refactored from 2855 → 545 lines (81% reduction)
+- 7 custom hooks extracted: useAutoHideBar, useReaderMode, useFindInPage, useDownloads, useAISummarize, useBrowserNavigation, useWebViewEngine
+- 4 components extracted: FindInPageBar, AISummarizerDrawer, BotDetectionBanner, PrivacyShredderToast
+- All features preserved and verified via testing agent
