@@ -36,7 +36,7 @@ import { QuickConverseView } from '../src/components/QuickConverseView';
 import { DownloadsModal, addDownloadToList } from '../src/components/DownloadsModal';
 import { DownloadNotificationBanner } from '../src/components/DownloadNotificationBanner';
 import { ImageContextMenu } from '../src/components/ImageContextMenu';
-import { TextSelectionMenu } from '../src/components/TextSelectionMenu';
+import { AuraActionPill } from '../src/components/AuraActionPill';
 import { useDownloadsStore } from '../src/store/useDownloadsStore';
 import { useAmbientAwareness } from '../src/hooks/useAmbientAwareness';
 import { usePrivacy } from '../src/context/PrivacyContext';
@@ -460,7 +460,7 @@ export default function BrowserScreen() {
 
   // Text Selection Menu state
   const [selectedText, setSelectedText] = useState('');
-  const [isTextMenuVisible, setIsTextMenuVisible] = useState(false);
+  const [isActionPillVisible, setIsActionPillVisible] = useState(false);
   
   // Find in Page state
   const [isFindModeActive, setIsFindModeActive] = useState(false);
@@ -1088,14 +1088,16 @@ export default function BrowserScreen() {
         }
       }
 
-      // Handle Text Selection Long-Press Menu
-      if (data.type === 'TEXT_LONG_PRESS') {
-        console.log('[Browser] Text long-press:', data.text?.substring(0, 50));
+      // Handle Text Selection — selectionchange-driven Aura Action Pill
+      if (data.type === 'TEXT_SELECTED') {
         if (data.text && data.text.trim().length > 0) {
           setSelectedText(data.text.trim());
-          setIsTextMenuVisible(true);
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setIsActionPillVisible(true);
         }
+      }
+      if (data.type === 'TEXT_CLEAR') {
+        setIsActionPillVisible(false);
+        setSelectedText('');
       }
       
       // Handle "Download All Links" scan result
@@ -1836,21 +1838,20 @@ export default function BrowserScreen() {
     }
 
     // ============================================================================
-    // UNIFIED CONTEXT MENU INTERCEPTOR
-    // Handles both image long-press and text selection long-press
-    // Suppresses the native callout while keeping text highlighting
+    // UNIFIED CONTEXT MENU + SELECTION INTERCEPTOR
+    // contextmenu → image long-press
+    // selectionchange → text selection action pill
     // ============================================================================
     scripts += `
       (function() {
         try {
-          // Suppress native touch-callout but keep text selection highlighting
+          // Suppress native touch-callout but keep text highlighting
           var style = document.createElement('style');
           style.innerHTML = 'body { -webkit-touch-callout: none; }';
           document.head.appendChild(style);
 
+          // IMAGE: contextmenu handler (long-press on images only)
           window.addEventListener('contextmenu', function(e) {
-            // === IMAGE HANDLER ===
-            // Walk up the DOM to find a nearby <img> (handles wrapped images)
             var el = e.target;
             var depth = 0;
             while (el && el.tagName !== 'IMG' && depth < 3) {
@@ -1864,22 +1865,29 @@ export default function BrowserScreen() {
                 type: 'IMAGE_LONG_PRESS',
                 src: el.src
               }));
-              return;
-            }
-
-            // === TEXT SELECTION HANDLER ===
-            var selectedText = window.getSelection().toString().trim();
-            if (selectedText.length > 0 && e.target.tagName !== 'IMG') {
-              e.preventDefault();
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'TEXT_LONG_PRESS',
-                text: selectedText
-              }));
             }
           }, true);
-          console.log('[Aura] Unified context menu interceptor active');
+
+          // TEXT: selectionchange listener for Aura Action Pill
+          var _auraSelTimer = null;
+          document.addEventListener('selectionchange', function() {
+            clearTimeout(_auraSelTimer);
+            _auraSelTimer = setTimeout(function() {
+              var sel = window.getSelection().toString().trim();
+              if (sel.length > 0) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'TEXT_SELECTED',
+                  text: sel
+                }));
+              } else {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'TEXT_CLEAR' }));
+              }
+            }, 150);
+          });
+
+          console.log('[Aura] Context menu + selection interceptors active');
         } catch(e) {
-          console.log('[Aura] Error setting up context interceptor:', e);
+          console.log('[Aura] Error setting up interceptors:', e);
         }
       })();
     `;
@@ -2316,16 +2324,11 @@ export default function BrowserScreen() {
           onDownload={handleFileDownload}
         />
 
-        {/* Text Selection Context Menu */}
-        <TextSelectionMenu
-          visible={isTextMenuVisible}
+        {/* Aura Action Pill — Text Selection Floating Menu */}
+        <AuraActionPill
+          visible={isActionPillVisible}
           selectedText={selectedText}
-          onClose={() => { setIsTextMenuVisible(false); setSelectedText(''); }}
-          onNavigate={(url) => {
-            if (activeTab && webViewRef.current) {
-              updateTab(activeTab.id, { url });
-            }
-          }}
+          onDismiss={() => { setIsActionPillVisible(false); setSelectedText(''); }}
         />
 
         {/* TTS Floating Control Bar */}
