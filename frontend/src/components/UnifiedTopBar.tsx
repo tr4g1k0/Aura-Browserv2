@@ -123,7 +123,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
 
   const getDisplayUrl = () => {
     if (isFocused) return inputValue;
-    if (!currentUrl || currentUrl === 'about:blank' || currentUrl === 'about:newtab') {
+    if (!currentUrl || currentUrl === '' || currentUrl === 'about:blank' || currentUrl === 'about:newtab') {
       return '';
     }
     try {
@@ -135,7 +135,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   };
 
   // Check if on new tab page
-  const isNewTabPage = !currentUrl || currentUrl === 'about:blank' || currentUrl === 'about:newtab';
+  const isNewTabPage = !currentUrl || currentUrl === '' || currentUrl === 'about:blank' || currentUrl === 'about:newtab';
 
   // Determine if we're showing shield status in URL bar
   const isProtected = browserSettings.adblockEnabled || vpnConnected || isGhostMode;

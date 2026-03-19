@@ -483,7 +483,7 @@ export const useBrowserStore = create<BrowserState>((set, get) => ({
     }
     
     // Skip internal pages and empty URLs
-    if (!url || url === 'about:blank' || url === 'about:newtab') {
+    if (!url || url === '' || url === 'about:blank' || url === 'about:newtab') {
       return;
     }
     
