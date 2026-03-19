@@ -51,15 +51,20 @@ if (Platform.OS !== 'web') {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Premium Color Palette
-const ELECTRIC_CYAN = '#00FFFF';
-const ELECTRIC_CYAN_GLOW = 'rgba(0, 255, 255, 0.15)';
+// Premium Color Palette - AURA BRANDING
+const AURA_BLUE = '#00F2FF';  // Official Aura accent color
+const AURA_BLUE_GLOW = 'rgba(0, 242, 255, 0.15)';
 const SHIELD_GREEN = '#00FF88';
 const DEEP_BLACK = '#050508';
+const DEEP_INDIGO = '#0A0A0F';  // Aura background
 const GLASS_WHITE = 'rgba(255, 255, 255, 0.05)';
 const GLASS_BORDER = 'rgba(255, 255, 255, 0.12)';
 const MUTED_GRAY = '#888888';
 const OFFLINE_GRAY = '#666666';
+
+// Legacy alias for compatibility
+const ELECTRIC_CYAN = AURA_BLUE;
+const ELECTRIC_CYAN_GLOW = AURA_BLUE_GLOW;
 
 interface NewTabPageProps {
   onNavigate: (url: string) => void;
@@ -212,8 +217,9 @@ const AIShieldStatus: React.FC<{ isAIActive: boolean }> = ({ isAIActive }) => {
 
   const isWeb = Platform.OS === 'web';
   const dotColor = isAIActive ? SHIELD_GREEN : OFFLINE_GRAY;
-  const statusText = isAIActive ? 'AI Active' : 'AI Offline';
-  const subText = isAIActive ? 'Shielding your data' : 'Shielding active';
+  // AURA BRANDING: Updated status text
+  const statusText = isAIActive ? 'Aura Active' : 'AI Offline';
+  const subText = 'Shielding your data';
 
   return (
     <Animated.View 
@@ -240,6 +246,64 @@ const AIShieldStatus: React.FC<{ isAIActive: boolean }> = ({ isAIActive }) => {
         </BlurView>
       )}
     </Animated.View>
+  );
+};
+
+// ============================================================
+// AURA BREATHING LOGO - Slow pulsing animation giving "alive" effect
+// ============================================================
+const AuraBreathingLogo: React.FC = () => {
+  const breatheValue = useSharedValue(0);
+  const glowOpacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    // Slow breathing animation - 4 seconds per cycle
+    breatheValue.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+    
+    // Glow pulse animation
+    glowOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.3, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const logoStyle = useAnimatedStyle(() => {
+    const scale = interpolate(breatheValue.value, [0, 1], [1, 1.08]);
+    return {
+      transform: [{ scale }],
+    };
+  });
+
+  const glowStyle = useAnimatedStyle(() => {
+    const scale = interpolate(breatheValue.value, [0, 1], [1, 1.3]);
+    return {
+      opacity: glowOpacity.value,
+      transform: [{ scale }],
+    };
+  });
+
+  return (
+    <View style={styles.logoContainer}>
+      {/* Outer breathing glow */}
+      <Animated.View style={[styles.logoGlowOuter, glowStyle]} />
+      {/* Inner glow */}
+      <View style={styles.logoGlow} />
+      {/* Breathing icon */}
+      <Animated.View style={logoStyle}>
+        <Ionicons name="shield-checkmark" size={56} color={SHIELD_GREEN} />
+      </Animated.View>
+    </View>
   );
 };
 
@@ -1106,25 +1170,22 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, on
 
   return (
     <View style={styles.container}>
-      {/* Immersive Backdrop with Electric Cyan Orb */}
+      {/* Immersive Backdrop with Aura Blue Orb */}
       <ImmersiveBackdrop />
 
       {/* Main Content */}
       <View style={[styles.content, { paddingTop: insets.top + 30 }]}>
         
-        {/* AI SHIELD DASHBOARD - Top Section */}
+        {/* AURA SHIELD DASHBOARD - Top Section */}
         <Animated.View 
           entering={FadeIn.delay(100).duration(800)}
           style={styles.brandingContainer}
         >
-          {/* Premium Logo */}
-          <View style={styles.logoContainer}>
-            <View style={styles.logoGlow} />
-            <Ionicons name="shield-checkmark" size={56} color={SHIELD_GREEN} />
-          </View>
+          {/* Premium Breathing Logo */}
+          <AuraBreathingLogo />
           
-          {/* Brand Title */}
-          <Text style={styles.brandTitle}>ACCESS</Text>
+          {/* Brand Title - AURA with wide kerning */}
+          <Text style={styles.brandTitle}>AURA</Text>
           
           {/* AI Shield Status Widget - Wired to strictLocalAI */}
           <AIShieldStatus isAIActive={isAIActive} />
@@ -1256,6 +1317,21 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 255, 136, 0.2)',
     position: 'relative',
   },
+  logoGlowOuter: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(0, 242, 255, 0.08)',
+    ...Platform.select({
+      ios: {
+        shadowColor: AURA_BLUE,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 40,
+      },
+    }),
+  },
   logoGlow: {
     position: 'absolute',
     width: 120,
@@ -1272,10 +1348,10 @@ const styles = StyleSheet.create({
     }),
   },
   brandTitle: {
-    fontSize: 36,
-    fontWeight: '800',
+    fontSize: 42,
+    fontWeight: '300',
     color: '#FFF',
-    letterSpacing: 8,
+    letterSpacing: 18,  // Wide kerning for modern look
     marginBottom: 16,
     ...Platform.select({
       ios: { fontFamily: 'System' },

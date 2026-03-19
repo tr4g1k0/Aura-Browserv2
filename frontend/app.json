@@ -1,25 +1,30 @@
 {
   "expo": {
-    "name": "ACCESS Browser",
-    "slug": "access-browser",
+    "name": "Aura Browser",
+    "slug": "aura-browser",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "access-browser",
+    "scheme": "aura-browser",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0F"
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Enable ambient sound detection for accessibility",
         "NSSpeechRecognitionUsageDescription": "Enable live captioning for media content"
       },
-      "bundleIdentifier": "com.anonymous.accessbrowser"
+      "bundleIdentifier": "com.aura.browser"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#0A0A0F"
       },
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "resize",
@@ -33,7 +38,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      "package": "com.anonymous.accessbrowser"
+      "package": "com.aura.browser"
     },
     "web": {
       "bundler": "metro",
@@ -48,7 +53,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#0A0A0F"
         }
       ],
       "onnxruntime-react-native",

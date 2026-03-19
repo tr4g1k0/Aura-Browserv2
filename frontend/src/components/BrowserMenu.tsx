@@ -19,14 +19,18 @@ import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Premium Glossy Color Palette
-const ELECTRIC_CYAN = '#00FFFF';
-const ELECTRIC_CYAN_GLOW = 'rgba(0, 255, 255, 0.3)';
+// Premium Glossy Color Palette - AURA BRANDING
+const AURA_BLUE = '#00F2FF';  // Official Aura accent color
+const AURA_BLUE_GLOW = 'rgba(0, 242, 255, 0.3)';
 const DANGER_RED = '#FF4444';
 const TEXT_DARK = '#1A1A1A';
 const TEXT_SECONDARY = '#555555';
 const GOLD = '#FFD700';
 const GOLD_GLOW = 'rgba(255, 215, 0, 0.3)';
+
+// Legacy alias for compatibility
+const ELECTRIC_CYAN = AURA_BLUE;
+const ELECTRIC_CYAN_GLOW = AURA_BLUE_GLOW;
 
 interface BrowserMenuProps {
   visible: boolean;

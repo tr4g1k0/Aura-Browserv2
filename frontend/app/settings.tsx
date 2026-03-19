@@ -348,7 +348,7 @@ export default function SettingsScreen() {
         </GlossyCard>
 
         {/* Version Footer */}
-        <Text style={styles.versionText}>ACCESS Browser v1.0</Text>
+        <Text style={styles.versionText}>Aura Browser v1.0</Text>
       </ScrollView>
 
       {/* Search Engine Modal */}

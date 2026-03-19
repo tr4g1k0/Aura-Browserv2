@@ -162,7 +162,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
 
   /**
    * Render History Item with Semantic Label
-   * Displays the AI-generated semantic label in Electric Cyan (#00FFFF)
+   * Displays the AI-generated semantic label in Aura Blue (#00F2FF)
    * This proves to the user that the AI 'remembered' the page content
    */
   const renderHistoryItem = useCallback(({ item }: { item: HistoryEntry }) => (

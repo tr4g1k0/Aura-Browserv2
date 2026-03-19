@@ -27,13 +27,16 @@ if (Platform.OS !== 'web') {
   }
 }
 
-// Premium Color Palette
-const ELECTRIC_CYAN = '#00FFFF';
+// Premium Color Palette - AURA BRANDING
+const AURA_BLUE = '#00F2FF';  // Official Aura accent color
 const CAPTION_GREEN = '#00FF88';
 const AMBIENT_ORANGE = '#FFB800';
 const CONVERSE_BLUE = '#00A3FF';
 const GLASS_BG = 'rgba(255, 255, 255, 0.05)';
 const GLASS_BORDER = 'rgba(255, 255, 255, 0.1)';
+
+// Legacy alias for compatibility
+const ELECTRIC_CYAN = AURA_BLUE;
 
 interface AccessibilityModalProps {
   visible: boolean;

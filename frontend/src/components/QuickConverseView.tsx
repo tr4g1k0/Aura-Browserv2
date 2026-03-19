@@ -43,13 +43,17 @@ if (Platform.OS !== 'web') {
   }
 }
 
-// Colors
+// Colors - AURA BRANDING
 const DEEP_BLACK = '#121212';
-const ELECTRIC_CYAN = '#00FFFF';
+const DEEP_INDIGO = '#0A0A0F';  // Aura background
+const AURA_BLUE = '#00F2FF';  // Official Aura accent color
 const PURE_WHITE = '#FFFFFF';
 const LISTENING_GREEN = '#00FF88';
 const GLASS_BG = 'rgba(255, 255, 255, 0.05)';
 const GLASS_BORDER = 'rgba(255, 255, 255, 0.1)';
+
+// Legacy alias for compatibility
+const ELECTRIC_CYAN = AURA_BLUE;
 
 interface QuickConverseViewProps {
   visible: boolean;

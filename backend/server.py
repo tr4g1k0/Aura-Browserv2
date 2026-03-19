@@ -117,7 +117,7 @@ async def get_llm_response(system_prompt: str, user_message: str) -> str:
 
 @api_router.get("/")
 async def root():
-    return {"message": "ACCESS Browser API", "version": "1.0.0"}
+    return {"message": "Aura Browser API", "version": "1.0.0"}
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
@@ -218,8 +218,8 @@ async def generate_brief(request: BriefRequest):
         for tab in request.tabs
     ])
     
-    system_prompt = """You are a helpful assistant that creates concise summaries.
-Generate a brief 2-4 bullet point summary of what these browser tabs are about.
+    system_prompt = """You are Aura, a privacy-focused AI assistant. Generate a concise summary.
+Create a brief 2-4 bullet point summary of what these browser tabs are about.
 Be concise and actionable. Focus on the main topics and any patterns you notice."""
 
     user_message = f"Category: {request.category}\n\nTabs:\n{tabs_text}\n\nGenerate a brief summary:"
@@ -242,7 +242,7 @@ Be concise and actionable. Focus on the main topics and any patterns you notice.
 async def execute_agent_command(request: AgentExecuteRequest):
     """Execute AI agent command for DOM manipulation and page interaction"""
     
-    system_prompt = """You are an AI browser assistant that helps users interact with webpages.
+    system_prompt = """You are Aura, a privacy-focused AI browser assistant that helps users interact with webpages.
 You can understand user commands and provide helpful responses about the current page.
 
 For now, you should:
@@ -290,7 +290,7 @@ Respond in a friendly, helpful manner."""
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "ACCESS Browser API"}
+    return {"status": "healthy", "service": "Aura Browser API"}
 
 # Include the router in the main app
 app.include_router(api_router)
