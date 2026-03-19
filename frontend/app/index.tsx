@@ -34,6 +34,7 @@ import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
 import { CaptionPill } from '../src/components/CaptionPill';
 import { QuickConverseView } from '../src/components/QuickConverseView';
 import { useAmbientAwareness } from '../src/hooks/useAmbientAwareness';
+import { usePrivacy } from '../src/context/PrivacyContext';
 import { downloadManager } from '../src/services/FileDownloadManager';
 import { ttsService, contentExtractionScript } from '../src/services/TextToSpeechService';
 import { TTSControlBar } from '../src/components/TTSControlBar';
@@ -173,6 +174,9 @@ export default function BrowserScreen() {
   
   // Safe Area Insets - ensures buttons don't overlap with system UI (status bar, home indicator)
   const insets = useSafeAreaInsets();
+  
+  // Privacy Context - for real-time ad/tracker blocking counts
+  const { incrementAds, incrementTrackers } = usePrivacy();
   
   const {
     tabs,
@@ -599,11 +603,26 @@ export default function BrowserScreen() {
       console.log('[Smart Shield] Blocked:', url);
       recordBlockedRequest(url);
       setAdsBlocked(prev => prev + 1);
+      
+      // Update Privacy Context - determine if it's a tracker or ad
+      const urlLower = url.toLowerCase();
+      const isTracker = urlLower.includes('track') || 
+                        urlLower.includes('analytics') || 
+                        urlLower.includes('pixel') ||
+                        urlLower.includes('beacon') ||
+                        urlLower.includes('telemetry');
+      
+      if (isTracker) {
+        incrementTrackers(1);
+      } else {
+        incrementAds(1);
+      }
+      
       return false;
     }
     
     return true;
-  }, [userSettings.aggressiveAdBlocking, checkForDownload, handleFileDownload]);
+  }, [userSettings.aggressiveAdBlocking, checkForDownload, handleFileDownload, incrementAds, incrementTrackers]);
 
   /**
    * Layer 2: DOM Injection

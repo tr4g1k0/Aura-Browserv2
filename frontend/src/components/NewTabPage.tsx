@@ -19,6 +19,7 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { usePrivacy } from '../context/PrivacyContext';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -453,11 +454,12 @@ const AddButtonOrb: React.FC<{
 // PRIVACY METRICS DASHBOARD - Glassmorphic Monolith
 // ============================================================
 const PrivacyMetricsDashboard: React.FC = () => {
-  // Hardcoded metrics for UI lockdown - will be wired to privacy engine later
-  const metrics = {
-    trackersBlocked: '1,492',
-    adsStopped: '384',
-    connectionStatus: 'Secure',  // Changed from 'Encrypted' for brevity
+  // Get real metrics from Privacy Context
+  const { adsBlockedCount, trackersBlockedCount } = usePrivacy();
+
+  // Format numbers with commas
+  const formatNumber = (num: number): string => {
+    return num.toLocaleString();
   };
 
   return (
@@ -479,7 +481,7 @@ const PrivacyMetricsDashboard: React.FC = () => {
         {/* Column 1: Trackers Blocked */}
         <View style={styles.metricColumn}>
           <Text style={styles.metricValue}>
-            {metrics.trackersBlocked}
+            {formatNumber(trackersBlockedCount)}
           </Text>
           <Text style={styles.metricLabel}>Trackers Blocked</Text>
         </View>
@@ -487,7 +489,7 @@ const PrivacyMetricsDashboard: React.FC = () => {
         {/* Column 2: Ads Stopped */}
         <View style={styles.metricColumn}>
           <Text style={styles.metricValue}>
-            {metrics.adsStopped}
+            {formatNumber(adsBlockedCount)}
           </Text>
           <Text style={styles.metricLabel}>Ads Stopped</Text>
         </View>
@@ -495,7 +497,7 @@ const PrivacyMetricsDashboard: React.FC = () => {
         {/* Column 3: Connection Status */}
         <View style={styles.metricColumn}>
           <Text style={[styles.metricValue, styles.metricValueCyan]}>
-            {metrics.connectionStatus}
+            Secure
           </Text>
           <Text style={styles.metricLabel}>Connection</Text>
         </View>

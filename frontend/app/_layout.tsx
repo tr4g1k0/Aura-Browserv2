@@ -6,13 +6,15 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import { AIProvider } from '../src/context/AIContext';
 import { SettingsProvider } from '../src/context/SettingsContext';
+import { PrivacyProvider } from '../src/context/PrivacyContext';
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
         <SettingsProvider>
-          <AIProvider>
+          <PrivacyProvider>
+            <AIProvider>
             {/* StatusBar Control: Light style for True Black theme, translucent for edge-to-edge */}
             <StatusBar style="light" translucent={true} backgroundColor="transparent" />
             <Stack
@@ -53,6 +55,7 @@ export default function RootLayout() {
               />
             </Stack>
           </AIProvider>
+          </PrivacyProvider>
         </SettingsProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
