@@ -48,6 +48,13 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - **Secure Status**: Green (#00FF88) connection indicator
 - **Persistence**: Counts stored/loaded via AsyncStorage through PrivacyContext
 
+### Bottom Navigation Bar ✅ (Feb 2026)
+- **Absolutely positioned overlay**: Bar overlays WebView at bottom (position: absolute, bottom: 0), WebView fills full screen
+- **Auto-hide on scroll**: translateY animation slides bar 200px down when scrolling down, returns on scroll up
+- **Ultra-compact**: URL bar 30px + nav row 32px = ~66px total (+ safe area on devices)
+- **No empty space**: Zero padding below icons, dock flush with screen bottom
+- **Home page dock**: FloatingIslandDock absolutely positioned at bottom, full-width, no bottom border radius
+
 ### Downloads Manager (Feb 2026) ✅
 **Core (v1):**
 - WebView download interception (iOS onFileDownload + Android URL pattern matching)
