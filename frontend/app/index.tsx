@@ -35,6 +35,7 @@ import { CaptionPill } from '../src/components/CaptionPill';
 import { QuickConverseView } from '../src/components/QuickConverseView';
 import { DownloadsModal, addDownloadToList } from '../src/components/DownloadsModal';
 import { DownloadNotificationBanner } from '../src/components/DownloadNotificationBanner';
+import { ImageContextMenu } from '../src/components/ImageContextMenu';
 import { useDownloadsStore } from '../src/store/useDownloadsStore';
 import { useAmbientAwareness } from '../src/hooks/useAmbientAwareness';
 import { usePrivacy } from '../src/context/PrivacyContext';
@@ -451,6 +452,10 @@ export default function BrowserScreen() {
 
   // Downloads Modal state
   const [downloadsModalVisible, setDownloadsModalVisible] = useState(false);
+
+  // Image Context Menu state
+  const [selectedImageUrl, setSelectedImageUrl] = useState('');
+  const [isImageMenuVisible, setIsImageMenuVisible] = useState(false);
   
   // Find in Page state
   const [isFindModeActive, setIsFindModeActive] = useState(false);
@@ -1066,6 +1071,16 @@ export default function BrowserScreen() {
       
       if (data.type === 'PAGE_CONTEXT_ERROR') {
         console.error('[Semantic History] Extraction error:', data.error);
+      }
+
+      // Handle Image Long-Press Context Menu
+      if (data.type === 'IMAGE_LONG_PRESS') {
+        console.log('[Browser] Image long-press:', data.src);
+        if (data.src) {
+          setSelectedImageUrl(data.src);
+          setIsImageMenuVisible(true);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
       }
       
       // Handle "Download All Links" scan result
@@ -1804,6 +1819,37 @@ export default function BrowserScreen() {
     } else {
       console.log('[Engine] Force Zoom DISABLED');
     }
+
+    // ============================================================================
+    // IMAGE LONG-PRESS CONTEXT MENU INTERCEPTOR
+    // Intercepts contextmenu on <img> tags to show Aura custom menu
+    // ============================================================================
+    scripts += `
+      (function() {
+        try {
+          window.addEventListener('contextmenu', function(e) {
+            var el = e.target;
+            // Walk up the DOM to find an <img> (handles wrapped images)
+            var depth = 0;
+            while (el && el.tagName !== 'IMG' && depth < 3) {
+              el = el.parentElement;
+              depth++;
+            }
+            if (el && el.tagName === 'IMG' && el.src) {
+              e.preventDefault();
+              e.stopPropagation();
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'IMAGE_LONG_PRESS',
+                src: el.src
+              }));
+            }
+          }, true);
+          console.log('[Aura] Image context menu interceptor active');
+        } catch(e) {
+          console.log('[Aura] Error setting up image interceptor:', e);
+        }
+      })();
+    `;
     
     return scripts || 'true;';
   }, [userSettings.aggressiveAdBlocking, userSettings.doNotTrack, userSettings.forceZoom, visionAISelectors, vpnScript]);
@@ -2227,6 +2273,14 @@ export default function BrowserScreen() {
         <DownloadNotificationBanner
           downloadsModalVisible={downloadsModalVisible}
           onOpenDownloads={() => setDownloadsModalVisible(true)}
+        />
+
+        {/* Image Long-Press Context Menu */}
+        <ImageContextMenu
+          visible={isImageMenuVisible}
+          imageUrl={selectedImageUrl}
+          onClose={() => setIsImageMenuVisible(false)}
+          onDownload={handleFileDownload}
         />
 
         {/* TTS Floating Control Bar */}
