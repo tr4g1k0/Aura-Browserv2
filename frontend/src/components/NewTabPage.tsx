@@ -1641,7 +1641,7 @@ const styles = StyleSheet.create({
   },
   metricsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-evenly',
     width: '100%',
     marginTop: 20,
   },
@@ -1650,6 +1650,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+    minWidth: 0,
   },
   metricValue: {
     fontSize: 22,
@@ -1664,7 +1665,7 @@ const styles = StyleSheet.create({
     }),
   },
   metricValueCyan: {
-    color: AURA_BLUE,
+    color: '#00FF88',
   },
   metricLabel: {
     fontSize: 11,
