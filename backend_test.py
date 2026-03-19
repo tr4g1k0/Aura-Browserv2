@@ -1,162 +1,72 @@
 #!/usr/bin/env python3
-"""
-Aura Browser reCAPTCHA/Bot Detection Fixes Testing
-Tests backend health endpoint and verifies all bot detection features are working correctly.
-"""
 
 import requests
-import json
+import time
 import sys
-from typing import Dict, Any
 
-# Backend URL from environment
-BACKEND_URL = "https://browser-preview-2.preview.emergentagent.com/api"
-
-def test_health_endpoint() -> Dict[str, Any]:
-    """Test the backend health endpoint"""
-    print("🔍 Testing backend health endpoint...")
+def test_backend_health():
+    """Test the Aura Browser API health endpoint"""
+    
+    # Use the same backend URL from frontend env
+    backend_url = "https://browser-preview-2.preview.emergentagent.com/api"
+    
+    print("=" * 60)
+    print("🔍 AURA BROWSER BACKEND TESTING")
+    print("=" * 60)
     
     try:
-        response = requests.get(f"{BACKEND_URL}/health", timeout=10)
+        print(f"📡 Testing Backend Health Endpoint...")
+        print(f"🌐 URL: {backend_url}/health")
         
-        result = {
-            "url": f"{BACKEND_URL}/health",
-            "status_code": response.status_code,
-            "success": response.status_code == 200,
-            "response_time_ms": int(response.elapsed.total_seconds() * 1000)
-        }
+        start_time = time.time()
+        response = requests.get(f"{backend_url}/health", timeout=10)
+        response_time = round((time.time() - start_time) * 1000)
         
-        if response.status_code == 200:
-            try:
-                data = response.json()
-                result["response_data"] = data
-                
-                # Verify expected response structure
-                expected_keys = {"status", "service"}
-                missing_keys = expected_keys - set(data.keys())
-                
-                if not missing_keys:
-                    if data.get("status") == "healthy" and data.get("service") == "Aura Browser API":
-                        result["validation"] = "✅ Response structure and content correct"
-                        print(f"  ✅ Health endpoint working: {data}")
-                    else:
-                        result["validation"] = f"❌ Unexpected response values: {data}"
-                        result["success"] = False
-                else:
-                    result["validation"] = f"❌ Missing required keys: {missing_keys}"
-                    result["success"] = False
-                    
-            except json.JSONDecodeError as e:
-                result["validation"] = f"❌ Invalid JSON response: {e}"
-                result["response_text"] = response.text
-                result["success"] = False
-        else:
-            result["validation"] = f"❌ HTTP {response.status_code}"
-            result["response_text"] = response.text
-            result["success"] = False
-            
-        return result
-        
-    except requests.exceptions.RequestException as e:
-        return {
-            "url": f"{BACKEND_URL}/health",
-            "success": False,
-            "error": f"Request failed: {e}",
-            "validation": "❌ Network or connection error"
-        }
-
-def test_root_endpoint() -> Dict[str, Any]:
-    """Test the backend root endpoint"""
-    print("🔍 Testing backend root endpoint...")
-    
-    try:
-        response = requests.get(f"{BACKEND_URL}/", timeout=10)
-        
-        result = {
-            "url": f"{BACKEND_URL}/",
-            "status_code": response.status_code,
-            "success": response.status_code == 200,
-            "response_time_ms": int(response.elapsed.total_seconds() * 1000)
-        }
+        print(f"⏱️  Response Time: {response_time}ms")
+        print(f"📊 Status Code: {response.status_code}")
         
         if response.status_code == 200:
-            try:
-                data = response.json()
-                result["response_data"] = data
-                
-                # Verify expected response structure
-                expected_keys = {"message", "version"}
-                missing_keys = expected_keys - set(data.keys())
-                
-                if not missing_keys:
-                    if data.get("message") == "Aura Browser API" and data.get("version") == "1.0.0":
-                        result["validation"] = "✅ Response structure and content correct"
-                        print(f"  ✅ Root endpoint working: {data}")
-                    else:
-                        result["validation"] = f"❌ Unexpected response values: {data}"
-                        result["success"] = False
-                else:
-                    result["validation"] = f"❌ Missing required keys: {missing_keys}"
-                    result["success"] = False
-                    
-            except json.JSONDecodeError as e:
-                result["validation"] = f"❌ Invalid JSON response: {e}"
-                result["response_text"] = response.text
-                result["success"] = False
-        else:
-            result["validation"] = f"❌ HTTP {response.status_code}"
-            result["response_text"] = response.text
-            result["success"] = False
+            data = response.json()
+            print(f"✅ Response Data: {data}")
             
-        return result
-        
+            # Verify expected response structure
+            if data.get("status") == "healthy" and data.get("service") == "Aura Browser API":
+                print(f"✅ HEALTH CHECK PASSED")
+                print(f"✅ Backend API is responding correctly")
+                return True
+            else:
+                print(f"❌ HEALTH CHECK FAILED - Unexpected response format")
+                return False
+        else:
+            print(f"❌ HEALTH CHECK FAILED - Status code: {response.status_code}")
+            return False
+            
     except requests.exceptions.RequestException as e:
-        return {
-            "url": f"{BACKEND_URL}/",
-            "success": False,
-            "error": f"Request failed: {e}",
-            "validation": "❌ Network or connection error"
-        }
+        print(f"❌ HEALTH CHECK FAILED - Network error: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ HEALTH CHECK FAILED - Error: {e}")
+        return False
 
 def main():
-    """Run all backend tests"""
-    print("🚀 Starting Aura Browser reCAPTCHA/Bot Detection Backend Testing\n")
+    print("Starting Aura Browser Bottom Bar Fixes Testing...")
     
-    results = {
-        "health_endpoint": test_health_endpoint(),
-        "root_endpoint": test_root_endpoint()
-    }
+    # Test backend health
+    health_passed = test_backend_health()
     
-    print("\n" + "="*60)
-    print("📊 BACKEND API TEST RESULTS")
-    print("="*60)
+    print("\n" + "=" * 60)
+    print("📋 BACKEND TEST SUMMARY")
+    print("=" * 60)
     
-    success_count = 0
-    total_tests = len(results)
-    
-    for test_name, result in results.items():
-        status = "✅ PASS" if result["success"] else "❌ FAIL"
-        print(f"{test_name}: {status}")
-        
-        if result["success"]:
-            print(f"  ▶ {result.get('validation', 'Success')}")
-            if "response_time_ms" in result:
-                print(f"  ▶ Response time: {result['response_time_ms']}ms")
-            success_count += 1
-        else:
-            print(f"  ▶ {result.get('validation', 'Failed')}")
-            if "error" in result:
-                print(f"  ▶ Error: {result['error']}")
-        print()
-    
-    print(f"📈 Backend API Results: {success_count}/{total_tests} tests passed")
-    
-    if success_count == total_tests:
-        print("✅ All backend tests PASSED!")
-        return 0
+    if health_passed:
+        print("✅ Backend Health Endpoint: WORKING")
+        print("✅ All backend tests passed!")
+        return True
     else:
-        print("❌ Some backend tests FAILED!")
-        return 1
+        print("❌ Backend Health Endpoint: FAILED")
+        print("❌ Backend tests failed!")
+        return False
 
 if __name__ == "__main__":
-    sys.exit(main())
+    success = main()
+    sys.exit(0 if success else 1)

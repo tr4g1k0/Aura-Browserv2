@@ -1249,23 +1249,23 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, on
 
         {/* PRIVACY METRICS DASHBOARD - Glassmorphic Monolith */}
         <PrivacyMetricsDashboard />
-
-        {/* FLOATING ISLAND DOCK - Bottom Section */}
-        <FloatingIslandDock 
-          onSearch={onSearch}
-          onNavigate={onNavigate}
-          searchEngineName={searchEngineName}
-          defaultSearchEngine={settings.defaultSearchEngine}
-          isBookmarked={false}
-          onToggleBookmark={handleToggleBookmark}
-          onHome={handleHome}
-          onLibrary={handleLibrary}
-          onAISummarize={handleAISummarize}
-          onTabs={handleTabs}
-          onMenu={handleMenu}
-          onQRScan={handleQRScan}
-        />
       </View>
+
+      {/* FLOATING ISLAND DOCK - Pinned to bottom */}
+      <FloatingIslandDock 
+        onSearch={onSearch}
+        onNavigate={onNavigate}
+        searchEngineName={searchEngineName}
+        defaultSearchEngine={settings.defaultSearchEngine}
+        isBookmarked={false}
+        onToggleBookmark={handleToggleBookmark}
+        onHome={handleHome}
+        onLibrary={handleLibrary}
+        onAISummarize={handleAISummarize}
+        onTabs={handleTabs}
+        onMenu={handleMenu}
+        onQRScan={handleQRScan}
+      />
 
       {/* Add Quick Link Modal */}
       <AddLinkModal
@@ -1331,7 +1331,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 24,
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-between',
+    paddingBottom: 0,
   },
 
   // ============== BRANDING ==============
@@ -1679,17 +1680,24 @@ const styles = StyleSheet.create({
 
   // ============== FLOATING ISLAND DOCK ==============
   floatingDockContainer: {
-    width: '100%',
-    paddingHorizontal: 20,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
   },
   floatingDockWrapper: {
     width: '100%',
   },
   floatingDock: {
-    borderRadius: 28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     overflow: 'hidden',
     backgroundColor: 'rgba(20, 20, 25, 0.85)',
     borderWidth: 1,
+    borderBottomWidth: 0,
     borderColor: GLASS_BORDER,
     ...Platform.select({
       ios: {
@@ -1718,9 +1726,9 @@ const styles = StyleSheet.create({
   dockContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    height: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    height: 44,
   },
   dockSearchContainer: {
     flex: 1,
@@ -1768,14 +1776,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-evenly',
     paddingHorizontal: 8,
-    paddingBottom: 12,
+    paddingBottom: 0,
+    paddingTop: 2,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    height: 34,
   },
   navIconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },

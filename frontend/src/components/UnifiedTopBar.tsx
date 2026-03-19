@@ -146,7 +146,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   const isWeb = Platform.OS === 'web';
 
   const renderContent = () => (
-    <View style={[styles.contentWrapper, { paddingTop: insets.top + 8 }]}>
+    <View style={styles.contentWrapper}>
       {/* URL Bar Row */}
       <View style={styles.urlBarRow}>
         {/* Shield inside URL bar (left) */}
@@ -160,7 +160,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
             <View style={styles.shieldInBar}>
               <Ionicons 
                 name="shield-checkmark" 
-                size={14} 
+                size={12} 
                 color={shieldColor} 
               />
             </View>
@@ -171,7 +171,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
           ) : (
             <Ionicons 
               name={isGhostMode ? "eye-off-outline" : "search"} 
-              size={16} 
+              size={14} 
               color={isFocused ? colors.accent : MUTED_GRAY} 
               style={styles.searchIcon} 
             />
@@ -205,7 +205,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
             >
               <Ionicons 
                 name={isBookmarked(currentUrl) ? "star" : "star-outline"} 
-                size={16} 
+                size={14} 
                 color={isBookmarked(currentUrl) ? ELECTRIC_CYAN : MUTED_GRAY} 
               />
             </TouchableOpacity>
@@ -219,7 +219,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
               }}
               style={styles.clearButton}
             >
-              <Ionicons name="close-circle" size={16} color="#555" />
+              <Ionicons name="close-circle" size={14} color="#555" />
             </TouchableOpacity>
           )}
         </View>
@@ -338,43 +338,44 @@ const styles = StyleSheet.create({
   // Containers
   blurContainer: {
     overflow: 'hidden',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   blurContainerGhost: {
     backgroundColor: 'rgba(42, 0, 0, 0.5)',
-    borderBottomColor: 'rgba(155, 89, 182, 0.3)',
+    borderTopColor: 'rgba(155, 89, 182, 0.3)',
   },
   webContainer: {
     backgroundColor: 'rgba(13, 13, 13, 0.95)',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   contentWrapper: {
-    paddingBottom: 4,
-    paddingHorizontal: 10,
+    paddingBottom: 2,
+    paddingTop: 4,
+    paddingHorizontal: 8,
   },
   // URL Bar Row
   urlBarRow: {
-    marginBottom: 4,
+    marginBottom: 2,
   },
   urlBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1A1A1A',
-    borderRadius: 10,
-    height: 34,
-    paddingHorizontal: 8,
+    borderRadius: 8,
+    height: 30,
+    paddingHorizontal: 6,
   },
   urlBarFocused: {
     backgroundColor: '#222',
     borderWidth: 1,
   },
   shieldInBar: {
-    marginRight: 8,
+    marginRight: 6,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
@@ -388,34 +389,34 @@ const styles = StyleSheet.create({
     }),
   },
   bookmarkInBar: {
-    padding: 6,
-    marginLeft: 4,
+    padding: 4,
+    marginLeft: 2,
   },
   clearButton: {
     padding: 4,
-    marginLeft: 4,
+    marginLeft: 2,
   },
   // ============================================================
-  // THE CORE 5 - Premium Navigation Row (Compact)
+  // THE CORE 5 - Premium Navigation Row (Ultra Compact)
   // ============================================================
   core5Row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-evenly',
     paddingVertical: 0,
-    height: 36,
+    height: 32,
   },
   // Standard nav icons - NO background, clean floating glyphs
   navIcon: {
-    width: 40,
-    height: 32,
+    width: 36,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
   // Center AI icon - Slightly larger touch target
   navIconCenter: {
-    width: 46,
-    height: 36,
+    width: 40,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },

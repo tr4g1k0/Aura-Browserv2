@@ -329,31 +329,12 @@ export default function BrowserScreen() {
   const openAIAgent = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/ai-agent'); };
 
   // ── Layout calculations ──
-  const bottomPadding = userSettings.addressBarPosition === 'bottom' ? insets.bottom : Math.max(insets.bottom, 8);
-  const topPadding = userSettings.addressBarPosition === 'bottom' ? insets.top : 0;
+  // No extra padding - the bar is absolutely positioned over the webview
+  const bottomBarHeight = 90;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={[styles.container, userSettings.addressBarPosition === 'bottom' && styles.containerBottomBar, { paddingBottom: bottomPadding, paddingTop: topPadding }]}>
-
-        {/* Unified Top Bar */}
-        {!isNewTabPage && (
-          <Animated.View style={{ opacity: browserViewOpacity, transform: [{ translateY: browserViewTranslateY }] }}>
-            <Animated.View style={{ transform: [{ translateY: isNewTabPage ? 0 : barTranslateY }] }}>
-              <UnifiedTopBar
-                onNavigate={navigation.handleNavigate}
-                onHomePress={navigation.handleGoHome}
-                onTabsPress={openTabsManager}
-                onSettingsPress={() => setMenuVisible(true)}
-                onAccessibilityPress={() => setAccessibilityModalVisible(true)}
-                onLibraryPress={() => setLibraryVisible(true)}
-                onShare={handleShare}
-                currentUrl={activeTab?.url || ''}
-                currentTitle={activeTab?.title || ''}
-              />
-            </Animated.View>
-          </Animated.View>
-        )}
+      <View style={styles.container}>
 
         {/* Find In Page Bar */}
         {isFindModeActive && (
@@ -395,7 +376,7 @@ export default function BrowserScreen() {
           onCopy={handleCopySummary}
         />
 
-        {/* WebView Container */}
+        {/* WebView Container - fills the FULL screen */}
         <View style={styles.webviewContainer}>
           {Platform.OS === 'web' || isNewTabPage ? (
             <Animated.View style={{ flex: 1, opacity: homeHubOpacity, transform: [{ translateY: homeHubTranslateY }] }}>
@@ -484,6 +465,26 @@ export default function BrowserScreen() {
             </TouchableOpacity>
           )}
           <PrivacyShredderToast />
+
+          {/* Bottom Navigation Bar - absolutely positioned, overlays webview */}
+          {!isNewTabPage && (
+            <Animated.View style={[
+              styles.bottomBarWrapper,
+              { paddingBottom: insets.bottom, transform: [{ translateY: barTranslateY }] },
+            ]}>
+              <UnifiedTopBar
+                onNavigate={navigation.handleNavigate}
+                onHomePress={navigation.handleGoHome}
+                onTabsPress={openTabsManager}
+                onSettingsPress={() => setMenuVisible(true)}
+                onAccessibilityPress={() => setAccessibilityModalVisible(true)}
+                onLibraryPress={() => setLibraryVisible(true)}
+                onShare={handleShare}
+                currentUrl={activeTab?.url || ''}
+                currentTitle={activeTab?.title || ''}
+              />
+            </Animated.View>
+          )}
         </View>
 
         <AccessibilityModal visible={accessibilityModalVisible} onClose={() => setAccessibilityModalVisible(false)} />
@@ -498,19 +499,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0D0D0D',
-    flexDirection: 'column',
-  },
-  containerBottomBar: {
-    flexDirection: 'column-reverse',
   },
   webviewContainer: {
     flex: 1,
     position: 'relative',
-    overflow: 'hidden',
   },
   webview: {
     flex: 1,
     backgroundColor: '#0D0D0D',
+  },
+  bottomBarWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    backgroundColor: 'rgba(13, 13, 13, 0.97)',
   },
   cacheHitIndicator: {
     position: 'absolute',

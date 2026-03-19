@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 
 export default function Root({ children }: PropsWithChildren) {
   return (
-    <html lang="en" style={{ height: "100%" }}>
+    <html lang="en" style={{ height: "100%", backgroundColor: "#0D0D0D" }}>
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
@@ -31,10 +31,12 @@ export default function Root({ children }: PropsWithChildren) {
       <body
         style={{
           margin: 0,
+          padding: 0,
           height: "100%",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
+          backgroundColor: "#0D0D0D",
         }}
       >
         {children}

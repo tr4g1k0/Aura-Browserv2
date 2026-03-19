@@ -21,8 +21,8 @@ export function useAutoHideBar() {
     if (isBarHiddenRef.current) return;
     isBarHiddenRef.current = true;
     Animated.timing(barTranslateY, {
-      toValue: 120,
-      duration: 200,
+      toValue: 200,
+      duration: 250,
       useNativeDriver: true,
     }).start();
   }, [barTranslateY]);
