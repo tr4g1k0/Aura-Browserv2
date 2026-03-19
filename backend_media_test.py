@@ -25,7 +25,7 @@ from typing import Dict, List, Tuple
 import sys
 
 # Test configuration
-BACKEND_URL = "https://price-history-hub-1.preview.emergentagent.com/api"
+BACKEND_URL = "https://audit-fixes-18.preview.emergentagent.com/api"
 HEALTH_ENDPOINT = f"{BACKEND_URL}/health"
 EXPECTED_HEALTH_RESPONSE = {"status": "healthy", "service": "Aura Browser API"}
 

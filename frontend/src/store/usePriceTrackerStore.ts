@@ -79,69 +79,75 @@ export const usePriceTrackerStore = create<PriceTrackerState>((set, get) => ({
 
   // Actions
   setDetectedProduct: async (product: DetectedProduct | null) => {
-    if (!product) {
-      set({ detectedProduct: null, isProductPage: false, currentDealScore: null, currentStats: null, currentRecommendation: null, currentHistory: [], isTracked: false, currentTrackedProduct: null });
-      return;
-    }
+    try {
+      if (!product) {
+        set({ detectedProduct: null, isProductPage: false, currentDealScore: null, currentStats: null, currentRecommendation: null, currentHistory: [], isTracked: false, currentTrackedProduct: null });
+        return;
+      }
 
-    set({ detectedProduct: product, isProductPage: true });
+      set({ detectedProduct: product, isProductPage: true });
 
-    // Check if already tracked
-    const existing = await priceTrackerDB.getProductByUrl(product.url);
-    if (existing) {
-      // Update current price + notify on price drops
-      if (existing.currentPrice !== product.price) {
-        const previousPrice = existing.currentPrice;
-        await priceTrackerDB.addPriceEntry(existing.id, product.price, product.currency);
+      const existing = await priceTrackerDB.getProductByUrl(product.url);
+      if (existing) {
+        // Update current price + notify on price drops
+        if (existing.currentPrice !== product.price) {
+          const previousPrice = existing.currentPrice;
+          await priceTrackerDB.addPriceEntry(existing.id, product.price, product.currency);
 
-        // Price drop notification
-        if (product.price < previousPrice) {
-          const dropPercent = ((previousPrice - product.price) / previousPrice) * 100;
-          if (dropPercent >= 30) {
-            // Flash sale!
-            priceNotificationService.notifyFlashSale(
-              existing.title, product.price, previousPrice, product.currency, dropPercent, product.url
-            );
-          } else if (dropPercent >= 5) {
-            priceNotificationService.notifyPriceDrop(
-              existing.title, product.price, previousPrice, product.currency, product.url
-            );
+          if (product.price < previousPrice) {
+            const dropPercent = ((previousPrice - product.price) / previousPrice) * 100;
+            try {
+              if (dropPercent >= 30) {
+                priceNotificationService.notifyFlashSale(existing.title, product.price, previousPrice, product.currency, dropPercent, product.url);
+              } else if (dropPercent >= 5) {
+                priceNotificationService.notifyPriceDrop(existing.title, product.price, previousPrice, product.currency, product.url);
+              }
+            } catch (e) {
+              console.warn('[PriceTracker] Notification error:', e);
+            }
+
+            await priceTrackerDB.addSaving({
+              productId: existing.id,
+              productTitle: existing.title,
+              savedAmount: previousPrice - product.price,
+              originalPrice: previousPrice,
+              dealPrice: product.price,
+              timestamp: Date.now(),
+            });
           }
-
-          // Record savings
-          await priceTrackerDB.addSaving({
-            productId: existing.id,
-            productTitle: existing.title,
-            savedAmount: previousPrice - product.price,
-            originalPrice: previousPrice,
-            dealPrice: product.price,
-            timestamp: Date.now(),
+        }
+        const updatedProduct = await priceTrackerDB.getProduct(existing.id);
+        const history = await priceTrackerDB.getProductHistory(existing.id);
+        if (updatedProduct) {
+          const dealScore = priceAnalysisService.calculateDealScore(updatedProduct, history);
+          const stats = priceAnalysisService.calculateStats(updatedProduct, history);
+          const recommendation = priceAnalysisService.getBuyRecommendation(updatedProduct, history, stats);
+          set({
+            isTracked: true,
+            currentTrackedProduct: updatedProduct,
+            currentHistory: history,
+            currentDealScore: dealScore,
+            currentStats: stats,
+            currentRecommendation: recommendation,
           });
         }
+      } else {
+        set({
+          isTracked: false,
+          currentTrackedProduct: null,
+          currentHistory: [],
+          currentDealScore: { score: 0, label: 'NEW', color: '#00FFFF', isNew: true, reason: 'Start tracking to see the deal score' },
+          currentStats: null,
+          currentRecommendation: null,
+        });
       }
-      const updatedProduct = await priceTrackerDB.getProduct(existing.id);
-      const history = await priceTrackerDB.getProductHistory(existing.id);
-      const dealScore = priceAnalysisService.calculateDealScore(updatedProduct!, history);
-      const stats = priceAnalysisService.calculateStats(updatedProduct!, history);
-      const recommendation = priceAnalysisService.getBuyRecommendation(updatedProduct!, history, stats);
-
+    } catch (error) {
+      console.error('[PriceTracker] setDetectedProduct error:', error);
       set({
-        isTracked: true,
-        currentTrackedProduct: updatedProduct,
-        currentHistory: history,
-        currentDealScore: dealScore,
-        currentStats: stats,
-        currentRecommendation: recommendation,
-      });
-    } else {
-      // Not tracked yet — show NEW badge
-      set({
+        isProductPage: !!product,
+        detectedProduct: product,
+        currentDealScore: null,
         isTracked: false,
-        currentTrackedProduct: null,
-        currentHistory: [],
-        currentDealScore: { score: 0, label: 'NEW', color: '#00FFFF', isNew: true, reason: 'Start tracking to see the deal score' },
-        currentStats: null,
-        currentRecommendation: null,
       });
     }
   },
@@ -155,109 +161,135 @@ export const usePriceTrackerStore = create<PriceTrackerState>((set, get) => ({
   setTimeRange: (range) => set({ selectedTimeRange: range }),
 
   trackProduct: async () => {
-    const { detectedProduct } = get();
-    if (!detectedProduct) return;
+    try {
+      const { detectedProduct } = get();
+      if (!detectedProduct) return;
 
-    const id = priceTrackerDB.generateProductId(detectedProduct.url);
-    const product: TrackedProduct = {
-      id,
-      title: detectedProduct.title,
-      url: detectedProduct.url,
-      siteName: detectedProduct.siteName,
-      imageUrl: detectedProduct.imageUrl,
-      currency: detectedProduct.currency,
-      initialPrice: detectedProduct.price,
-      currentPrice: detectedProduct.price,
-      lowestPrice: detectedProduct.price,
-      highestPrice: detectedProduct.price,
-      lowestPriceDate: Date.now(),
-      highestPriceDate: Date.now(),
-      dateAdded: Date.now(),
-      lastChecked: Date.now(),
-      isTracking: true,
-      category: guessCategoryFromUrl(detectedProduct.url),
-    };
+      const id = priceTrackerDB.generateProductId(detectedProduct.url);
+      const product: TrackedProduct = {
+        id,
+        title: detectedProduct.title,
+        url: detectedProduct.url,
+        siteName: detectedProduct.siteName,
+        imageUrl: detectedProduct.imageUrl,
+        currency: detectedProduct.currency,
+        initialPrice: detectedProduct.price,
+        currentPrice: detectedProduct.price,
+        lowestPrice: detectedProduct.price,
+        highestPrice: detectedProduct.price,
+        lowestPriceDate: Date.now(),
+        highestPriceDate: Date.now(),
+        dateAdded: Date.now(),
+        lastChecked: Date.now(),
+        isTracking: true,
+        category: guessCategoryFromUrl(detectedProduct.url),
+      };
 
-    await priceTrackerDB.saveProduct(product);
-    await priceTrackerDB.addPriceEntry(id, detectedProduct.price, detectedProduct.currency);
+      await priceTrackerDB.saveProduct(product);
+      await priceTrackerDB.addPriceEntry(id, detectedProduct.price, detectedProduct.currency);
 
-    const history = await priceTrackerDB.getProductHistory(id);
-    const dealScore = priceAnalysisService.calculateDealScore(product, history);
-    const stats = priceAnalysisService.calculateStats(product, history);
-    const recommendation = priceAnalysisService.getBuyRecommendation(product, history, stats);
+      const history = await priceTrackerDB.getProductHistory(id);
+      const dealScore = priceAnalysisService.calculateDealScore(product, history);
+      const stats = priceAnalysisService.calculateStats(product, history);
+      const recommendation = priceAnalysisService.getBuyRecommendation(product, history, stats);
 
-    set({
-      isTracked: true,
-      currentTrackedProduct: product,
-      currentHistory: history,
-      currentDealScore: dealScore,
-      currentStats: stats,
-      currentRecommendation: recommendation,
-    });
+      set({
+        isTracked: true,
+        currentTrackedProduct: product,
+        currentHistory: history,
+        currentDealScore: dealScore,
+        currentStats: stats,
+        currentRecommendation: recommendation,
+      });
 
-    // Reload list
-    await get().loadTrackedProducts();
+      await get().loadTrackedProducts();
+    } catch (error) {
+      console.error('[PriceTracker] trackProduct error:', error);
+    }
   },
 
   stopTracking: async (productId: string) => {
-    await priceTrackerDB.deleteProduct(productId);
-    set({ isTracked: false, currentTrackedProduct: null, currentDealScore: null });
-    await get().loadTrackedProducts();
-    await get().loadStats();
+    try {
+      await priceTrackerDB.deleteProduct(productId);
+      set({ isTracked: false, currentTrackedProduct: null, currentDealScore: null });
+      await get().loadTrackedProducts();
+      await get().loadStats();
+    } catch (error) {
+      console.error('[PriceTracker] stopTracking error:', error);
+    }
   },
 
   refreshCurrentProduct: async () => {
-    const { currentTrackedProduct, selectedTimeRange } = get();
-    if (!currentTrackedProduct) return;
-    const history = await priceTrackerDB.getProductHistory(currentTrackedProduct.id, selectedTimeRange);
-    const allHistory = await priceTrackerDB.getProductHistory(currentTrackedProduct.id);
-    const dealScore = priceAnalysisService.calculateDealScore(currentTrackedProduct, allHistory);
-    const stats = priceAnalysisService.calculateStats(currentTrackedProduct, allHistory);
-    const recommendation = priceAnalysisService.getBuyRecommendation(currentTrackedProduct, allHistory, stats);
-    set({ currentHistory: history, currentDealScore: dealScore, currentStats: stats, currentRecommendation: recommendation });
+    try {
+      const { currentTrackedProduct, selectedTimeRange } = get();
+      if (!currentTrackedProduct) return;
+      const history = await priceTrackerDB.getProductHistory(currentTrackedProduct.id, selectedTimeRange);
+      const allHistory = await priceTrackerDB.getProductHistory(currentTrackedProduct.id);
+      const dealScore = priceAnalysisService.calculateDealScore(currentTrackedProduct, allHistory);
+      const stats = priceAnalysisService.calculateStats(currentTrackedProduct, allHistory);
+      const recommendation = priceAnalysisService.getBuyRecommendation(currentTrackedProduct, allHistory, stats);
+      set({ currentHistory: history, currentDealScore: dealScore, currentStats: stats, currentRecommendation: recommendation });
+    } catch (error) {
+      console.error('[PriceTracker] refreshCurrentProduct error:', error);
+    }
   },
 
   loadTrackedProducts: async () => {
-    const products = await priceTrackerDB.getTrackedProducts();
-    set({ trackedProducts: products });
+    try {
+      const products = await priceTrackerDB.getTrackedProducts();
+      set({ trackedProducts: products });
+    } catch (error) {
+      console.error('[PriceTracker] loadTrackedProducts error:', error);
+      set({ trackedProducts: [] });
+    }
   },
 
   loadStats: async () => {
-    const statsData = await priceTrackerDB.getStats();
-    set({
-      totalSavings: statsData.totalSavings,
-      priceDropCount: statsData.priceDrops,
-      bestDeal: statsData.bestDeal,
-    });
+    try {
+      const statsData = await priceTrackerDB.getStats();
+      set({
+        totalSavings: statsData.totalSavings,
+        priceDropCount: statsData.priceDrops,
+        bestDeal: statsData.bestDeal,
+      });
+    } catch (error) {
+      console.error('[PriceTracker] loadStats error:', error);
+    }
   },
 
   clearAll: async () => {
-    await priceTrackerDB.clearAll();
-    set({
-      detectedProduct: null,
-      isProductPage: false,
-      currentDealScore: null,
-      currentStats: null,
-      currentRecommendation: null,
-      currentHistory: [],
-      isTracked: false,
-      currentTrackedProduct: null,
-      trackedProducts: [],
-      totalSavings: 0,
-      priceDropCount: 0,
-      bestDeal: null,
-    });
+    try {
+      await priceTrackerDB.clearAll();
+      set({
+        detectedProduct: null,
+        isProductPage: false,
+        currentDealScore: null,
+        currentStats: null,
+        currentRecommendation: null,
+        currentHistory: [],
+        isTracked: false,
+        currentTrackedProduct: null,
+        trackedProducts: [],
+        totalSavings: 0,
+        priceDropCount: 0,
+        bestDeal: null,
+      });
+    } catch (error) {
+      console.error('[PriceTracker] clearAll error:', error);
+    }
   },
 
   initialize: async () => {
-    await get().loadTrackedProducts();
-    await get().loadStats();
-    // Initialize notifications (no-op on web)
-    priceNotificationService.initialize();
+    try {
+      await get().loadTrackedProducts();
+      await get().loadStats();
+      priceNotificationService.initialize();
+    } catch (error) {
+      console.error('[PriceTracker] initialize error:', error);
+    }
   },
 }));
 
-// Helper: guess product category from URL
 function guessCategoryFromUrl(url: string): string {
   const lower = url.toLowerCase();
   if (lower.includes('electronic') || lower.includes('computer') || lower.includes('phone') || lower.includes('laptop') || lower.includes('tv')) return 'Electronics';

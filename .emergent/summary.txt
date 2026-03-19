@@ -1,174 +1,199 @@
-**original_problem_statement:**
-The user's core objective is to build a sophisticated, privacy-focused mobile web browser named Aura Browser with a unique, AI-ready user interface.
+**original_problem_statement**: The user initially requested the implementation of an Advanced Price Tracker feature for the Aura Browser mobile app. The detailed specifications included:
+- Auto-detection of product pages using injected JavaScript.
+- A floating Deal Score badge on product pages.
+- A price history graph using SQLite for local storage.
+- A Best Time to Buy prediction algorithm.
+- One-tap price comparison via Google Shopping.
+- A coupon auto-finder for checkout pages.
+- A dedicated Price Tracker screen to manage tracked products.
+- Flash sale detection with push notifications.
+- A Share Deal feature to generate a shareable image.
+- A total savings dashboard.
+- Comprehensive push notifications for various events.
+- A strong emphasis on local data storage for privacy.
 
-Over the session, the user guided the agent to build and fix the following:
-**PRODUCT REQUIREMENTS:**
-1.  **Downloads Manager:** A full-featured manager to intercept, save, and manage file downloads from the WebView, with a custom UI for listing, opening, and deleting files. This was later enhanced with:
-    *   Live progress indicators for active downloads.
-    *   Search and filtering capabilities.
-    *   Batch download support (Download All Links).
-    *   A persistent notification banner for background downloads.
-    *   Auto-categorization of downloads into folders (Documents, Images, Media, etc.).
-2.  **Custom Context Menus:**
-    *   **Image Menu:** A custom long-press context menu for images to replace the default system menu, offering Download, Copy URL, Share, and a placeholder Aura Vision (OCR) option.
-    *   **Text Selection Menu:** A custom UI to replace the native text selection pop-up, initially a bottom sheet, then refactored into a floating Aura Action Pill. It provides Copy, Secure Search, and placeholder AI actions (Insight, Flashcard).
-3.  **Bug Fixes:**
-    *   **AURA Shield UI:** Fix uneven layout of the privacy stats panel and change the Secure status color to green.
-    *   **Ad/Tracker Counters:** Fix the Trackers Blocked and Ads Stopped counters, which were stuck at 0.
-    *   **Home Button:** Fix the non-functional home button in the bottom navigation bar.
-    *   **Bottom Nav Bar UI/UX:** Reduce the size of the bottom navigation bar and implement an auto-hide-on-scroll feature.
-    *   **reCAPTCHA/Bot Detection:** Implement a multi-point fix to prevent sites from flagging the browser as a bot, including setting a mobile User-Agent and defaulting to DuckDuckGo search.
-    *   **Crashes:** Resolve two separate crashes related to module resolution () and undefined props in the  screen.
+Subsequently, the user requested a full, 15-phase audit of the entire application to fix all broken, incomplete, or non-working features, aiming to improve the app's health score.
+
+Most recently, the user provided a specific list of gaps found during the audit and instructed the agent to fix them to raise the app health score from 88/100 to 95+/100. This includes improving error handling, performance, navigation, and settings persistence.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The project is a full-stack application consisting of a React Native (Expo) frontend and a FastAPI backend, functioning as a mobile web browser called Aura Browser.
+The project is a full-stack Aura Browser application using React Native (Expo) for the frontend and a FastAPI backend.
 
-Key implemented features include:
-- A comprehensive Downloads Manager with features like categorization, search, and progress tracking, using a Zustand store () for state management.
-- Custom, non-native context menus for both image long-press () and text selection () that are triggered by intercepting WebView events.
-- A central New Tab Page () that displays a privacy dashboard (AURA Shield).
-- A compact bottom navigation bar () that automatically hides when the user scrolls down the page.
-- A functional ad and tracker blocking system where counts are now reported from the WebView back to the UI.
-- The backend is minimal, primarily serving health check endpoints.
+The agent has successfully implemented the core infrastructure for the Advanced Price Tracker feature. This includes creating services for product detection (), local database management using AsyncStorage (), price analysis (), and push notifications (). Several new UI components have been built (, , ) and integrated into the main application shell (, ). The backend was also extended with mock API endpoints for price comparison and coupon fetching.
+
+Following the feature implementation, the agent performed a comprehensive code audit, successfully resolving **52 TypeScript errors** (bringing the total to zero) and implementing a global  to prevent app-wide crashes.
 
 **Last working item**:
-The agent was working on fixing two issues within the AURA Shield stats panel located on the home screen ().
-
--   Last item agent was working: The agent addressed two user-reported issues simultaneously:
-    1.  **Uneven Layout:** The three stats columns (Trackers, Ads, Connection) were not visually aligned due to varying character widths of the numbers and text. The agent applied a  style to the metric values to enforce monospaced (tabular) numbering for consistent alignment.
-    2.  **Non-Functional Counters:** The Trackers Blocked and Ads Stopped counters were always zero. The agent identified that the DOM-level ad blocker was only hiding elements via CSS and not communicating the block count back to the React Native application. The fix involved modifying the injected  to use a , count the number of blocked elements, and send this count back via . A corresponding message handler was added in  to update the counts in the .
--   Status: **USER VERIFICATION PENDING**
--   Agent Testing Done: N (The agent only took a screenshot of the home page, which verifies the layout but not the counter functionality, which requires web navigation.)
--   Which testing method agent to use? **both**
-    -  To test the layout fix, the **screenshot tool** can be used on the home page.
-    -  To test the counter fix, the **frontend testing agent** should be used to perform a multi-step test: 1. Load the home page and record the initial counts. 2. Navigate to a third-party website with known ads (e.g., forbes.com). 3. Navigate back to the home page and verify that the Ads Stopped and/or Trackers Blocked counters have incremented.
--   User Testing Done: N
+    - Last item agent was working: The agent was addressing the list of remaining gaps from the user's audit request to improve the app's health score. The immediate last action was to enhance error handling by adding  blocks to all asynchronous functions within the Price Tracker's state management file, .
+    - Status: IN PROGRESS
+    - Agent Testing Done: N
+    - Which testing method agent to use? After all audit fixes are complete, the agent should perform a full regression test. This will involve using the  to verify UI and navigation across all screens, and  to test backend endpoints. Due to the nature of many features (WebView injection, native modules), generating a QR code for user testing on a real device will be critical for final verification.
+    - User Testing Done: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1: Verify AURA Shield Panel Fixes (P0)**
-    -   **Description:** The agent has implemented fixes for both the uneven layout and the non-functional ad/tracker counters in the AURA Shield panel. These fixes need to be thoroughly tested to confirm they work as expected.
-    -   **Status:** USER VERIFICATION PENDING
-    -   **Next debug checklist:**
-        1.  Run the **frontend testing agent** to execute the test flow described in the Last working item section.
-        2.  Inspect  and confirm the  style is present on .
-        3.  Inspect  to ensure the  function sends an  message.
-        4.  Inspect  to confirm the  function correctly handles the  message and calls .
-    -   **Why fix this issue and what will be achieved with the fix?** This will fix a core feature of the privacy-focused browser, providing users with real-time feedback on blocking activity and improving the UI's professional appearance.
+  - Issue 1: Complete the full app audit and fix all remaining gaps (P0)
+  - Issue 2: Intermittent Expo/ngrok tunnel instability (P1)
+
+  Issues Detail:
+  - **Issue 1: Complete the full app audit and fix all remaining gaps (P0)**
+     - **Description:** The user has mandated a series of fixes to raise the app health score to 95+. This is the current, highest-priority task.
+     - **Sub-Issue 1.1: Error Handling**
+        - **Next debug checklist:**
+            - Add  blocks to all async functions in  and .
+            - Review all API calls () and database operations () to ensure they have user-facing error handling (e.g., showing an alert) instead of failing silently.
+        - **Status:** IN PROGRESS
+     - **Sub-Issue 1.2: Performance**
+        - **Next debug checklist:**
+            - Address  calls that lack a corresponding . These are in singleton services (, , ). Implement proper cleanup logic for when these services are hypothetically stopped or the app closes.
+            - Add cleanup functions to the 8  hooks in  that are missing them.
+            - Audit all , , and virtualized list components to ensure  is implemented and  is used where item heights are fixed, to optimize rendering.
+        - **Status:** NOT STARTED
+     - **Sub-Issue 1.3: Specific Feature Audit**
+        - **Description:** A set of features that are difficult or impossible to test in the web preview and are blocked pending a stable environment for device testing.
+        - **Next debug checklist:** Once a stable QR code can be generated, these must be tested: Ghost Mode biometric lock, self-destruct timer, Price Tracker badge on live shopping sites (Amazon/Walmart), Aura Memory auto-saving, background video playback, download resume, and Kids Mode PIN lock.
+        - **Status:** BLOCKED
+     - **Why fix this issue and what will be achieved with the fix?** To improve the application's overall stability, performance, and reliability, meeting the user's quality standards and raising the health score to 95+.
+     - **Should Test frontend/backend/both after fix?** Both. A full regression test is required.
+
+  - **Issue 2: Intermittent Expo/ngrok tunnel instability (P1)**
+     - **Description:** The preview tunnel provided by the environment is highly unstable, frequently causing  errors. This severely hinders UI verification and testing.
+     - **Attempted fixes:** Numerous restarts of the expo service, clearing Metro cache.
+     - **Next debug checklist:** Follow the user's standing instruction: Do not spend credits diagnosing the tunnel. If it fails, report Tunnel is down... and continue with code-level tasks. Only attempt UI verification when the tunnel is temporarily stable.
+     - **Status:** BLOCKED
+     - **Is recurring issue?** Y
 
 **In progress Task List**:
-None.
+  - **Task 1: Complete the full app audit and fixes (P0)**
+     - **Where to resume:** The agent just fixed error handling in . The next immediate step is to apply similar  fixes to the remaining identified files:  and . Afterward, proceed to the performance fixes (, ) as outlined in the issue list.
+     - **What will be achieved with this?** A more robust, performant, and reliable application that meets the user's quality requirements.
+     - **Status:** IN PROGRESS
+     - **Should Test frontend/backend/both after fix?** Both.
 
 **Upcoming and Future Tasks**
+  **Upcoming Tasks:**
+  - (P1) Wire AI Actions: Implement the Explain/Summarize with GPT-4o functionality within the .
 
--   **Upcoming Tasks:**
-    -   **(P1) Wire AI Actions:** Implement the backend logic and frontend integration for the placeholder AI buttons.
-        -   Wire Explain and Summarize buttons in  to a GPT-4o service.
-        -   Wire Aura Vision button in  to a GPT-4o Vision API for image-to-text extraction.
-
--   **Future Tasks:**
-    -   **(P2) Add Define Button:** Implement a Define action in  for single-word dictionary lookups.
-    -   **(P2) Add Translate Button:** Add translation capabilities to the text and image context menus.
-    -   **(P3) Downloads Storage Insights:** Enhance the Downloads Manager with a visual chart showing storage usage by category.
-    -   **(P3) Cloud Sync:** Implement a cloud backup/sync feature for bookmarks and download history.
+  **Future Tasks:**
+  - (P2) Add Translate Button: Integrate translation into text and image context menus.
+  - (P3) Downloads Storage Insights: Create a visual chart for download storage breakdown.
+  - (P3) Cloud Sync: Implement backup and sync functionality for bookmarks and download history.
 
 **Completed work in this session**
--   **Downloads Manager (Features):**
-    -   Implemented a complete Downloads Manager with a custom UI (), file handling logic (), and state management ().
-    -   Added advanced features: live progress, search, batch downloads, background notifications, and auto-categorization.
--   **Custom UI Components (Features):**
-    -   Created a custom long-press context menu for images ().
-    -   Created a floating Aura Action Pill for text selection ().
--   **Bug Fixes & Refinements:**
-    -   Fixed multiple UI layout issues in the AURA Shield panel ().
-    -   Fixed a non-functional home button by creating a dedicated  handler (, ).
-    -   Resolved two critical app crashes related to module resolution and undefined props in .
-    -   Fixed bot-detection issues by setting a proper User-Agent and changing the default search engine to DuckDuckGo.
-    -   Made the bottom navigation bar more compact and implemented an auto-hide-on-scroll animation.
-    -   Implemented the counting mechanism for the ad and tracker blocker.
+- **Advanced Price Tracker Feature (Core Implementation):**
+  - **Services:** , , , .
+  - **UI Components:** , , , .
+  - **Backend:** Added  and  endpoints to .
+  - **Integration:** Connected the feature to the main browser UI in , , , and .
+- **Full App Audit & Code Quality Overhaul:**
+  - **TypeScript Errors:** Fixed 52 distinct TypeScript errors, achieving a zero-error state across the codebase.
+  - **Crash Prevention:** Created and implemented a global  around the root layout () to catch runtime errors and prevent the app from crashing.
+  - **Platform Fixes:** Resolved a web-platform crash in  by adding a  check.
 
 **Earlier issues found/mentioned but not fixed**
-None. The agent has addressed all issues raised by the user during this session.
+All known code-level issues are being addressed as part of the active Complete the full app audit task. The only major un-fixed issue is the infrastructure-level tunnel instability.
 
 **Known issue recurrence from previous fork**
-None.
+  - The previous handoff summary was empty (Unable to find the analysis...).
+  - The primary recurring issue within this session is the **ngrok tunnel instability**, which has persisted despite multiple restarts and troubleshooting attempts.
+  - **Recurrence count:** High (occurred dozens of times).
+  - **Status:** BLOCKED (Infrastructure issue).
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Frameworks:** React Native (Expo) for the frontend, FastAPI for the backend.
--   **WebView-Native Bridge:** The core mechanism for custom browser features. It relies on injecting JavaScript into the  to capture events (e.g., , , ) and using  to send data back to the React Native host app.
--   **State Management:** A hybrid approach using React Context for localized state () and Zustand for more complex, global state (, ).
--   **File System:**  and  are used for the Downloads Manager.
--   **Animation:** The React Native  API is used for UI animations like the auto-hiding navigation bar.
+- **Frontend:** React Native, Expo, Expo Router (file-based routing), TypeScript
+- **Backend:** FastAPI (Python)
+- **Database:** No traditional DB. Uses device's  for local, private data persistence, managed via service layers like .
+- **State Management:** Zustand (, , etc.)
+- **Architecture:** Monorepo-like structure with  and  directories. Heavy use of WebView injection () to bridge native UI with web content for features like product detection.
 
 **key DB schema**
-No database schemas were modified or created. Data persistence for ad/tracker counts is handled via  on the device.
+The application uses  for local persistence, not a formal database. Data structures are defined by TypeScript interfaces in :
+- **TrackedProduct**: 
+- **PriceHistoryEntry**: 
+- **SavingsRecord**: 
 
 **changes in tech stack**
-None.
+- **Added:**  and  for the price history graph feature.
 
 **All files of reference**
--   : The main application screen. It hosts the  and contains the message handling logic that connects the web content to the native UI features. It was heavily modified to integrate almost every new feature.
--   : The home screen component. It was updated to fix the layout of the AURA Shield stats.
--   : Contains the ad/tracker blocking logic. It was updated to add counting and report back to the main app.
--   : The React Context responsible for managing and persisting the ad and tracker block counts.
--   : The bottom navigation bar. It was refactored to be more compact, to auto-hide on scroll, and to fix the home button.
--   : The bookmarks/history screen. It was fixed to prevent a crash when opened as a route.
--   : A newly created component for the floating text selection menu.
--   : A newly created component for the custom image long-press menu.
--   : Newly created service to handle all file download logic.
--   : Newly created Zustand store to manage the state of all downloads.
--   : The agent-managed Product Requirements document.
+- **Created:**
+  - : Manages all database operations for the price tracker using AsyncStorage.
+  - : Contains the JavaScript code to be injected into WebViews to detect product pages.
+  - : Includes logic for calculating deal scores and generating buy now/wait recommendations.
+  - : Zustand store to manage all state related to price tracking.
+  - : Handles scheduling and sending local push notifications for price alerts.
+  - : The main bottom sheet UI that displays the price chart and details.
+  - : The full-screen modal for managing all tracked products.
+  - : The small floating icon that appears in the URL bar.
+  - : The bottom sheet for displaying found coupon codes.
+  - : A global error boundary to catch runtime errors and prevent app crashes.
+- **Updated:**
+  - : Added new API endpoints for price comparison and coupon fetching.
+  - : Major integration point for state management, WebView message handling, and rendering new UI components.
+  - : Modified to inject product detection scripts into the WebView.
+  - : Added a menu item to open the Price Tracker screen.
+  - : Integrated Price Tracker data clearing into the Burn Data feature.
+  - : Wrapped the entire app with the new .
+  - **Numerous other files** were updated to fix the 52 TypeScript errors found during the audit.
 
 **Areas that need refactoring**:
--   The main application file, , has grown to over 2,800 lines. It manages a significant amount of state, side effects, and complex JSX. It should be broken down into smaller, more manageable custom hooks and components to improve readability and maintainability. For example, the WebView message handling logic and the various modal visibility states could be extracted.
+- : Has 8  hooks that are missing cleanup functions, which could lead to memory leaks or unexpected behavior. This file needs to be refactored to include proper cleanup logic.
+- Singleton services like  use  without a corresponding . While intended to run for the app's lifetime, adding a cleanup method to these services would make them more robust.
 
 **key api endpoints**
--   
--   
+- 
+- : (Mock) Proxies a search to Google Shopping.
+- : (Mock) Returns sample coupon codes for a given domain.
 
 **Critical Info for New Agent**
--   The application's most complex features (custom menus, ad counting, scroll behavior) are built on the **WebView-to-Native communication bridge**. When debugging these features, you must examine both the injected JavaScript (in  within  and ) and the  function in .
--   The project uses a mix of state management tools. Be sure to identify whether the relevant state is managed by **Zustand**, **React Context**, or local .
--   The file  is the application's core. Be cautious when making changes here, as they can have far-reaching impacts.
--   Some components like  are designed to function as both modal components (receiving props) and standalone routes (receiving no props), which has been a source of bugs. Always check for a default export, which indicates an Expo Router route.
+- **PRIORITY 1 is the Audit Fixes:** Your main goal is to continue the work of fixing all the gaps identified in the user's audit request (message 771). This involves improving error handling, performance (/ cleanup), and verifying settings persistence.
+- **IGNORE TUNNEL ISSUES:** The Expo preview tunnel is extremely unstable. This is a known infrastructure problem. **Do not waste any time or credits trying to diagnose or fix it.** If the preview is down, state Tunnel is down... and continue working on code-level tasks. The code can be verified via build checks (- Making sure project is set up correctly...
+- Making sure project is set up correctly...) and TypeScript checks ().
+- **Web Preview Limitations:** Many features like WebView script injection, native notifications, and biometrics will not function in the web preview. The app must be tested on a real device via Expo Go for full validation, which is currently blocked by the tunnel instability.
+- **Code Quality is Key:** The previous agent fixed 52 TypeScript errors. Maintain a zero-error policy. The user is focused on high-quality, robust code.
 
 **documents and test reports created in this job**
--   /app/memory/PRD.md
--   /app/test_result.md (updated throughout the job)
+- The file  was updated to include the new Price Tracker feature.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **Request (Pending Verification):** Fix the uneven layout and non-working ad/tracker counters in the AURA Shield panel.
-2.  **Summary:** Agent confirms fix for  crash.
-3.  **Request:** Fix a crash in  where  is undefined.
-4.  **Summary:** Agent confirms fix for the bottom navigation bar UI/UX.
-5.  **Request:** Make the bottom navigation bar smaller and auto-hide on scroll.
-6.  **Summary:** Agent confirms fix for the non-working home button.
-7.  **Request:** Fix the home button.
-8.  **Summary:** Agent confirms fix for reCAPTCHA/bot detection issues.
-9.  **Request:** Fix reCAPTCHA/bot detection issues with a 5-point plan.
-10. **Summary:** Agent confirms fix for an earlier crash in .
+10.  Great audit results. Now improve the app health score from 88 to 95+ by fixing remaining gaps in error handling, performance, navigation, and settings.
+9.  CONFIRMS audit is complete and provides final instructions. (This was the  tool call summary, not a user message).
+8.  Requests a complete 15-phase audit of the entire app, fixing every issue found related to code quality, navigation, settings, and all major features.
+7.  Responds to  tool summary on price tracker.
+6.  Provides new, permanent instructions for handling the unstable ngrok tunnel: do not diagnose, just report it's down and continue building. Gives specific commands to try and restart it if instructed.
+5.  Expresses frustration with the unstable ngrok tunnel wasting credits and provides urgent instructions to switch to a LAN-based setup.
+4.  Responds to  tool summary.
+3.  Responds to  with 'continue'.
+2.  Provided the full, detailed specification for the Advanced Price Tracker feature.
+1.  Please use ask_human tool and confirm your plan now.
 
 **Project Health Check:**
--   **Broken:** None confirmed, but the fix for the ad/tracker counters is pending verification.
--   **Mocked:** The AI-powered actions are placeholders.
-    -   Explain & Summarize buttons in the .
-    -   Aura Vision button in the .
+- **Broken:**
+  - The Expo preview tunnel is intermittently non-functional, blocking most UI/UX testing.
+  - Multiple features are not fully robust as per the user's audit (e.g., missing error handling, potential memory leaks), which is the current task to resolve.
+- **Mocked:**
+  - The backend endpoints for price comparison () and coupons () currently return static, mock data.
+  - The tab manager screen () uses a hardcoded list of mock tabs for display when not in Ghost Mode.
 
 **3rd Party Integrations**
--   None added in this session. The project uses standard React Native / Expo libraries.
+- : Used for the price history graph.
+- : Dependency for .
+- : Used for price drop alerts.
+- : Used for managing downloads.
+- : Present for local AI model inference (flagged by deployment agent as a blocker for Emergent's standard deployment).
 
 **Testing status**
--   Testing agent used after significant changes: YES. The agent used  regularly, which appears to perform static code analysis and health checks.
--   Troubleshoot agent used after agent stuck in loop: NO.
--   Test files created: None.
--   Known regressions: None.
+  - **Testing agent used after significant changes:** NO (Manual testing and  were used, but were heavily impacted by infrastructure issues).
+  - **Troubleshoot agent used after agent stuck in loop:** YES (Used to diagnose the ngrok tunnel issue).
+  - **Test files created:** None.
+  - **Known regressions:** The user's audit request (message 483) serves as a list of features that are not working as expected, which can be considered regressions or incomplete implementations.
 
 **Credentials to test flow:**
 N/A
 
 **What agent forgot to execute**
--   The agent did not perform a functional test of the ad/tracker counter fix after implementing it. It only took a screenshot of the home page, which could not verify if the counters increment after browsing an ad-heavy website. The next agent must perform this verification step.
+The agent is currently in the process of executing the user's latest and most critical request: fixing all the gaps identified during the full app audit. Nothing has been forgotten, but the task is large and in progress.
