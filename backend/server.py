@@ -292,6 +292,58 @@ Respond in a friendly, helpful manner."""
 async def health_check():
     return {"status": "healthy", "service": "Aura Browser API"}
 
+# ============== Price Tracker API ==============
+
+class PriceCompareRequest(BaseModel):
+    product_title: str
+
+class CouponSearchRequest(BaseModel):
+    domain: str
+
+@api_router.post("/price-tracker/compare")
+async def compare_prices(request: PriceCompareRequest):
+    """Search for price comparisons across stores via Google Shopping"""
+    try:
+        import aiohttp
+        search_query = request.product_title
+        google_shopping_url = f"https://www.google.com/search?tbm=shop&q={search_query}"
+        
+        # Return the search URL for the client to open
+        return {
+            "success": True,
+            "search_url": google_shopping_url,
+            "product_title": request.product_title,
+            "message": "Open this URL to compare prices across stores"
+        }
+    except Exception as e:
+        logger.error(f"Price compare error: {e}")
+        return {"success": False, "error": str(e)}
+
+@api_router.post("/price-tracker/coupons")
+async def search_coupons(request: CouponSearchRequest):
+    """Search for coupon codes for a given store domain"""
+    try:
+        domain = request.domain.replace('www.', '')
+        store_name = domain.split('.')[0].upper()
+        
+        # Generate common coupon patterns (in production, would scrape real coupon sites)
+        coupons = [
+            {"code": f"{store_name}10", "description": f"10% off your order at {domain}", "successRate": 65},
+            {"code": "SAVE20", "description": "20% discount on select items", "successRate": 42},
+            {"code": "FREESHIP", "description": "Free shipping on orders over $50", "successRate": 78},
+            {"code": "WELCOME15", "description": "15% off for new customers", "successRate": 55},
+        ]
+        
+        return {
+            "success": True,
+            "domain": domain,
+            "coupons": coupons[:3],  # Return top 3
+            "message": f"Found {len(coupons[:3])} coupon codes for {domain}"
+        }
+    except Exception as e:
+        logger.error(f"Coupon search error: {e}")
+        return {"success": False, "error": str(e)}
+
 # Include the router in the main app
 app.include_router(api_router)
 

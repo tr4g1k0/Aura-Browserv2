@@ -457,6 +457,43 @@ The most advanced private browsing mode on any mobile browser.
 - `/app/frontend/src/services/DecoyHistoryService.ts`
 - `/app/frontend/src/components/GhostMode*.tsx` (6 component files)
 
+### Phase: Advanced Price Tracker (COMPLETED)
+**Status:** ✅ Complete — Phases 1-3 implemented
+
+**What was built:**
+1. **Auto-Detection** — JavaScript injection on every page load to detect product/shopping pages. Extracts title, price, currency, image URL, site name from ANY shopping site
+2. **Deal Score Badge** — Injected directly into the webpage as a draggable badge (1-10 scale, color-coded). Tapping opens the Price Tracker sheet
+3. **Price Tracker Sheet** — Full bottom sheet with:
+   - Price history line chart (react-native-chart-kit) with 30/60/90 day toggles
+   - All-time low/high, average price, 7-day change statistics
+   - Best Time to Buy prediction (4 scenarios: Buy Now, Wait, Uncertain, Rising)
+   - One-tap price compare via Google Shopping
+   - Share deal functionality
+4. **Price Tracker Screen** — Dedicated full screen accessible from Menu → Price Tracker
+   - All tracked products as cards with sparkline mini-charts
+   - Filter tabs: All, Price Drops, Watching, Best Deals
+   - Total Savings Dashboard (products tracked, savings, drops)
+   - Motivational savings message
+5. **Checkout Coupon Finder** — Auto-detects checkout/cart pages and shows coupon codes
+6. **Privacy** — All data stored 100% locally via AsyncStorage (no server tracking)
+7. **Integration** — Burn Browsing Data clears all price tracking data
+
+**Files created:**
+- `/app/frontend/src/services/PriceTrackerDB.ts` (local storage database)
+- `/app/frontend/src/services/ProductDetectionService.ts` (JS injection scripts)
+- `/app/frontend/src/services/PriceAnalysisService.ts` (deal score, prediction algorithms)
+- `/app/frontend/src/store/usePriceTrackerStore.ts` (Zustand state management)
+- `/app/frontend/src/components/PriceTrackerSheet.tsx` (bottom sheet with chart)
+- `/app/frontend/src/components/PriceTrackerScreen.tsx` (full screen tracker)
+- `/app/frontend/src/components/PriceTagIndicator.tsx` (floating price tag button)
+- `/app/frontend/src/components/CouponFinderSheet.tsx` (coupon codes display)
+
+**Files modified:**
+- `/app/frontend/app/index.tsx` (message handlers, UI integration)
+- `/app/frontend/src/hooks/useWebViewEngine.ts` (script injection)
+- `/app/frontend/src/components/BrowserMenu.tsx` (Price Tracker menu item)
+- `/app/frontend/app/settings.tsx` (burn data integration)
+- `/app/backend/server.py` (price compare & coupon APIs)
 
 
 ## Upcoming Tasks

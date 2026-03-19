@@ -217,7 +217,7 @@ export const PriceTrackerSheet: React.FC = () => {
                     backgroundColor: 'transparent',
                     backgroundGradientFrom: DARK_BG,
                     backgroundGradientTo: DARK_BG,
-                    decimalCount: 2,
+                    decimalPlaces: 2,
                     color: (opacity = 1) => `rgba(0, 255, 255, ${opacity})`,
                     labelColor: () => '#666',
                     propsForDots: { r: '3', strokeWidth: '1', stroke: CYAN },
