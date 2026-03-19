@@ -255,7 +255,7 @@ class KidsContentFilter {
             // Add SafeSearch parameter if not already present
             const paramKey = param.split('=')[0].replace('&', '');
             if (!urlObj.searchParams.has(paramKey)) {
-              return url + (url.includes('?') ? param : param.replace('&', '?'));
+              return url + (url.includes('?') ? param : param.replace(/^&/, '?'));
             }
           }
           break;
