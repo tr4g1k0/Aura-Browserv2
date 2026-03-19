@@ -41,13 +41,20 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - Ambient Awareness alerts
 - Accessibility modal
 
-### Downloads Manager (Feb 2026)
+### Downloads Manager (Feb 2026) ✅
+**Core (v1):**
 - WebView download interception (iOS onFileDownload + Android URL pattern matching)
 - FileDownloadManager service with progress tracking
 - DownloadToast for real-time download progress
-- DownloadsModal - full-screen file manager with file type icons, tap-to-open (Sharing API), delete, clear all
+- DownloadsModal — full-screen file manager with file type icons, tap-to-open (Sharing API), delete, clear all
 - Downloads persisted to AsyncStorage
 - Menu → Downloads button opens DownloadsModal
+
+**Enhancements (v2):**
+- **Active Downloads with Live Progress**: Zustand store (`useDownloadsStore`) tracks all active downloads with real-time progress bars displayed at the top of DownloadsModal
+- **Search & Filter**: Search bar filters by filename; filter chips by file type (All, Docs, Images, Audio, Video, Archives) with extension-based categorization
+- **Batch Download Support**: Long-press enables multi-select mode with checkboxes, bulk delete, select-all. "Download All Links" menu item scans current page for downloadable `<a>` href links via JS injection
+- **Background Download Notifications**: `DownloadNotificationBanner` — persistent floating banner when downloads are active and modal is closed, shows aggregate progress, tap to open modal, auto-dismisses on completion
 
 ### Settings
 - Premium glossy glassmorphic design
@@ -69,6 +76,8 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - `/app/frontend/app/index.tsx` - Main browser (2500+ lines)
 - `/app/frontend/app/settings.tsx` - Settings screen
 - `/app/frontend/src/components/BrowserMenu.tsx` - 3-dot menu
-- `/app/frontend/src/components/DownloadsModal.tsx` - Downloads manager
+- `/app/frontend/src/components/DownloadsModal.tsx` - Downloads manager (enhanced)
+- `/app/frontend/src/components/DownloadNotificationBanner.tsx` - Background download banner
+- `/app/frontend/src/store/useDownloadsStore.ts` - Active downloads Zustand store
 - `/app/frontend/src/services/FileDownloadManager.ts` - Download service
 - `/app/backend/server.py` - All API routes
