@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -51,2047 +51,867 @@ if (Platform.OS !== 'web') {
   }
 }
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SW, height: SH } = Dimensions.get('window');
 
-// Premium Color Palette - AURA BRANDING
-const AURA_BLUE = '#00F2FF';  // Official Aura accent color
-const AURA_BLUE_GLOW = 'rgba(0, 242, 255, 0.15)';
+// ── PREMIUM PALETTE ──
+const DEEP_BG = '#050508';
 const SHIELD_GREEN = '#00FF88';
-const DEEP_BLACK = '#050508';
-const DEEP_INDIGO = '#0A0A0F';  // Aura background
-const GLASS_WHITE = 'rgba(255, 255, 255, 0.05)';
-const GLASS_BORDER = 'rgba(255, 255, 255, 0.12)';
-const MUTED_GRAY = '#888888';
-const OFFLINE_GRAY = '#666666';
+const AURA_TEAL = '#00FFD0';
+const AURA_CYAN = '#00F2FF';
+const GLASS_BG = 'rgba(255,255,255,0.05)';
+const GLASS_BORDER = 'rgba(255,255,255,0.10)';
+const GLASS_BORDER_LIT = 'rgba(255,255,255,0.14)';
+const TEXT_DIM = 'rgba(255,255,255,0.45)';
+const TEXT_SOFT = 'rgba(255,255,255,0.65)';
+const FONT_STACK = Platform.select({
+  ios: { fontFamily: 'System' },
+  android: { fontFamily: 'Roboto' },
+  web: { fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif' },
+}) as any;
 
-// Legacy alias for compatibility
-const ELECTRIC_CYAN = AURA_BLUE;
-const ELECTRIC_CYAN_GLOW = AURA_BLUE_GLOW;
-
-interface NewTabPageProps {
-  onNavigate: (url: string) => void;
-  onSearch: (query: string) => void;
-  onOpenMenu?: () => void;
-  onAISummarize?: () => void;
-  onAccessibility?: () => void;
-}
-
-// Get first letter of title for display
-const getInitial = (title: string): string => {
-  return title.charAt(0).toUpperCase();
+// ── Utility fns (unchanged) ──
+const getInitial = (t: string) => t.charAt(0).toUpperCase();
+const isLikelyUrl = (s: string) => {
+  const t = s.trim().toLowerCase();
+  if (!t.includes(' ') && t.includes('.')) return true;
+  if (t.startsWith('http://') || t.startsWith('https://')) return true;
+  return ['.com','.org','.net','.io','.co','.dev','.app','.ai'].some(x => t.endsWith(x));
 };
-
-// Check if input looks like a URL
-const isLikelyUrl = (input: string): boolean => {
-  const trimmed = input.trim().toLowerCase();
-  // Has no spaces and contains a dot (likely a domain)
-  if (!trimmed.includes(' ') && trimmed.includes('.')) {
-    return true;
-  }
-  // Starts with http:// or https://
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return true;
-  }
-  // Common TLDs
-  const tlds = ['.com', '.org', '.net', '.io', '.co', '.dev', '.app', '.ai'];
-  return tlds.some(tld => trimmed.endsWith(tld));
+const formatUrl = (s: string) => {
+  const t = s.trim();
+  return t.startsWith('http://') || t.startsWith('https://') ? t : `https://${t}`;
 };
-
-// Format URL with https if needed
-const formatUrl = (input: string): string => {
-  const trimmed = input.trim();
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return trimmed;
-  }
-  return `https://${trimmed}`;
-};
-
-// Get search URL based on engine
-const getSearchUrl = (query: string, engine: string): string => {
-  const encodedQuery = encodeURIComponent(query);
-  switch (engine) {
-    case 'duckduckgo':
-      return `https://duckduckgo.com/?q=${encodedQuery}`;
-    case 'bing':
-      return `https://www.bing.com/search?q=${encodedQuery}`;
-    case 'google':
-    default:
-      return `https://duckduckgo.com/?q=${encodedQuery}`;
+const getSearchUrl = (q: string, e: string) => {
+  const eq = encodeURIComponent(q);
+  switch (e) {
+    case 'duckduckgo': return `https://duckduckgo.com/?q=${eq}`;
+    case 'bing': return `https://www.bing.com/search?q=${eq}`;
+    default: return `https://duckduckgo.com/?q=${eq}`;
   }
 };
-
-// Extract domain from URL
-const extractDomain = (url: string): string => {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.hostname.replace('www.', '');
-  } catch {
-    return url;
-  }
+const extractDomain = (url: string) => {
+  try { return new URL(url).hostname.replace('www.', ''); }
+  catch { return url; }
 };
 
-// ============================================================
-// IMMERSIVE BACKDROP - Deep gradient with Electric Cyan orb
-// ============================================================
-const ImmersiveBackdrop: React.FC = () => {
-  const pulseValue = useSharedValue(0);
-
+// ================================================================
+// 1. LIVING AURORA BACKDROP – animated glow + floating particles
+// ================================================================
+const LivingAuroraBackdrop: React.FC = () => {
+  const drift = useSharedValue(0);
   useEffect(() => {
-    pulseValue.value = withRepeat(
+    drift.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 4000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
+        withTiming(1, { duration: 8000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 8000, easing: Easing.inOut(Easing.ease) }),
+      ), -1, false,
     );
   }, []);
 
-  const orbStyle = useAnimatedStyle(() => {
-    const scale = interpolate(pulseValue.value, [0, 1], [1, 1.15]);
-    const opacity = interpolate(pulseValue.value, [0, 1], [0.08, 0.15]);
-    return {
-      transform: [{ scale }],
-      opacity,
-    };
+  const tealGlow = useAnimatedStyle(() => {
+    const tx = interpolate(drift.value, [0, 1], [-20, 20]);
+    const ty = interpolate(drift.value, [0, 1], [-10, 10]);
+    return { transform: [{ translateX: tx }, { translateY: ty }] };
+  });
+  const blueGlow = useAnimatedStyle(() => {
+    const tx = interpolate(drift.value, [0, 1], [15, -15]);
+    const ty = interpolate(drift.value, [0, 1], [10, -5]);
+    return { transform: [{ translateX: tx }, { translateY: ty }] };
   });
 
   return (
-    <View style={styles.backdropContainer}>
-      <LinearGradient
-        colors={[DEEP_BLACK, '#0A0A12', '#080810', DEEP_BLACK]}
-        locations={[0, 0.3, 0.7, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      
-      <Animated.View style={[styles.cyanOrb, orbStyle]}>
-        <LinearGradient
-          colors={['rgba(0, 255, 255, 0.3)', 'rgba(0, 255, 255, 0.05)', 'transparent']}
-          style={styles.orbGradient}
-          start={{ x: 0.5, y: 0.5 }}
-          end={{ x: 0.5, y: 1 }}
-        />
-      </Animated.View>
-
-      <View style={styles.purpleOrb}>
-        <LinearGradient
-          colors={['rgba(139, 92, 246, 0.08)', 'transparent']}
-          style={styles.orbGradient}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
-      </View>
-
-      <View style={styles.noiseOverlay} />
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient colors={[DEEP_BG, '#07070C', '#060609', DEEP_BG]} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill} />
+      {/* Teal glow behind shield */}
+      <Animated.View style={[{
+        position: 'absolute', top: SH * 0.02, left: SW * 0.15, width: SW * 0.7, height: SW * 0.7,
+        borderRadius: SW * 0.35, backgroundColor: 'rgba(0,255,150,0.055)',
+      }, Platform.OS === 'web' ? { boxShadow: '0 0 120px 60px rgba(0,255,150,0.04)' } as any : {}, tealGlow]} />
+      {/* Blue glow bottom */}
+      <Animated.View style={[{
+        position: 'absolute', bottom: SH * 0.05, left: -SW * 0.1, width: SW * 0.6, height: SW * 0.6,
+        borderRadius: SW * 0.3, backgroundColor: 'rgba(0,100,255,0.035)',
+      }, Platform.OS === 'web' ? { boxShadow: '0 0 100px 50px rgba(0,100,255,0.03)' } as any : {}, blueGlow]} />
+      <Animated.View style={[{
+        position: 'absolute', bottom: SH * 0.12, right: -SW * 0.15, width: SW * 0.5, height: SW * 0.5,
+        borderRadius: SW * 0.25, backgroundColor: 'rgba(80,60,200,0.03)',
+      }, blueGlow]} />
+      {/* Floating particles */}
+      {PARTICLES.map((p, i) => <FloatingParticle key={i} {...p} />)}
     </View>
   );
 };
 
-// ============================================================
-// AI SHIELD STATUS WIDGET - Wired to strictLocalAI setting
-// ============================================================
-const AIShieldStatus: React.FC<{ isAIActive: boolean }> = ({ isAIActive }) => {
-  const pulseValue = useSharedValue(0);
+const PARTICLES = Array.from({ length: 8 }, (_, i) => ({
+  left: Math.random() * SW,
+  size: 2 + Math.random() * 1.5,
+  delay: i * 800,
+  duration: 7000 + Math.random() * 5000,
+  color: i % 3 === 0 ? 'rgba(0,255,136,0.5)' : i % 3 === 1 ? 'rgba(0,210,200,0.4)' : 'rgba(0,180,255,0.35)',
+}));
 
+const FloatingParticle = React.memo(({ left, size, delay, duration, color }: typeof PARTICLES[0]) => {
+  const prog = useSharedValue(0);
   useEffect(() => {
-    if (isAIActive) {
-      pulseValue.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-          withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        false
-      );
-    } else {
-      pulseValue.value = withTiming(0.5, { duration: 300 });
-    }
-  }, [isAIActive]);
+    prog.value = withDelay(delay, withRepeat(withTiming(1, { duration, easing: Easing.linear }), -1, false));
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(prog.value, [0, 1], [SH + 20, -40]) }],
+    opacity: interpolate(prog.value, [0, 0.1, 0.8, 1], [0, 0.7, 0.7, 0]),
+  }));
+  return <Animated.View style={[{ position: 'absolute', left, width: size, height: size, borderRadius: size / 2, backgroundColor: color }, style]} />;
+});
 
-  const dotStyle = useAnimatedStyle(() => {
-    const scale = isAIActive ? interpolate(pulseValue.value, [0, 1], [1, 1.3]) : 1;
-    const opacity = isAIActive ? interpolate(pulseValue.value, [0, 1], [0.7, 1]) : 0.5;
-    return {
-      transform: [{ scale }],
-      opacity,
-    };
-  });
+// ================================================================
+// 2. HERO SHIELD – iconic shield with radar ripples
+// ================================================================
+const HeroShield: React.FC = () => {
+  const breathe = useSharedValue(0);
+  useEffect(() => {
+    breathe.value = withRepeat(withSequence(
+      withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+      withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+    ), -1, false);
+  }, []);
 
-  const isWeb = Platform.OS === 'web';
-  const dotColor = isAIActive ? SHIELD_GREEN : OFFLINE_GRAY;
-  // AURA BRANDING: Updated status text
-  const statusText = isAIActive ? 'Aura Active' : 'AI Offline';
-  const subText = 'Shielding your data';
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(breathe.value, [0, 1], [1, 1.06]) }],
+  }));
+  const innerGlow = useAnimatedStyle(() => ({
+    opacity: interpolate(breathe.value, [0, 1], [0.35, 0.65]),
+    transform: [{ scale: interpolate(breathe.value, [0, 1], [1, 1.15]) }],
+  }));
+  const outerGlow = useAnimatedStyle(() => ({
+    opacity: interpolate(breathe.value, [0, 1], [0.12, 0.25]),
+    transform: [{ scale: interpolate(breathe.value, [0, 1], [1, 1.25]) }],
+  }));
 
   return (
-    <Animated.View 
-      entering={FadeIn.delay(400).duration(600)}
-      style={styles.shieldStatusContainer}
-    >
-      {isWeb ? (
-        <View style={styles.shieldStatusPill}>
-          <View style={styles.shieldStatusHighlight} />
-          <Animated.View style={[styles.statusDot, { backgroundColor: dotColor }, dotStyle]} />
-          <Text style={[styles.shieldStatusText, { color: dotColor }]}>{statusText}</Text>
-          <View style={styles.shieldDivider} />
-          <Ionicons name="shield-checkmark" size={14} color={dotColor} />
-          <Text style={styles.shieldStatusSubtext}>{subText}</Text>
-        </View>
-      ) : (
-        <BlurView tint="dark" intensity={40} style={styles.shieldStatusPill}>
-          <View style={styles.shieldStatusHighlight} />
-          <Animated.View style={[styles.statusDot, { backgroundColor: dotColor }, dotStyle]} />
-          <Text style={[styles.shieldStatusText, { color: dotColor }]}>{statusText}</Text>
-          <View style={styles.shieldDivider} />
-          <Ionicons name="shield-checkmark" size={14} color={dotColor} />
-          <Text style={styles.shieldStatusSubtext}>{subText}</Text>
-        </BlurView>
-      )}
+    <Animated.View entering={FadeIn.delay(100).duration(800).springify()} style={s.shieldWrap}>
+      {/* Outermost pulse glow */}
+      <Animated.View style={[s.shieldGlow3, outerGlow]} />
+      {/* Outer glow */}
+      <Animated.View style={[s.shieldGlow2, outerGlow]} />
+      {/* Inner glow */}
+      <Animated.View style={[s.shieldGlow1, innerGlow]} />
+      {/* Radar ripples */}
+      <RadarRipple delay={0} />
+      <RadarRipple delay={600} />
+      <RadarRipple delay={1200} />
+      {/* Shield icon */}
+      <Animated.View style={[s.shieldIcon, iconStyle]}>
+        <Ionicons name="shield-checkmark" size={64} color={SHIELD_GREEN} />
+      </Animated.View>
     </Animated.View>
   );
 };
 
-// ============================================================
-// AURA BREATHING LOGO - Slow pulsing animation giving "alive" effect
-// ============================================================
-const AuraBreathingLogo: React.FC = () => {
-  const breatheValue = useSharedValue(0);
-  const glowOpacity = useSharedValue(0.3);
-
+const RadarRipple = React.memo(({ delay }: { delay: number }) => {
+  const prog = useSharedValue(0);
   useEffect(() => {
-    // Slow breathing animation - 4 seconds per cycle
-    breatheValue.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    );
-    
-    // Glow pulse animation
-    glowOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.3, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    );
+    prog.value = withDelay(delay, withRepeat(withTiming(1, { duration: 2400, easing: Easing.out(Easing.ease) }), -1, false));
   }, []);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(prog.value, [0, 1], [0.8, 2]) }],
+    opacity: interpolate(prog.value, [0, 0.2, 1], [0.25, 0.15, 0]),
+    borderColor: 'rgba(0,255,136,0.2)',
+  }));
+  return <Animated.View style={[s.radarRing, style]} />;
+});
 
-  const logoStyle = useAnimatedStyle(() => {
-    const scale = interpolate(breatheValue.value, [0, 1], [1, 1.08]);
-    return {
-      transform: [{ scale }],
-    };
-  });
-
-  const glowStyle = useAnimatedStyle(() => {
-    const scale = interpolate(breatheValue.value, [0, 1], [1, 1.3]);
-    return {
-      opacity: glowOpacity.value,
-      transform: [{ scale }],
-    };
-  });
+// ================================================================
+// 3. STATUS BAR PILL
+// ================================================================
+const StatusBarPill: React.FC<{ isAIActive: boolean }> = ({ isAIActive }) => {
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    if (isAIActive) {
+      pulse.value = withRepeat(withSequence(
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      ), -1, false);
+    }
+  }, [isAIActive]);
+  const dotGlow = useAnimatedStyle(() => ({
+    opacity: isAIActive ? interpolate(pulse.value, [0, 1], [0.4, 1]) : 0.3,
+    transform: [{ scale: isAIActive ? interpolate(pulse.value, [0, 1], [1, 1.5]) : 1 }],
+  }));
+  const dotColor = isAIActive ? SHIELD_GREEN : '#666';
+  const statusText = isAIActive ? 'Aura Active' : 'AI Offline';
 
   return (
-    <View style={styles.logoContainer}>
-      {/* Outer breathing glow */}
-      <Animated.View style={[styles.logoGlowOuter, glowStyle]} />
-      {/* Inner glow */}
-      <View style={styles.logoGlow} />
-      {/* Breathing icon */}
-      <Animated.View style={logoStyle}>
-        <Ionicons name="shield-checkmark" size={56} color={SHIELD_GREEN} />
-      </Animated.View>
-    </View>
+    <Animated.View entering={FadeIn.delay(500).duration(600)} style={s.pillWrap}>
+      <View style={s.pill}>
+        <View style={s.pillHighlight} />
+        <View style={s.pillDotWrap}>
+          <Animated.View style={[s.pillDotGlow, { backgroundColor: dotColor }, dotGlow]} />
+          <View style={[s.pillDot, { backgroundColor: dotColor }]} />
+        </View>
+        <Text style={[s.pillText, { color: dotColor }]}>{statusText}</Text>
+        <View style={s.pillDivider} />
+        <Ionicons name="shield-checkmark" size={14} color={dotColor} />
+        <Text style={s.pillSub}>Shielding your data</Text>
+      </View>
+    </Animated.View>
   );
 };
 
-// ============================================================
-// QUICK LINK ORB - Circular glassmorphic tile
-// ============================================================
-const QuickLinkOrb: React.FC<{
-  link: QuickLink;
-  index: number;
-  onPress: (url: string) => void;
-  onLongPress: (link: QuickLink) => void;
-}> = ({ link, index, onPress, onLongPress }) => {
-  const scale = useSharedValue(0);
+// ================================================================
+// 4. QUICK ACCESS SECTION
+// ================================================================
+const QuickAccessCard: React.FC<{
+  link: QuickLink; index: number; onPress: (url: string) => void; onLongPress: (l: QuickLink) => void;
+}> = React.memo(({ link, index, onPress, onLongPress }) => {
+  const enter = useSharedValue(0);
   const pressed = useSharedValue(0);
-
   useEffect(() => {
-    scale.value = withDelay(
-      index * 80 + 500,
-      withSpring(1, { damping: 14, stiffness: 120 })
-    );
+    enter.value = withDelay(index * 80 + 600, withSpring(1, { damping: 14, stiffness: 120 }));
   }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
+  const aStyle = useAnimatedStyle(() => ({
     transform: [
-      { scale: scale.value * (1 - pressed.value * 0.08) },
-      { translateY: interpolate(scale.value, [0, 1], [30, 0]) },
+      { scale: enter.value * (1 - pressed.value * 0.06) },
+      { translateY: interpolate(enter.value, [0, 1], [25, 0]) },
     ],
-    opacity: scale.value,
+    opacity: enter.value,
   }));
-
   const glowStyle = useAnimatedStyle(() => ({
-    opacity: pressed.value * 0.8,
-    transform: [{ scale: 1 + pressed.value * 0.15 }],
+    opacity: pressed.value * 0.6,
   }));
-
-  const handlePressIn = () => {
-    pressed.value = withTiming(1, { duration: 100 });
-  };
-
-  const handlePressOut = () => {
-    pressed.value = withTiming(0, { duration: 250 });
-  };
-
-  const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress(link.url);
-  };
-
-  const handleLongPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onLongPress(link);
-  };
-
-  const isWeb = Platform.OS === 'web';
-  const linkColor = link.color || SHIELD_GREEN;
-
+  const color = link.color || SHIELD_GREEN;
   return (
-    <Animated.View style={[styles.orbWrapper, animatedStyle]}>
-      <Animated.View style={[styles.orbGlowEffect, { backgroundColor: linkColor }, glowStyle]} />
-      
+    <Animated.View style={[s.qaCardWrap, aStyle]}>
+      <Animated.View style={[s.qaCardGlow, { backgroundColor: color }, glowStyle]} />
       <Pressable
-        onPress={handlePress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onLongPress={handleLongPress}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(link.url); }}
+        onPressIn={() => { pressed.value = withTiming(1, { duration: 80 }); }}
+        onPressOut={() => { pressed.value = withTiming(0, { duration: 200 }); }}
+        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onLongPress(link); }}
         delayLongPress={500}
-        style={styles.orbTouchable}
+        style={s.qaCardTouch}
       >
-        {isWeb ? (
-          <View style={styles.orbTile}>
-            <View style={styles.orbHighlight} />
-            <View style={[styles.orbIconContainer, { backgroundColor: `${linkColor}15` }]}>
-              {link.icon ? (
-                <Ionicons name={link.icon as any} size={26} color="#FFF" />
-              ) : (
-                <Text style={[styles.orbInitial, { color: linkColor }]}>
-                  {getInitial(link.title)}
-                </Text>
-              )}
-            </View>
-            <Text style={styles.orbLabel} numberOfLines={1}>{link.title}</Text>
+        <View style={s.qaCard}>
+          <LinearGradient colors={['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.01)']} style={StyleSheet.absoluteFill} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} />
+          <View style={[s.qaIconWrap, { backgroundColor: `${color}18` }]}>
+            {link.icon ? (
+              <Ionicons name={link.icon as any} size={30} color="#FFF" />
+            ) : (
+              <Text style={[s.qaInitial, { color }]}>{getInitial(link.title)}</Text>
+            )}
           </View>
-        ) : (
-          <BlurView tint="dark" intensity={30} style={styles.orbTile}>
-            <View style={styles.orbHighlight} />
-            <View style={[styles.orbIconContainer, { backgroundColor: `${linkColor}15` }]}>
-              {link.icon ? (
-                <Ionicons name={link.icon as any} size={26} color="#FFF" />
-              ) : (
-                <Text style={[styles.orbInitial, { color: linkColor }]}>
-                  {getInitial(link.title)}
-                </Text>
-              )}
-            </View>
-            <Text style={styles.orbLabel} numberOfLines={1}>{link.title}</Text>
-          </BlurView>
-        )}
+          <Text style={s.qaLabel} numberOfLines={1}>{link.title}</Text>
+        </View>
       </Pressable>
     </Animated.View>
   );
-};
+});
 
-// ============================================================
-// ADD BUTTON ORB - Dashed border with transparent background
-// ============================================================
-const AddButtonOrb: React.FC<{
-  index: number;
-  onPress: () => void;
-}> = ({ index, onPress }) => {
-  const scale = useSharedValue(0);
-
+const AddQuickButton: React.FC<{ index: number; onPress: () => void }> = React.memo(({ index, onPress }) => {
+  const enter = useSharedValue(0);
   useEffect(() => {
-    scale.value = withDelay(
-      index * 80 + 500,
-      withSpring(1, { damping: 14, stiffness: 120 })
-    );
+    enter.value = withDelay(index * 80 + 600, withSpring(1, { damping: 14, stiffness: 120 }));
   }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: scale.value,
-  }));
-
+  const aStyle = useAnimatedStyle(() => ({ transform: [{ scale: enter.value }], opacity: enter.value }));
   return (
-    <Animated.View style={[styles.orbWrapper, animatedStyle]}>
-      <TouchableOpacity
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress();
-        }}
-        activeOpacity={0.8}
-        style={styles.orbTouchable}
-      >
-        <View style={styles.addOrbTile}>
-          <View style={styles.addOrbIconContainer}>
-            <Ionicons name="add" size={28} color="rgba(255, 255, 255, 0.6)" />
-          </View>
-          <Text style={styles.addOrbLabel}>Add</Text>
+    <Animated.View style={[s.qaCardWrap, aStyle]}>
+      <TouchableOpacity activeOpacity={0.7} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }} style={s.qaCardTouch}>
+        <View style={s.qaAddCard}>
+          <Ionicons name="add" size={28} color="rgba(255,255,255,0.5)" />
+          <Text style={s.qaAddLabel}>Add</Text>
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
-};
+});
 
-// ============================================================
-// PRIVACY METRICS DASHBOARD - Glassmorphic Monolith
-// ============================================================
-const PrivacyMetricsDashboard: React.FC = () => {
-  // Get real metrics from Privacy Context
+// ================================================================
+// 5. AURA SHIELD PANEL – premium glass card
+// ================================================================
+const ShieldPanel: React.FC = () => {
   const { adsBlockedCount, trackersBlockedCount } = usePrivacy();
+  const [dispTrackers, setDispTrackers] = useState(0);
+  const [dispAds, setDispAds] = useState(0);
 
-  // Format numbers with commas
-  const formatNumber = (num: number): string => {
-    return num.toLocaleString();
-  };
+  // Animate numbers counting up
+  useEffect(() => {
+    const steps = 20;
+    const dt = 40;
+    let step = 0;
+    const iv = setInterval(() => {
+      step++;
+      const ratio = Math.min(step / steps, 1);
+      const ease = 1 - Math.pow(1 - ratio, 3);
+      setDispTrackers(Math.round(trackersBlockedCount * ease));
+      setDispAds(Math.round(adsBlockedCount * ease));
+      if (step >= steps) clearInterval(iv);
+    }, dt);
+    return () => clearInterval(iv);
+  }, [trackersBlockedCount, adsBlockedCount]);
+
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    pulse.value = withRepeat(withSequence(
+      withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+    ), -1, false);
+  }, []);
+  const dotGlow = useAnimatedStyle(() => ({
+    opacity: interpolate(pulse.value, [0, 1], [0.3, 0.8]),
+    transform: [{ scale: interpolate(pulse.value, [0, 1], [1, 1.4]) }],
+  }));
 
   return (
-    <Animated.View 
-      entering={FadeIn.delay(400).duration(600)}
-      style={styles.metricsDashboard}
-    >
-      {/* Header - Status Indicator */}
-      <View style={styles.metricsHeader}>
-        <View style={styles.statusIndicator}>
-          <View style={styles.statusDotGlow} />
-          <View style={styles.statusDot} />
+    <Animated.View entering={FadeInDown.delay(700).duration(600).springify()} style={s.panel}>
+      {/* Green accent top line */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,255,136,0.5)', 'rgba(0,255,136,0.5)', 'transparent']}
+        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+        style={s.panelAccentLine}
+      />
+      {/* Header */}
+      <View style={s.panelHeader}>
+        <View style={s.panelDotWrap}>
+          <Animated.View style={[s.panelDotGlow, dotGlow]} />
+          <View style={s.panelDot} />
         </View>
-        <Text style={styles.statusText}>AURA SHIELD ACTIVE</Text>
+        <Text style={s.panelTitle}>AURA SHIELD ACTIVE</Text>
       </View>
-
-      {/* Metrics Grid - Each column takes exactly 33.3% */}
-      <View style={styles.metricsGrid}>
-        {/* Column 1: Trackers Blocked */}
-        <View style={styles.metricColumn}>
-          <Text style={styles.metricValue}>
-            {formatNumber(trackersBlockedCount)}
-          </Text>
-          <Text style={styles.metricLabel}>Trackers Blocked</Text>
+      {/* Stats row */}
+      <View style={s.panelStats}>
+        <View style={s.panelStat}>
+          <Text style={s.panelStatNum}>{dispTrackers.toLocaleString()}</Text>
+          <Text style={s.panelStatLabel}>Trackers Blocked</Text>
         </View>
-
-        {/* Column 2: Ads Stopped */}
-        <View style={styles.metricColumn}>
-          <Text style={styles.metricValue}>
-            {formatNumber(adsBlockedCount)}
-          </Text>
-          <Text style={styles.metricLabel}>Ads Stopped</Text>
+        <View style={s.panelDividerV} />
+        <View style={s.panelStat}>
+          <Text style={s.panelStatNum}>{dispAds.toLocaleString()}</Text>
+          <Text style={s.panelStatLabel}>Ads Stopped</Text>
         </View>
-
-        {/* Column 3: Connection Status */}
-        <View style={styles.metricColumn}>
-          <Text style={[styles.metricValue, styles.metricValueCyan]}>
-            Secure
-          </Text>
-          <Text style={styles.metricLabel}>Connection</Text>
+        <View style={s.panelDividerV} />
+        <View style={s.panelStat}>
+          <Text style={[s.panelStatNum, s.panelSecure]}>Secure</Text>
+          <Text style={s.panelStatLabel}>Connection</Text>
         </View>
+      </View>
+      {/* Footer */}
+      <View style={s.panelFooter}>
+        <Ionicons name="time-outline" size={12} color={TEXT_DIM} />
+        <Text style={s.panelFooterText}>Protected since today</Text>
       </View>
     </Animated.View>
   );
 };
 
-// ============================================================
-// QR SCANNER MODAL
-// ============================================================
-const QRScannerModal: React.FC<{
-  visible: boolean;
-  onClose: () => void;
-  onScan: (url: string) => void;
-}> = ({ visible, onClose, onScan }) => {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [scanned, setScanned] = useState(false);
+// ================================================================
+// 6. SEARCH BAR – cycling placeholder, frosted pill
+// ================================================================
+const PLACEHOLDERS = ['Search privately...', 'Where to next?', 'Aura protects your search...', 'Enter URL or search...'];
 
-  useEffect(() => {
-    if (visible && Platform.OS !== 'web' && useCameraPermissions) {
-      (async () => {
-        try {
-          const { status } = await require('expo-camera').Camera.requestCameraPermissionsAsync();
-          setHasPermission(status === 'granted');
-        } catch (e) {
-          console.log('Camera permission error:', e);
-          setHasPermission(false);
-        }
-      })();
-    }
-  }, [visible]);
-
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
-    if (scanned) return;
-    setScanned(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    // Check if the scanned data is a URL
-    if (data.startsWith('http://') || data.startsWith('https://') || isLikelyUrl(data)) {
-      onScan(formatUrl(data));
-      onClose();
-    } else {
-      Alert.alert(
-        'QR Code Scanned',
-        `Content: ${data}\n\nThis doesn't appear to be a URL. Would you like to search for it?`,
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => setScanned(false) },
-          { 
-            text: 'Search', 
-            onPress: () => {
-              onScan(getSearchUrl(data, 'google'));
-              onClose();
-            }
-          },
-        ]
-      );
-    }
-  };
-
-  const handleClose = () => {
-    setScanned(false);
-    onClose();
-  };
-
-  if (Platform.OS === 'web') {
-    return (
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-        <View style={styles.qrModalOverlay}>
-          <Pressable style={styles.qrModalBackdrop} onPress={handleClose} />
-          <View style={styles.qrModalContent}>
-            <Text style={styles.qrModalTitle}>QR Scanner</Text>
-            <Text style={styles.qrModalText}>QR scanning is not available on web.</Text>
-            <TouchableOpacity style={styles.qrCloseButton} onPress={handleClose}>
-              <Text style={styles.qrCloseButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
-
-  if (!CameraView) {
-    return (
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-        <View style={styles.qrModalOverlay}>
-          <Pressable style={styles.qrModalBackdrop} onPress={handleClose} />
-          <View style={styles.qrModalContent}>
-            <Text style={styles.qrModalTitle}>QR Scanner</Text>
-            <Text style={styles.qrModalText}>Camera not available. Please install expo-camera.</Text>
-            <TouchableOpacity style={styles.qrCloseButton} onPress={handleClose}>
-              <Text style={styles.qrCloseButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View style={styles.qrScannerContainer}>
-        {hasPermission === null ? (
-          <View style={styles.qrLoadingContainer}>
-            <Text style={styles.qrLoadingText}>Requesting camera permission...</Text>
-          </View>
-        ) : hasPermission === false ? (
-          <View style={styles.qrLoadingContainer}>
-            <Ionicons name="camera-outline" size={48} color={MUTED_GRAY} />
-            <Text style={styles.qrLoadingText}>Camera permission denied</Text>
-            <Text style={styles.qrSubText}>Please enable camera access in settings</Text>
-            <TouchableOpacity style={styles.qrCloseButton} onPress={handleClose}>
-              <Text style={styles.qrCloseButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <CameraView
-              style={StyleSheet.absoluteFill}
-              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-            />
-            <View style={styles.qrOverlay}>
-              <View style={styles.qrHeader}>
-                <TouchableOpacity onPress={handleClose} style={styles.qrBackButton}>
-                  <Ionicons name="close" size={28} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.qrHeaderTitle}>Scan QR Code</Text>
-                <View style={{ width: 44 }} />
-              </View>
-              <View style={styles.qrFrameContainer}>
-                <View style={styles.qrFrame}>
-                  <View style={[styles.qrCorner, styles.qrCornerTL]} />
-                  <View style={[styles.qrCorner, styles.qrCornerTR]} />
-                  <View style={[styles.qrCorner, styles.qrCornerBL]} />
-                  <View style={[styles.qrCorner, styles.qrCornerBR]} />
-                </View>
-              </View>
-              <Text style={styles.qrInstructions}>Point your camera at a QR code</Text>
-            </View>
-          </>
-        )}
-      </View>
-    </Modal>
-  );
-};
-
-// ============================================================
-// FLOATING ISLAND DOCK - Full navigation with all icons
-// ============================================================
-const FloatingIslandDock: React.FC<{
-  onSearch: (query: string) => void;
-  onNavigate: (url: string) => void;
-  searchEngineName: string;
-  defaultSearchEngine: string;
-  currentUrl?: string;
-  isBookmarked: boolean;
-  onToggleBookmark: () => void;
-  onHome: () => void;
-  onLibrary: () => void;
-  onAISummarize: () => void;
-  onAccessibility: () => void;
-  onTabs: () => void;
-  onMenu: () => void;
-  onQRScan: () => void;
-}> = ({ 
-  onSearch, 
-  onNavigate,
-  searchEngineName, 
-  defaultSearchEngine,
-  currentUrl,
-  isBookmarked,
-  onToggleBookmark,
-  onHome,
-  onLibrary,
-  onAISummarize,
-  onAccessibility,
-  onTabs,
-  onMenu,
-  onQRScan,
-}) => {
-  const [inputValue, setInputValue] = useState('');
+const SearchBarSection: React.FC<{
+  onSearch: (q: string) => void; onNavigate: (u: string) => void;
+  defaultSearchEngine: string; onQRScan: () => void;
+}> = React.memo(({ onSearch, onNavigate, defaultSearchEngine, onQRScan }) => {
+  const [input, setInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const focusScale = useSharedValue(1);
-  const insets = useSafeAreaInsets();
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const inputRef = useRef<TextInput>(null);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
-  // Keyboard awareness: move dock above keyboard when it opens
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      setKeyboardOffset(e.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardOffset(0);
-    });
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
+    const iv = setInterval(() => {
+      setPlaceholderIdx(prev => (prev + 1) % PLACEHOLDERS.length);
+    }, 3000);
+    return () => clearInterval(iv);
   }, []);
 
-  const handleFocus = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setIsFocused(true);
-    focusScale.value = withSpring(1.02, { damping: 15, stiffness: 150 });
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-    focusScale.value = withSpring(1, { damping: 15, stiffness: 150 });
-  };
-
-  const handleSubmit = () => {
-    const trimmed = inputValue.trim();
-    if (!trimmed) return;
-    
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Keyboard.dismiss();
-    
-    if (isLikelyUrl(trimmed)) {
-      // Navigate to URL
-      onNavigate(formatUrl(trimmed));
-    } else {
-      // Search using default search engine
-      onSearch(getSearchUrl(trimmed, defaultSearchEngine));
-    }
-    setInputValue('');
-  };
-
-  const handleVoiceSearch = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      '🎤 Voice Search',
-      'Dictation keyboard activated. Tap the microphone on your keyboard to speak.',
-      [{ text: 'OK' }]
-    );
-    // Focus the input to bring up the keyboard (which has dictation)
-    inputRef.current?.focus();
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: focusScale.value }],
+  const phStyle = useAnimatedStyle(() => ({ opacity: 1 }));
+  const focusGlow = useSharedValue(0);
+  useEffect(() => {
+    focusGlow.value = withTiming(isFocused ? 1 : 0, { duration: 250 });
+  }, [isFocused]);
+  const borderStyle = useAnimatedStyle(() => ({
+    borderColor: isFocused ? 'rgba(0,255,200,0.45)' : GLASS_BORDER_LIT,
   }));
 
-  const isWeb = Platform.OS === 'web';
-  const displayUrl = currentUrl ? extractDomain(currentUrl) : searchEngineName;
+  const handleSubmit = () => {
+    const t = input.trim();
+    if (!t) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Keyboard.dismiss();
+    if (isLikelyUrl(t)) onNavigate(formatUrl(t));
+    else onSearch(getSearchUrl(t, defaultSearchEngine));
+    setInput('');
+  };
 
   return (
-    <Animated.View 
-      entering={FadeInUp.delay(600).duration(500).springify()}
-      style={[
-        styles.floatingDockContainer,
-        { bottom: keyboardOffset > 0 ? keyboardOffset - insets.bottom : 0 }
-      ]}
-    >
-      <Animated.View style={[styles.floatingDockWrapper, animatedStyle]}>
-        {isWeb ? (
-          <View style={styles.floatingDock}>
-            <View style={styles.dockHighlight} />
-            <View style={styles.dockContent}>
-              {/* Search Input */}
-              <View style={styles.dockSearchContainer}>
-                <Ionicons 
-                  name="search" 
-                  size={20} 
-                  color={isFocused ? ELECTRIC_CYAN : '#666'} 
-                  style={styles.dockSearchIcon}
-                />
-                <TextInput
-                  ref={inputRef}
-                  style={styles.dockSearchInput}
-                  value={inputValue}
-                  onChangeText={setInputValue}
-                  onFocus={handleFocus}
-                  onBlur={handleBlur}
-                  onSubmitEditing={handleSubmit}
-                  placeholder={`Search or enter URL`}
-                  placeholderTextColor="#555"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="go"
-                  selectionColor={ELECTRIC_CYAN}
-                />
-                {inputValue.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setInputValue('')}
-                    style={styles.dockClearButton}
-                  >
-                    <Ionicons name="close-circle" size={18} color="#555" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={styles.dockDivider} />
-
-              {/* Voice Search */}
-              <TouchableOpacity style={styles.dockIconButton} onPress={handleVoiceSearch}>
-                <Ionicons name="mic-outline" size={22} color={MUTED_GRAY} />
-              </TouchableOpacity>
-
-              {/* QR Scanner */}
-              <TouchableOpacity style={styles.dockIconButton} onPress={onQRScan}>
-                <Ionicons name="qr-code-outline" size={20} color={MUTED_GRAY} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Navigation Row */}
-            <View style={styles.dockNavRow}>
-              {/* Home */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onHome}>
-                <Ionicons name="home-outline" size={22} color={MUTED_GRAY} />
-              </TouchableOpacity>
-
-              {/* Bookmark */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onToggleBookmark}>
-                <Ionicons 
-                  name={isBookmarked ? "star" : "star-outline"} 
-                  size={22} 
-                  color={isBookmarked ? ELECTRIC_CYAN : MUTED_GRAY} 
-                />
-              </TouchableOpacity>
-
-              {/* Accessibility */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onAccessibility}>
-                <Ionicons name="accessibility-outline" size={22} color={MUTED_GRAY} />
-              </TouchableOpacity>
-
-              {/* AI Summarize */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onAISummarize}>
-                <Ionicons name="sparkles-outline" size={22} color={MUTED_GRAY} />
-              </TouchableOpacity>
-
-              {/* Tabs */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onTabs}>
-                <View style={styles.tabsIconContainer}>
-                  <Text style={styles.tabsIconText}>1</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Menu */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onMenu}>
-                <Ionicons name="ellipsis-vertical" size={20} color={MUTED_GRAY} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <BlurView tint="dark" intensity={60} style={styles.floatingDock}>
-            <View style={styles.dockHighlight} />
-            <View style={styles.dockContent}>
-              {/* Search Input */}
-              <View style={styles.dockSearchContainer}>
-                <Ionicons 
-                  name="search" 
-                  size={20} 
-                  color={isFocused ? ELECTRIC_CYAN : '#666'} 
-                  style={styles.dockSearchIcon}
-                />
-                <TextInput
-                  ref={inputRef}
-                  style={styles.dockSearchInput}
-                  value={inputValue}
-                  onChangeText={setInputValue}
-                  onFocus={handleFocus}
-                  onBlur={handleBlur}
-                  onSubmitEditing={handleSubmit}
-                  placeholder={`Search or enter URL`}
-                  placeholderTextColor="#555"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="go"
-                  selectionColor={ELECTRIC_CYAN}
-                />
-                {inputValue.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setInputValue('')}
-                    style={styles.dockClearButton}
-                  >
-                    <Ionicons name="close-circle" size={18} color="#555" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={styles.dockDivider} />
-
-              {/* Voice Search */}
-              <TouchableOpacity style={styles.dockIconButton} onPress={handleVoiceSearch}>
-                <Ionicons name="mic-outline" size={22} color={MUTED_GRAY} />
-              </TouchableOpacity>
-
-              {/* QR Scanner */}
-              <TouchableOpacity style={styles.dockIconButton} onPress={onQRScan}>
-                <Ionicons name="qr-code-outline" size={20} color={MUTED_GRAY} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Navigation Row */}
-            <View style={styles.dockNavRow}>
-              {/* Home */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onHome}>
-                <Ionicons name="home-outline" size={22} color={MUTED_GRAY} />
-              </TouchableOpacity>
-
-              {/* Bookmark */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onToggleBookmark}>
-                <Ionicons 
-                  name={isBookmarked ? "star" : "star-outline"} 
-                  size={22} 
-                  color={isBookmarked ? ELECTRIC_CYAN : MUTED_GRAY} 
-                />
-              </TouchableOpacity>
-
-              {/* Accessibility */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onAccessibility}>
-                <Ionicons name="accessibility-outline" size={22} color={MUTED_GRAY} />
-              </TouchableOpacity>
-
-              {/* AI Summarize */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onAISummarize}>
-                <Ionicons name="sparkles-outline" size={22} color={MUTED_GRAY} />
-              </TouchableOpacity>
-
-              {/* Tabs */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onTabs}>
-                <View style={styles.tabsIconContainer}>
-                  <Text style={styles.tabsIconText}>1</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Menu */}
-              <TouchableOpacity style={styles.navIconButton} onPress={onMenu}>
-                <Ionicons name="ellipsis-vertical" size={20} color={MUTED_GRAY} />
-              </TouchableOpacity>
-            </View>
-          </BlurView>
+    <Animated.View entering={FadeInUp.delay(900).duration(500).springify()} style={s.searchWrap}>
+      <Animated.View style={[s.searchPill, borderStyle]}>
+        <Ionicons name="search" size={18} color={isFocused ? AURA_TEAL : TEXT_DIM} style={{ marginRight: 10 }} />
+        <View style={{ flex: 1, position: 'relative', justifyContent: 'center' }}>
+          <TextInput
+            ref={inputRef}
+            style={s.searchInput}
+            value={input}
+            onChangeText={setInput}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onSubmitEditing={handleSubmit}
+            placeholder=""
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="go"
+            selectionColor={AURA_TEAL}
+            data-testid="home-search-input"
+          />
+          {input.length === 0 && !isFocused && (
+            <Animated.Text style={[s.searchPlaceholder, phStyle]} pointerEvents="none">
+              {PLACEHOLDERS[placeholderIdx]}
+            </Animated.Text>
+          )}
+          {input.length === 0 && isFocused && (
+            <Text style={s.searchPlaceholder} pointerEvents="none">Search or enter URL</Text>
+          )}
+        </View>
+        {input.length > 0 && (
+          <TouchableOpacity onPress={() => setInput('')} style={{ padding: 4 }}>
+            <Ionicons name="close-circle" size={18} color={TEXT_DIM} />
+          </TouchableOpacity>
         )}
+        <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); inputRef.current?.focus(); }} style={s.searchIconBtn}>
+          <Ionicons name="mic-outline" size={20} color={TEXT_SOFT} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onQRScan} style={s.searchIconBtn}>
+          <Ionicons name="qr-code-outline" size={18} color={TEXT_SOFT} />
+        </TouchableOpacity>
       </Animated.View>
     </Animated.View>
   );
-};
+});
 
-// ============================================================
-// ADD LINK MODAL - Premium glassmorphic modal
-// ============================================================
-const AddLinkModal: React.FC<{
-  visible: boolean;
-  onClose: () => void;
-  onSave: (title: string, url: string) => void;
-}> = ({ visible, onClose, onSave }) => {
-  const [title, setTitle] = useState('');
-  const [url, setUrl] = useState('');
+// ================================================================
+// 7. BOTTOM NAV BAR
+// ================================================================
+const BottomNav: React.FC<{
+  onHome: () => void; onBookmarks: () => void; onAI: () => void; onTabs: () => void; onMenu: () => void;
+  tabCount: number;
+}> = React.memo(({ onHome, onBookmarks, onAI, onTabs, onMenu, tabCount }) => {
+  const [active, setActive] = useState(0);
+  const insets = useSafeAreaInsets();
 
-  const handleSave = () => {
-    const trimmedTitle = title.trim();
-    const trimmedUrl = url.trim();
-
-    if (!trimmedTitle) {
-      Alert.alert('Error', 'Please enter a site name.');
-      return;
-    }
-    if (!trimmedUrl) {
-      Alert.alert('Error', 'Please enter a URL.');
-      return;
-    }
-    if (!isLikelyUrl(trimmedUrl) && !trimmedUrl.includes('.')) {
-      Alert.alert('Invalid URL', 'Please enter a valid website URL (e.g., google.com)');
-      return;
-    }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onSave(trimmedTitle, formatUrl(trimmedUrl));
-    setTitle('');
-    setUrl('');
-    onClose();
+  const NavBtn = ({ idx, icon, label, onPress, badge }: {
+    idx: number; icon: string; label: string; onPress: () => void; badge?: number;
+  }) => {
+    const pressed = useSharedValue(0);
+    const isActive = idx === active;
+    const color = isActive ? AURA_TEAL : TEXT_DIM;
+    const pStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: 1 - pressed.value * 0.15 }],
+    }));
+    return (
+      <Animated.View style={[s.navBtnWrap, pStyle]}>
+        {isActive && <View style={s.navActiveBar} />}
+        <Pressable
+          onPressIn={() => { pressed.value = withSpring(1, { damping: 10, stiffness: 300 }); }}
+          onPressOut={() => { pressed.value = withSpring(0, { damping: 10, stiffness: 300 }); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActive(idx); onPress(); }}
+          style={s.navBtn}
+        >
+          {badge ? (
+            <View style={s.navTabBadge}>
+              <Text style={s.navTabText}>{badge}</Text>
+            </View>
+          ) : (
+            <Ionicons name={icon as any} size={22} color={color} />
+          )}
+          {isActive && <View style={s.navActiveDot} />}
+        </Pressable>
+      </Animated.View>
+    );
   };
-
-  const handleClose = () => {
-    setTitle('');
-    setUrl('');
-    onClose();
-  };
-
-  const isWeb = Platform.OS === 'web';
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalOverlay}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={handleClose} />
-        
-        {isWeb ? (
-          <View style={styles.modalContent}>
-            <View style={styles.modalHighlight} />
-            <Text style={styles.modalTitle}>Add Quick Link</Text>
-            
-            <View style={styles.modalInputContainer}>
-              <Text style={styles.modalInputLabel}>Site Name</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={title}
-                onChangeText={setTitle}
-                placeholder="e.g., GitHub"
-                placeholderTextColor="#555"
-                autoCapitalize="words"
-              />
-            </View>
+    <Animated.View entering={FadeInUp.delay(1000).duration(400)} style={[s.navBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      <View style={s.navBarBorder} />
+      <View style={s.navBarRow}>
+        <NavBtn idx={0} icon="home-outline" label="Home" onPress={onHome} />
+        <NavBtn idx={1} icon="star-outline" label="Bookmarks" onPress={onBookmarks} />
+        <NavBtn idx={2} icon="sparkles-outline" label="AI" onPress={onAI} />
+        <NavBtn idx={3} icon="layers-outline" label="Tabs" onPress={onTabs} badge={tabCount} />
+        <NavBtn idx={4} icon="ellipsis-vertical" label="Menu" onPress={onMenu} />
+      </View>
+    </Animated.View>
+  );
+});
 
-            <View style={styles.modalInputContainer}>
-              <Text style={styles.modalInputLabel}>URL</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={url}
-                onChangeText={setUrl}
-                placeholder="e.g., github.com"
-                placeholderTextColor="#555"
-                autoCapitalize="none"
-                keyboardType="url"
-                autoCorrect={false}
-              />
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalCancelButton} onPress={handleClose}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveButton} onPress={handleSave}>
-                <Text style={styles.modalSaveText}>Save</Text>
-              </TouchableOpacity>
-            </View>
+// ================================================================
+// MODALS (kept from original)
+// ================================================================
+const AddLinkModal: React.FC<{ visible: boolean; onClose: () => void; onSave: (t: string, u: string) => void }> = ({ visible, onClose, onSave }) => {
+  const [title, setTitle] = useState('');
+  const [url, setUrl] = useState('');
+  const handleSave = () => {
+    const tt = title.trim(), tu = url.trim();
+    if (!tt) { Alert.alert('Error', 'Please enter a site name.'); return; }
+    if (!tu) { Alert.alert('Error', 'Please enter a URL.'); return; }
+    if (!isLikelyUrl(tu) && !tu.includes('.')) { Alert.alert('Invalid URL', 'Please enter a valid website URL (e.g., google.com)'); return; }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onSave(tt, formatUrl(tu));
+    setTitle(''); setUrl(''); onClose();
+  };
+  const handleClose = () => { setTitle(''); setUrl(''); onClose(); };
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.modalOverlay}>
+        <Pressable style={s.modalBackdrop} onPress={handleClose} />
+        <View style={s.modalContent}>
+          <Text style={s.modalTitle}>Add Quick Link</Text>
+          <View style={s.modalInputWrap}><Text style={s.modalInputLabel}>NAME</Text>
+            <TextInput style={s.modalInput} value={title} onChangeText={setTitle} placeholder="e.g. Reddit" placeholderTextColor="#555" /></View>
+          <View style={s.modalInputWrap}><Text style={s.modalInputLabel}>URL</Text>
+            <TextInput style={s.modalInput} value={url} onChangeText={setUrl} placeholder="e.g. reddit.com" placeholderTextColor="#555" autoCapitalize="none" keyboardType="url" /></View>
+          <View style={s.modalBtns}>
+            <TouchableOpacity style={s.modalCancel} onPress={handleClose}><Text style={s.modalCancelText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={s.modalSave} onPress={handleSave}><Text style={s.modalSaveText}>Add</Text></TouchableOpacity>
           </View>
-        ) : (
-          <BlurView tint="dark" intensity={80} style={styles.modalContent}>
-            <View style={styles.modalHighlight} />
-            <Text style={styles.modalTitle}>Add Quick Link</Text>
-            
-            <View style={styles.modalInputContainer}>
-              <Text style={styles.modalInputLabel}>Site Name</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={title}
-                onChangeText={setTitle}
-                placeholder="e.g., GitHub"
-                placeholderTextColor="#555"
-                autoCapitalize="words"
-              />
-            </View>
-
-            <View style={styles.modalInputContainer}>
-              <Text style={styles.modalInputLabel}>URL</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={url}
-                onChangeText={setUrl}
-                placeholder="e.g., github.com"
-                placeholderTextColor="#555"
-                autoCapitalize="none"
-                keyboardType="url"
-                autoCorrect={false}
-              />
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalCancelButton} onPress={handleClose}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveButton} onPress={handleSave}>
-                <Text style={styles.modalSaveText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </BlurView>
-        )}
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
 };
 
-// ============================================================
-// MAIN NEW TAB PAGE COMPONENT (Memoized for performance)
-// ============================================================
-const NewTabPageComponent: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, onOpenMenu, onAISummarize, onAccessibility }) => {
+const QRScannerModal: React.FC<{ visible: boolean; onClose: () => void; onScan: (u: string) => void }> = ({ visible, onClose, onScan }) => {
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [scanned, setScanned] = useState(false);
+  useEffect(() => {
+    if (visible && Platform.OS !== 'web' && useCameraPermissions) {
+      (async () => { try { const { status } = await require('expo-camera').Camera.requestCameraPermissionsAsync(); setHasPermission(status === 'granted'); } catch { setHasPermission(false); } })();
+    }
+  }, [visible]);
+  const handleClose = () => { setScanned(false); onClose(); };
+  if (Platform.OS === 'web' || !CameraView) {
+    return (<Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+      <View style={s.qrOverlay}><Pressable style={s.modalBackdrop} onPress={handleClose} />
+        <View style={s.qrContent}><Text style={s.qrTitle}>QR Scanner</Text><Text style={s.qrText}>QR scanning requires a mobile device.</Text>
+          <TouchableOpacity style={s.qrBtn} onPress={handleClose}><Text style={s.qrBtnText}>Close</Text></TouchableOpacity></View></View>
+    </Modal>);
+  }
+  return (<Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      {hasPermission ? (<>
+        <CameraView style={StyleSheet.absoluteFill} barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onBarcodeScanned={scanned ? undefined : ({ data }: { data: string }) => {
+            if (scanned) return; setScanned(true); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            if (data.startsWith('http') || isLikelyUrl(data)) { onScan(formatUrl(data)); onClose(); }
+            else { Alert.alert('QR Code', data, [{ text: 'Search', onPress: () => { onScan(getSearchUrl(data, 'google')); onClose(); } }, { text: 'Cancel', onPress: () => setScanned(false) }]); }
+          }} />
+        <View style={{ position: 'absolute', top: 60, left: 16 }}>
+          <TouchableOpacity onPress={handleClose} style={s.qrCloseCircle}><Ionicons name="close" size={28} color="#FFF" /></TouchableOpacity>
+        </View>
+      </>) : (<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#FFF', fontSize: 16 }}>{hasPermission === null ? 'Requesting camera...' : 'Camera permission denied'}</Text>
+        <TouchableOpacity style={[s.qrBtn, { marginTop: 20 }]} onPress={handleClose}><Text style={s.qrBtnText}>Close</Text></TouchableOpacity>
+      </View>)}
+    </View>
+  </Modal>);
+};
+
+// ================================================================
+// MAIN PAGE COMPONENT
+// ================================================================
+const NewTabPageComponent: React.FC<NewTabPageProps> = ({
+  onNavigate, onSearch, onOpenMenu, onAISummarize, onAccessibility,
+}) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { settings } = useSettings();
-  const { 
-    quickLinks, 
-    addQuickLink, 
-    removeQuickLink,
-    bookmarks,
-    toggleBookmark,
-    isBookmarked,
-    tabs,
-  } = useBrowserStore();
-  
+  const { quickLinks, addQuickLink, removeQuickLink, isBookmarked, tabs } = useBrowserStore();
   const [addModalVisible, setAddModalVisible] = useState(false);
-  const [qrScannerVisible, setQRScannerVisible] = useState(false);
-
-  // AI Active status based on strictLocalAI setting
+  const [qrVisible, setQrVisible] = useState(false);
   const isAIActive = settings.strictLocalAI;
+  const searchEngineName = settings.defaultSearchEngine === 'duckduckgo' ? 'DuckDuckGo' : settings.defaultSearchEngine === 'bing' ? 'Bing' : 'Google';
 
-  const searchEngineName = settings.defaultSearchEngine === 'duckduckgo' 
-    ? 'DuckDuckGo' 
-    : settings.defaultSearchEngine === 'bing' 
-      ? 'Bing' 
-      : 'Google';
-
-  const handleQuickLinkPress = (url: string) => {
-    onNavigate(url);
-  };
-
-  const handleQuickLinkLongPress = (link: QuickLink) => {
+  const handleLinkLongPress = useCallback((link: QuickLink) => {
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm(`Delete "${link.title}" shortcut?`);
-      if (confirmed) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        removeQuickLink(link.id);
-      }
+      if (window.confirm(`Delete "${link.title}" shortcut?`)) { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); removeQuickLink(link.id); }
     } else {
-      Alert.alert(
-        'Delete Shortcut',
-        `Do you want to delete "${link.title}"?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              removeQuickLink(link.id);
-            },
-          },
-        ]
-      );
+      Alert.alert('Delete Shortcut', `Delete "${link.title}"?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); removeQuickLink(link.id); } }]);
     }
-  };
+  }, [removeQuickLink]);
 
-  const handleAddLink = (title: string, url: string) => {
-    addQuickLink(title, url);
-  };
-
-  const handleHome = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Already on home/new tab page, could refresh or do nothing
-    Alert.alert('Home', 'You are already on the Home screen.');
-  };
-
-  const handleToggleBookmark = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // On new tab page, nothing to bookmark
-    Alert.alert('Bookmark', 'Navigate to a website first to bookmark it.');
-  };
-
-  const handleLibrary = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/library');
-  };
-
-  const handleAISummarize = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Call parent handler if provided, otherwise show alert
-    if (onAISummarize) {
-      onAISummarize();
-    } else {
-      Alert.alert(
-        '✨ AI Summarize',
-        'Navigate to a website first to get an AI-powered summary of the page content.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
-
-  const handleTabs = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/tabs-manager');
-  };
-
-  const handleMenu = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Call parent handler to open BrowserMenu
-    if (onOpenMenu) {
-      onOpenMenu();
-    } else {
-      // Fallback to settings
-      router.push('/settings');
-    }
-  };
-
-  const handleAccessibility = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Call parent handler to open AccessibilityModal
-    if (onAccessibility) {
-      onAccessibility();
-    } else {
-      Alert.alert('Accessibility', 'Accessibility features are available when browsing.');
-    }
-  };
-
-  const handleQRScan = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setQRScannerVisible(true);
-  };
-
-  const handleQRScanned = (url: string) => {
-    setQRScannerVisible(false);
-    onNavigate(url);
-  };
+  interface NewTabPageProps {
+    onNavigate: (url: string) => void;
+    onSearch: (query: string) => void;
+    onOpenMenu?: () => void;
+    onAISummarize?: () => void;
+    onAccessibility?: () => void;
+  }
 
   return (
-    <View style={styles.container}>
-      {/* Immersive Backdrop with Aura Blue Orb */}
-      <ImmersiveBackdrop />
+    <View style={s.container} data-testid="home-screen">
+      <LivingAuroraBackdrop />
 
-      {/* Main Content */}
-      <View style={[styles.content, { paddingTop: insets.top + 30 }]}>
-        
-        {/* AURA SHIELD DASHBOARD - Top Section */}
-        <Animated.View 
-          entering={FadeIn.delay(100).duration(800)}
-          style={styles.brandingContainer}
-        >
-          {/* Premium Breathing Logo */}
-          <AuraBreathingLogo />
-          
-          {/* Brand Title - AURA with wide kerning */}
-          <Text style={styles.brandTitle}>AURA</Text>
-          
-          {/* AI Shield Status Widget - Wired to strictLocalAI */}
-          <AIShieldStatus isAIActive={isAIActive} />
-        </Animated.View>
+      <View style={[s.content, { paddingTop: insets.top + 20 }]}>
+        {/* HERO SHIELD */}
+        <HeroShield />
 
-        {/* FLOATING QUICK LINK ORBS - Middle Section */}
-        <Animated.View 
-          entering={FadeIn.delay(300).duration(600)}
-          style={styles.quickLinksSection}
-        >
-          <Text style={styles.sectionLabel}>QUICK ACCESS</Text>
-          <ScrollView
-            horizontal={true}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickLinksScrollContent}
-            style={styles.quickLinksScroll}
-          >
-            {quickLinks.map((link, index) => (
-              <QuickLinkOrb
-                key={link.id}
-                link={link}
-                index={index}
-                onPress={handleQuickLinkPress}
-                onLongPress={handleQuickLinkLongPress}
-              />
+        {/* AURA Title */}
+        <Animated.Text entering={FadeIn.delay(300).duration(600)} style={s.brandTitle}>A U R A</Animated.Text>
+
+        {/* Status Pill */}
+        <StatusBarPill isAIActive={isAIActive} />
+
+        {/* QUICK ACCESS */}
+        <Animated.View entering={FadeIn.delay(550).duration(600)} style={s.qaSection}>
+          <Text style={s.qaTitle}>QUICK ACCESS</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.qaScroll}>
+            {quickLinks.map((link, i) => (
+              <QuickAccessCard key={link.id} link={link} index={i} onPress={onNavigate} onLongPress={handleLinkLongPress} />
             ))}
-            <AddButtonOrb
-              index={quickLinks.length}
-              onPress={() => setAddModalVisible(true)}
-            />
+            <AddQuickButton index={quickLinks.length} onPress={() => setAddModalVisible(true)} />
           </ScrollView>
         </Animated.View>
 
-        {/* PRIVACY METRICS DASHBOARD - Glassmorphic Monolith */}
-        <PrivacyMetricsDashboard />
+        {/* SHIELD PANEL */}
+        <ShieldPanel />
+
+        {/* SEARCH BAR */}
+        <SearchBarSection
+          onSearch={onSearch}
+          onNavigate={onNavigate}
+          defaultSearchEngine={settings.defaultSearchEngine}
+          onQRScan={() => setQrVisible(true)}
+        />
       </View>
 
-      {/* FLOATING ISLAND DOCK - Pinned to bottom */}
-      <FloatingIslandDock 
-        onSearch={onSearch}
-        onNavigate={onNavigate}
-        searchEngineName={searchEngineName}
-        defaultSearchEngine={settings.defaultSearchEngine}
-        isBookmarked={false}
-        onToggleBookmark={handleToggleBookmark}
-        onHome={handleHome}
-        onLibrary={handleLibrary}
-        onAISummarize={handleAISummarize}
-        onTabs={handleTabs}
-        onMenu={handleMenu}
-        onQRScan={handleQRScan}
+      {/* BOTTOM NAV */}
+      <BottomNav
+        onHome={() => {}}
+        onBookmarks={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/library'); }}
+        onAI={() => { onAISummarize?.() || Alert.alert('AI Summarize', 'Navigate to a page first.'); }}
+        onTabs={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/tabs-manager'); }}
+        onMenu={() => { onOpenMenu?.() || router.push('/settings'); }}
+        tabCount={tabs?.length || 1}
       />
 
-      {/* Add Quick Link Modal */}
-      <AddLinkModal
-        visible={addModalVisible}
-        onClose={() => setAddModalVisible(false)}
-        onSave={handleAddLink}
-      />
-
-      {/* QR Scanner Modal */}
-      <QRScannerModal
-        visible={qrScannerVisible}
-        onClose={() => setQRScannerVisible(false)}
-        onScan={handleQRScanned}
-      />
+      <AddLinkModal visible={addModalVisible} onClose={() => setAddModalVisible(false)} onSave={(t, u) => addQuickLink(t, u)} />
+      <QRScannerModal visible={qrVisible} onClose={() => setQrVisible(false)} onScan={(u) => { setQrVisible(false); onNavigate(u); }} />
     </View>
   );
 };
 
-// ============================================================
-// STYLES - Premium Glassmorphic Design System
-// ============================================================
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: DEEP_BLACK,
-  },
+// ================================================================
+// STYLES
+// ================================================================
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: DEEP_BG },
+  content: { flex: 1, alignItems: 'center', paddingHorizontal: 20, justifyContent: 'space-between', paddingBottom: 90 },
 
-  // ============== BACKDROP ==============
-  backdropContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  cyanOrb: {
-    position: 'absolute',
-    top: -SCREEN_HEIGHT * 0.1,
-    left: SCREEN_WIDTH * 0.5 - SCREEN_WIDTH * 0.6,
-    width: SCREEN_WIDTH * 1.2,
-    height: SCREEN_WIDTH * 1.2,
-    borderRadius: SCREEN_WIDTH * 0.6,
-  },
-  purpleOrb: {
-    position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.2,
-    right: -SCREEN_WIDTH * 0.3,
-    width: SCREEN_WIDTH * 0.8,
-    height: SCREEN_WIDTH * 0.8,
-    borderRadius: SCREEN_WIDTH * 0.4,
-    opacity: 0.5,
-  },
-  orbGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 9999,
-  },
-  noiseOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.02,
-    backgroundColor: '#FFF',
-  },
-
-  // ============== CONTENT ==============
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    justifyContent: 'space-between',
-    paddingBottom: 100,
-  },
-
-  // ============== BRANDING ==============
-  brandingContainer: {
-    alignItems: 'center',
-    marginBottom: 0,
-  },
-  logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 30,
-    backgroundColor: 'rgba(0, 255, 136, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 136, 0.2)',
-    position: 'relative',
-  },
-  logoGlowOuter: {
-    position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(0, 242, 255, 0.08)',
+  // ── Shield ──
+  shieldWrap: { width: 130, height: 130, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  shieldIcon: { zIndex: 5 },
+  shieldGlow1: {
+    position: 'absolute', width: 100, height: 100, borderRadius: 50,
+    backgroundColor: 'rgba(0,255,136,0.12)',
     ...Platform.select({
-      ios: {
-        shadowColor: AURA_BLUE,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6,
-        shadowRadius: 40,
-      },
+      ios: { shadowColor: SHIELD_GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 20 },
+      web: { boxShadow: '0 0 30px 15px rgba(0,255,136,0.15)' } as any,
     }),
   },
-  logoGlow: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(0, 255, 136, 0.1)',
+  shieldGlow2: {
+    position: 'absolute', width: 140, height: 140, borderRadius: 70,
+    backgroundColor: 'rgba(0,255,136,0.05)',
     ...Platform.select({
-      ios: {
-        shadowColor: SHIELD_GREEN,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 30,
-      },
+      ios: { shadowColor: SHIELD_GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 40 },
+      web: { boxShadow: '0 0 50px 25px rgba(0,255,136,0.08)' } as any,
     }),
   },
+  shieldGlow3: {
+    position: 'absolute', width: 180, height: 180, borderRadius: 90,
+    backgroundColor: 'rgba(0,255,136,0.02)',
+    ...Platform.select({
+      ios: { shadowColor: SHIELD_GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.1, shadowRadius: 80 },
+      web: { boxShadow: '0 0 80px 40px rgba(0,255,136,0.04)' } as any,
+    }),
+  },
+  radarRing: {
+    position: 'absolute', width: 100, height: 100, borderRadius: 50,
+    borderWidth: 1.5, borderColor: 'rgba(0,255,136,0.2)',
+  },
+
+  // ── Brand ──
   brandTitle: {
-    fontSize: 42,
-    fontWeight: '300',
-    color: '#FFF',
-    letterSpacing: 18,  // Wide kerning for modern look
-    marginBottom: 16,
+    fontSize: 36, fontWeight: '700', color: '#FFF', letterSpacing: 14, marginBottom: 12,
+    ...FONT_STACK,
     ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+      web: { textShadow: '0 0 20px rgba(255,255,255,0.15)' } as any,
+      ios: { shadowColor: '#FFF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.08, shadowRadius: 10 } as any,
     }),
   },
 
-  // ============== AI SHIELD STATUS ==============
-  shieldStatusContainer: {
-    marginTop: 4,
+  // ── Pill ──
+  pillWrap: { marginBottom: 24 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 11, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden', position: 'relative',
+    ...Platform.select({ web: { backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any }),
   },
-  shieldStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: GLASS_WHITE,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  shieldStatusHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  shieldStatusText: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  shieldDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    marginHorizontal: 12,
-  },
-  shieldStatusSubtext: {
-    fontSize: 12,
-    color: '#888',
-    marginLeft: 6,
-  },
+  pillHighlight: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.15)' },
+  pillDotWrap: { width: 12, height: 12, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+  pillDot: { width: 7, height: 7, borderRadius: 3.5 },
+  pillDotGlow: { position: 'absolute', width: 14, height: 14, borderRadius: 7 },
+  pillText: { fontSize: 13, fontWeight: '600', letterSpacing: 0.5, ...FONT_STACK },
+  pillDivider: { width: 1, height: 14, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 12 },
+  pillSub: { fontSize: 12, color: '#777', marginLeft: 6, ...FONT_STACK },
 
-  // ============== QUICK LINKS SECTION ==============
-  quickLinksSection: {
-    width: '100%',
-    alignItems: 'center',
+  // ── Quick Access ──
+  qaSection: { width: '100%', alignItems: 'center' },
+  qaTitle: { fontSize: 11, fontWeight: '700', color: AURA_TEAL, letterSpacing: 2.5, marginBottom: 16, opacity: 0.7 },
+  qaScroll: { paddingHorizontal: 4, paddingRight: 24, alignItems: 'center', gap: 14 },
+  qaCardWrap: { position: 'relative' },
+  qaCardGlow: { position: 'absolute', top: 6, left: 6, right: 6, bottom: 6, borderRadius: 20, opacity: 0 },
+  qaCardTouch: { borderRadius: 20, overflow: 'hidden' },
+  qaCard: {
+    width: 78, height: 92, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.055)', borderWidth: 1, borderColor: GLASS_BORDER,
+    overflow: 'hidden', position: 'relative',
   },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#555',
-    letterSpacing: 2.5,
-    marginBottom: 20,
+  qaIconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  qaLabel: { fontSize: 11, fontWeight: '500', color: 'rgba(255,255,255,0.75)', textAlign: 'center', maxWidth: 68, ...FONT_STACK },
+  qaInitial: { fontSize: 22, fontWeight: '700', ...FONT_STACK },
+  qaAddCard: {
+    width: 78, height: 92, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.2)',
   },
-  quickLinksScroll: {
-    width: '100%',
-  },
-  quickLinksScrollContent: {
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    gap: 16,
-  },
-  // Keep orbsGrid for backwards compatibility but no longer used
-  orbsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 20,
-    maxWidth: 360,
-  },
+  qaAddLabel: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.4)', marginTop: 4, ...FONT_STACK },
 
-  // ============== ORB TILES ==============
-  orbWrapper: {
-    position: 'relative',
-  },
-  orbGlowEffect: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    right: 8,
-    bottom: 8,
-    borderRadius: 28,
-    opacity: 0,
-  },
-  orbTouchable: {
-    borderRadius: 28,
-    overflow: 'hidden',
-  },
-  orbTile: {
-    width: 76,
-    height: 90,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: GLASS_WHITE,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  orbHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  orbIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  orbLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#AAA',
-    textAlign: 'center',
-    maxWidth: 66,
-  },
-  orbInitial: {
-    fontSize: 22,
-    fontWeight: '700',
+  // ── Shield Panel ──
+  panel: {
+    width: '100%', borderRadius: 20, overflow: 'hidden', position: 'relative',
+    backgroundColor: 'rgba(0,255,136,0.03)', borderWidth: 1, borderColor: 'rgba(0,255,136,0.18)',
+    padding: 20, marginVertical: 6,
     ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+      web: { backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' } as any,
+      ios: { shadowColor: SHIELD_GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.06, shadowRadius: 16 },
     }),
   },
+  panelAccentLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 2 },
+  panelHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  panelDotWrap: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  panelDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: SHIELD_GREEN },
+  panelDotGlow: {
+    position: 'absolute', width: 18, height: 18, borderRadius: 9, backgroundColor: SHIELD_GREEN,
+    ...Platform.select({
+      ios: { shadowColor: SHIELD_GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 6 },
+      web: { boxShadow: `0 0 10px ${SHIELD_GREEN}` } as any,
+    }),
+  },
+  panelTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 2.5, color: 'rgba(0,255,136,0.85)', ...FONT_STACK },
+  panelStats: { flexDirection: 'row', width: '100%' },
+  panelStat: { flex: 1, alignItems: 'center' },
+  panelStatNum: {
+    fontSize: 26, fontWeight: '800', color: '#FFF', marginBottom: 4,
+    ...FONT_STACK,
+    ...Platform.select({
+      ios: { fontVariant: ['tabular-nums'] as any },
+      web: { fontVariantNumeric: 'tabular-nums' } as any,
+    }),
+  },
+  panelSecure: {
+    color: SHIELD_GREEN, fontSize: 22,
+    ...Platform.select({
+      web: { textShadow: `0 0 12px ${SHIELD_GREEN}` } as any,
+      ios: { shadowColor: SHIELD_GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 8 } as any,
+    }),
+  },
+  panelStatLabel: { fontSize: 10, fontWeight: '500', color: TEXT_DIM, textTransform: 'uppercase', letterSpacing: 0.5, ...FONT_STACK },
+  panelDividerV: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.08)', alignSelf: 'center' },
+  panelFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
+  panelFooterText: { fontSize: 11, color: TEXT_DIM, ...FONT_STACK },
 
-  // ============== ADD BUTTON ORB ==============
-  addOrbGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 28,
-    backgroundColor: 'transparent',
-    opacity: 0,
-  },
-  addOrbTile: {
-    width: 76,
-    height: 90,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  addOrbHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-  },
-  addOrbIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  addOrbLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-
-  // ============== PRIVACY METRICS DASHBOARD ==============
-  metricsDashboard: {
-    alignSelf: 'center',
-    width: '90%',
-    marginTop: 24,
-    marginBottom: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 24,
-  },
-  metricsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIndicator: {
-    width: 10,
-    height: 10,
-    marginRight: 10,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusDotGlow: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: SHIELD_GREEN,
-    opacity: 0.4,
-    ...Platform.select({
-      ios: {
-        shadowColor: SHIELD_GREEN,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 6,
-      },
-      web: {
-        boxShadow: `0 0 10px ${SHIELD_GREEN}`,
-      },
-    }),
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: SHIELD_GREEN,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 2,
-    color: '#666',
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    width: '100%',
-    marginTop: 20,
-  },
-  metricColumn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  metricValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 6,
-    textAlign: 'center',
-    ...Platform.select({
-      ios: { fontFamily: 'System', fontVariant: ['tabular-nums'] as any },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', fontVariantNumeric: 'tabular-nums' } as any,
-    }),
-  },
-  metricValueCyan: {
-    color: '#00FF88',
-    fontSize: 22,
-  },
-  metricLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#666',
-    textAlign: 'center',
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
-  },
-
-  // ============== FLOATING ISLAND DOCK ==============
-  floatingDockContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-  },
-  floatingDockWrapper: {
-    width: '100%',
-  },
-  floatingDock: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(20, 20, 25, 0.85)',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: GLASS_BORDER,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 20,
-      },
-      android: {
-        elevation: 12,
-      },
-      web: {
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-      },
-    }),
-  },
-  dockHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    zIndex: 10,
-  },
-  dockContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    height: 44,
-  },
-  dockSearchContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dockSearchIcon: {
-    marginRight: 10,
-  },
-  dockSearchInput: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 15,
-    height: '100%',
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { 
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        outlineStyle: 'none',
-      },
-    }),
-  },
-  dockClearButton: {
-    padding: 4,
-    marginLeft: 4,
-  },
-  dockDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginHorizontal: 12,
-  },
-  dockIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 4,
-  },
-  // Navigation Row in Dock
-  dockNavRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-evenly',
-    paddingHorizontal: 8,
-    paddingBottom: 0,
-    paddingTop: 2,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
-    height: 34,
-  },
-  navIconButton: {
-    width: 36,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabsIconContainer: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: MUTED_GRAY,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabsIconText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: MUTED_GRAY,
-  },
-
-  // ============== SPACER ==============
-  flexSpacer: {
-    flex: 1,
-    minHeight: 40,
-  },
-
-  // ============== MODAL ==============
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  modalContent: {
-    width: '100%',
-    backgroundColor: 'rgba(25, 25, 30, 0.95)',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 28,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    borderBottomWidth: 0,
-    overflow: 'hidden',
-    position: 'relative',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 20,
-      },
-      android: {
-        elevation: 24,
-      },
-      web: {
-        boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.4)',
-      },
-    }),
-  },
-  modalHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#FFF',
-    marginBottom: 28,
-    textAlign: 'center',
-    ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-    }),
-  },
-  modalInputContainer: {
-    marginBottom: 20,
-  },
-  modalInputLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#666',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
-  modalInput: {
-    backgroundColor: GLASS_WHITE,
-    borderRadius: 14,
+  // ── Search ──
+  searchWrap: { width: '100%' },
+  searchPill: {
+    flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: GLASS_BORDER_LIT,
     paddingHorizontal: 18,
-    paddingVertical: 16,
-    color: '#FFF',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
     ...Platform.select({
-      ios: { fontFamily: 'System' },
-      android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+      web: { backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' } as any,
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12 },
     }),
   },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 28,
-    gap: 14,
+  searchInput: {
+    flex: 1, color: '#FFF', fontSize: 15, height: '100%',
+    ...FONT_STACK,
+    ...Platform.select({ web: { outlineStyle: 'none' } as any }),
   },
-  modalCancelButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 14,
-    backgroundColor: GLASS_WHITE,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
+  searchPlaceholder: {
+    position: 'absolute', left: 0, top: 0, bottom: 0, lineHeight: 52,
+    fontSize: 15, color: TEXT_DIM, ...FONT_STACK,
   },
-  modalCancelText: {
-    color: '#888',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalSaveButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 14,
-    backgroundColor: ELECTRIC_CYAN,
-    alignItems: 'center',
-  },
-  modalSaveButtonDisabled: {
-    backgroundColor: 'rgba(0, 255, 255, 0.25)',
-  },
-  modalSaveText: {
-    color: '#0A0A0A',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  searchIconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
-  // ============== QR SCANNER ==============
-  qrModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  // ── Bottom Nav ──
+  navBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50,
+    backgroundColor: 'rgba(5,5,8,0.88)',
+    ...Platform.select({
+      web: { backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any,
+    }),
   },
-  qrModalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  navBarBorder: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
+  navBarRow: { flexDirection: 'row', justifyContent: 'space-evenly', paddingTop: 8 },
+  navBtnWrap: { alignItems: 'center', width: 48, position: 'relative' },
+  navBtn: { width: 48, height: 40, alignItems: 'center', justifyContent: 'center' },
+  navActiveBar: {
+    position: 'absolute', top: -8, width: 24, height: 2, borderRadius: 1,
+    backgroundColor: AURA_TEAL,
+    ...Platform.select({
+      web: { boxShadow: `0 0 8px ${AURA_TEAL}` } as any,
+      ios: { shadowColor: AURA_TEAL, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 4 },
+    }),
   },
-  qrModalContent: {
-    width: SCREEN_WIDTH - 48,
-    maxWidth: 400,
-    backgroundColor: 'rgba(25, 25, 30, 0.95)',
-    borderRadius: 28,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
+  navActiveDot: {
+    width: 4, height: 4, borderRadius: 2, backgroundColor: AURA_TEAL, marginTop: 2,
+    ...Platform.select({
+      web: { boxShadow: `0 0 6px ${AURA_TEAL}` } as any,
+    }),
   },
-  qrModalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#FFF',
-    marginBottom: 16,
+  navTabBadge: {
+    width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: AURA_TEAL,
+    alignItems: 'center', justifyContent: 'center',
   },
-  qrModalText: {
-    fontSize: 16,
-    color: '#888',
-    textAlign: 'center',
-    marginBottom: 24,
+  navTabText: { fontSize: 12, fontWeight: '700', color: AURA_TEAL, ...FONT_STACK },
+
+  // ── Modals ──
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.8)' },
+  modalContent: {
+    width: '100%', backgroundColor: 'rgba(20,20,25,0.95)', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 28, borderWidth: 1, borderColor: GLASS_BORDER, borderBottomWidth: 0,
   },
-  qrCloseButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 14,
-    backgroundColor: ELECTRIC_CYAN,
+  modalTitle: { fontSize: 22, fontWeight: '700', color: '#FFF', marginBottom: 28, textAlign: 'center', ...FONT_STACK },
+  modalInputWrap: { marginBottom: 20 },
+  modalInputLabel: { fontSize: 11, fontWeight: '700', color: '#666', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1.5 },
+  modalInput: {
+    backgroundColor: GLASS_BG, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 16,
+    color: '#FFF', fontSize: 16, borderWidth: 1, borderColor: GLASS_BORDER, ...FONT_STACK,
   },
-  qrCloseButtonText: {
-    color: '#0A0A0A',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  qrScannerContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  qrLoadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: DEEP_BLACK,
-    padding: 24,
-  },
-  qrLoadingText: {
-    fontSize: 18,
-    color: '#FFF',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  qrSubText: {
-    fontSize: 14,
-    color: '#888',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  qrOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  qrHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 16,
-  },
-  qrBackButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qrHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFF',
-  },
-  qrFrameContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qrFrame: {
-    width: 250,
-    height: 250,
-    position: 'relative',
-  },
-  qrCorner: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderColor: ELECTRIC_CYAN,
-    borderWidth: 4,
-  },
-  qrCornerTL: {
-    top: 0,
-    left: 0,
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 12,
-  },
-  qrCornerTR: {
-    top: 0,
-    right: 0,
-    borderLeftWidth: 0,
-    borderBottomWidth: 0,
-    borderTopRightRadius: 12,
-  },
-  qrCornerBL: {
-    bottom: 0,
-    left: 0,
-    borderRightWidth: 0,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 12,
-  },
-  qrCornerBR: {
-    bottom: 0,
-    right: 0,
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    borderBottomRightRadius: 12,
-  },
-  qrInstructions: {
-    position: 'absolute',
-    bottom: 120,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-    fontSize: 16,
-    color: '#FFF',
-    fontWeight: '500',
-  },
+  modalBtns: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 28, gap: 14 },
+  modalCancel: { flex: 1, paddingVertical: 16, borderRadius: 14, backgroundColor: GLASS_BG, alignItems: 'center', borderWidth: 1, borderColor: GLASS_BORDER },
+  modalCancelText: { color: '#888', fontSize: 16, fontWeight: '600' },
+  modalSave: { flex: 1, paddingVertical: 16, borderRadius: 14, backgroundColor: AURA_CYAN, alignItems: 'center' },
+  modalSaveText: { color: '#0A0A0A', fontSize: 16, fontWeight: '700' },
+
+  // ── QR ──
+  qrOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  qrContent: { width: SW - 48, maxWidth: 400, backgroundColor: 'rgba(20,20,25,0.95)', borderRadius: 28, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: GLASS_BORDER },
+  qrTitle: { fontSize: 22, fontWeight: '700', color: '#FFF', marginBottom: 16 },
+  qrText: { fontSize: 16, color: '#888', textAlign: 'center', marginBottom: 24 },
+  qrBtn: { paddingVertical: 14, paddingHorizontal: 32, borderRadius: 14, backgroundColor: AURA_CYAN },
+  qrBtnText: { color: '#0A0A0A', fontSize: 16, fontWeight: '700' },
+  qrCloseCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
 });
 
-// Export memoized component to prevent unnecessary re-renders
 export const NewTabPage = React.memo(NewTabPageComponent);
-
 export default NewTabPage;
