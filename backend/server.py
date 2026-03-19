@@ -121,15 +121,23 @@ async def root():
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.model_dump())
-    return status_obj
+    try:
+        status_dict = input.model_dump()
+        status_obj = StatusCheck(**status_dict)
+        _ = await db.status_checks.insert_one(status_obj.model_dump())
+        return status_obj
+    except Exception as e:
+        logger.error(f"Database error creating status check: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create status check")
 
 @api_router.get("/status", response_model=List[StatusCheck])
 async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+    try:
+        status_checks = await db.status_checks.find().to_list(1000)
+        return [StatusCheck(**status_check) for status_check in status_checks]
+    except Exception as e:
+        logger.error(f"Database error fetching status checks: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch status checks")
 
 # ============== Tab Categorization ==============
 
@@ -184,7 +192,6 @@ Do not include any other text."""
     categorized = []
     for tab in request.tabs:
         url_lower = tab.url.lower()
-        title_lower = tab.title.lower()
         
         category = "Other"
         if any(x in url_lower for x in ['amazon', 'ebay', 'shop', 'store', 'buy', 'cart']):

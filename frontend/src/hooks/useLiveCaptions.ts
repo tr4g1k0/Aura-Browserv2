@@ -212,24 +212,30 @@ export const useLiveCaptions = (): UseLiveCaptionsReturn => {
    * Start the caption stream
    */
   const start = useCallback(async (): Promise<boolean> => {
-    // Reset state
-    bufferRef.current = [];
-    setCaptionText('');
-    setWords([]);
-    setConfidence(0);
-    
-    // Reset mock state for fresh start
-    SpeechModelService.resetMockState();
-    
-    // Start audio recording
-    const success = await audioStream.startRecording();
-    
-    if (success) {
-      setStatus('listening');
-      setConfidence(0.9);
+    try {
+      // Reset state
+      bufferRef.current = [];
+      setCaptionText('');
+      setWords([]);
+      setConfidence(0);
+      
+      // Reset mock state for fresh start
+      SpeechModelService.resetMockState();
+      
+      // Start audio recording
+      const success = await audioStream.startRecording();
+      
+      if (success) {
+        setStatus('listening');
+        setConfidence(0.9);
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('[LiveCaptions] Failed to start:', error);
+      setStatus('idle');
+      return false;
     }
-    
-    return success;
   }, [audioStream]);
   
   /**

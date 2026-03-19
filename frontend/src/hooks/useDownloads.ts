@@ -17,57 +17,67 @@ export function useDownloads(webViewRef: RefObject<any>) {
   }, []);
 
   const handleFileDownload = useCallback(async (downloadUrl: string) => {
-    console.log('[Browser] Download intercepted:', downloadUrl);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      console.log('[Browser] Download intercepted:', downloadUrl);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (Platform.OS === 'web') {
-      console.log('[Browser] Downloads not supported on web');
+      if (Platform.OS === 'web') {
+        console.log('[Browser] Downloads not supported on web');
+        return false;
+      }
+
+      const store = useDownloadsStore.getState();
+      const extractedName = downloadManager.extractFilename(downloadUrl);
+      const activeId = store.startDownload(downloadUrl, extractedName);
+
+      setDownloadToastVisible(true);
+      setDownloadStatus('downloading');
+      setDownloadProgress(0);
+
+      const result = await downloadManager.downloadAndShare(downloadUrl, (status, progress, filename, error) => {
+        if (filename) {
+          setDownloadFilename(filename);
+        }
+        
+        switch (status) {
+          case 'starting':
+            setDownloadStatus('downloading');
+            setDownloadProgress(0);
+            break;
+          case 'downloading':
+            setDownloadStatus('downloading');
+            setDownloadProgress(progress || 0);
+            useDownloadsStore.getState().updateProgress(activeId, progress || 0);
+            break;
+          case 'complete':
+            setDownloadStatus('complete');
+            setDownloadProgress(100);
+            useDownloadsStore.getState().completeDownload(activeId);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            break;
+          case 'error':
+            setDownloadStatus('error');
+            useDownloadsStore.getState().failDownload(activeId, error || 'Download failed');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            console.error('[Browser] Download error:', error);
+            Alert.alert('Download Failed', error || 'Could not download the file. Please try again.');
+            break;
+        }
+      });
+
+      if (result.success && result.localUri && result.filename) {
+        addDownloadToList(result.filename, result.localUri);
+      }
+
+      return true;
+    } catch (error: any) {
+      console.error('[Browser] Download exception:', error);
+      setDownloadStatus('error');
+      setDownloadToastVisible(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Download Error', error?.message || 'An unexpected error occurred during download.');
       return false;
     }
-
-    const store = useDownloadsStore.getState();
-    const extractedName = downloadManager.extractFilename(downloadUrl);
-    const activeId = store.startDownload(downloadUrl, extractedName);
-
-    setDownloadToastVisible(true);
-    setDownloadStatus('downloading');
-    setDownloadProgress(0);
-
-    const result = await downloadManager.downloadAndShare(downloadUrl, (status, progress, filename, error) => {
-      if (filename) {
-        setDownloadFilename(filename);
-      }
-      
-      switch (status) {
-        case 'starting':
-          setDownloadStatus('downloading');
-          setDownloadProgress(0);
-          break;
-        case 'downloading':
-          setDownloadStatus('downloading');
-          setDownloadProgress(progress || 0);
-          useDownloadsStore.getState().updateProgress(activeId, progress || 0);
-          break;
-        case 'complete':
-          setDownloadStatus('complete');
-          setDownloadProgress(100);
-          useDownloadsStore.getState().completeDownload(activeId);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          break;
-        case 'error':
-          setDownloadStatus('error');
-          useDownloadsStore.getState().failDownload(activeId, error || 'Download failed');
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          console.error('[Browser] Download error:', error);
-          break;
-      }
-    });
-
-    if (result.success && result.localUri && result.filename) {
-      addDownloadToList(result.filename, result.localUri);
-    }
-
-    return true;
   }, []);
 
   const dismissDownloadToast = useCallback(() => {

@@ -135,15 +135,19 @@ class ResumableDownloadService {
    * Handle network state changes
    */
   private handleNetworkChange = async (state: NetInfoState): Promise<void> => {
-    const wasOffline = !this.isOnline;
-    this.isOnline = state.isConnected ?? false;
+    try {
+      const wasOffline = !this.isOnline;
+      this.isOnline = state.isConnected ?? false;
 
-    if (wasOffline && this.isOnline) {
-      console.log('[ResumableDownloads] Network restored');
-      await this.resumeInterruptedDownloads();
-    } else if (!this.isOnline) {
-      console.log('[ResumableDownloads] Network lost - pausing downloads');
-      await this.pauseAllDownloads();
+      if (wasOffline && this.isOnline) {
+        console.log('[ResumableDownloads] Network restored');
+        await this.resumeInterruptedDownloads();
+      } else if (!this.isOnline) {
+        console.log('[ResumableDownloads] Network lost - pausing downloads');
+        await this.pauseAllDownloads();
+      }
+    } catch (error) {
+      console.error('[ResumableDownloads] Network change handler error:', error);
     }
   };
 
@@ -151,9 +155,13 @@ class ResumableDownloadService {
    * Handle app state changes
    */
   private handleAppStateChange = async (nextAppState: AppStateStatus): Promise<void> => {
-    if (nextAppState === 'background' || nextAppState === 'inactive') {
-      // Save progress when app goes to background
-      await this.saveRecords();
+    try {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        // Save progress when app goes to background
+        await this.saveRecords();
+      }
+    } catch (error) {
+      console.error('[ResumableDownloads] App state change handler error:', error);
     }
   };
 

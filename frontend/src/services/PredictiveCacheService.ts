@@ -131,13 +131,34 @@ class PredictiveCacheService {
   private networkUnsubscribe: (() => void) | null = null;
   private batterySubscription: any = null;
 
+  private cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
+
   constructor() {
     this.initializeMonitoring();
     
-    // Periodically clean expired entries
+    // Periodically clean expired entries (with tracked interval for cleanup)
     if (Platform.OS !== 'web') {
-      setInterval(() => this.cleanExpired(), 60000);
+      this.cleanupIntervalId = setInterval(() => this.cleanExpired(), 60000);
     }
+  }
+
+  /**
+   * Destroy the service and clean up intervals
+   */
+  destroy(): void {
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
+    }
+    if (this.networkUnsubscribe) {
+      this.networkUnsubscribe();
+      this.networkUnsubscribe = null;
+    }
+    if (this.batterySubscription) {
+      this.batterySubscription.remove();
+      this.batterySubscription = null;
+    }
+    this.cancelAllPrefetches();
   }
 
   /**

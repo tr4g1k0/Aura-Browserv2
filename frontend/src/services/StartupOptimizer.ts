@@ -107,25 +107,29 @@ class StartupOptimizerService {
    * This is called once on app launch
    */
   async runStartupOptimizations(): Promise<void> {
-    const startTime = Date.now();
-    console.log('[StartupOptimizer] Running startup optimizations...');
+    try {
+      const startTime = Date.now();
+      console.log('[StartupOptimizer] Running startup optimizations...');
 
-    // Run all optimizations in parallel
-    await Promise.all([
-      // 1. Pre-warm WebView engine
-      webViewPrewarmer.prewarm(),
-      
-      // 2. Batch load all startup data
-      this.loadAllStartupData(),
-      
-      // 3. DNS prefetch for Quick Access sites
-      new Promise<void>((resolve) => {
-        prefetchQuickAccessDNS();
-        resolve();
-      }),
-    ]);
+      // Run all optimizations in parallel
+      await Promise.all([
+        // 1. Pre-warm WebView engine
+        webViewPrewarmer.prewarm().catch(e => console.warn('[StartupOptimizer] Prewarm failed:', e)),
+        
+        // 2. Batch load all startup data
+        this.loadAllStartupData(),
+        
+        // 3. DNS prefetch for Quick Access sites
+        new Promise<void>((resolve) => {
+          try { prefetchQuickAccessDNS(); } catch (e) { console.warn('[StartupOptimizer] DNS prefetch failed:', e); }
+          resolve();
+        }),
+      ]);
 
-    console.log(`[StartupOptimizer] All optimizations complete in ${Date.now() - startTime}ms`);
+      console.log(`[StartupOptimizer] All optimizations complete in ${Date.now() - startTime}ms`);
+    } catch (error) {
+      console.error('[StartupOptimizer] Startup optimizations error:', error);
+    }
   }
 
   /**

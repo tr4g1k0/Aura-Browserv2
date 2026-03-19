@@ -73,8 +73,13 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
   const [adsBlocked, setAdsBlocked] = useState(0);
 
   const initVisionAISelectors = useCallback(async () => {
-    const selectors = await visionAIScannerPlaceholder('');
-    setVisionAISelectors(selectors);
+    try {
+      const selectors = await visionAIScannerPlaceholder('');
+      setVisionAISelectors(selectors);
+    } catch (error) {
+      console.error('[WebViewEngine] Failed to init Vision AI selectors:', error);
+      setVisionAISelectors([]);
+    }
   }, []);
 
   const vpnScript = settings.vpnEnabled ? `

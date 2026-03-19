@@ -134,7 +134,7 @@ export default function BrowserScreen() {
 
   // ── Memoized computations ──
   const isNewTabPage = useMemo(() => !activeTab?.url || activeTab.url === 'about:blank' || activeTab.url === 'about:newtab' || activeTab.url === '', [activeTab?.url]);
-  const webViewKey = useMemo(() => `webview-${activeTab?.id || 'none'}-${activeTab?.isDesktopMode ? 'desktop' : 'mobile'}-${isGhostMode ? 'ghost' : 'normal'}-${userSettings.doNotTrack ? 'dnt' : 'nodnt'}`, [activeTab?.id, activeTab?.isDesktopMode, isGhostMode, userSettings.doNotTrack]);
+  const webViewKey = useMemo(() => `webview-${activeTab?.id || 'none'}-${activeTab?.isDesktopMode ? 'desktop' : 'mobile'}-${isGhostMode ? 'ghost' : 'normal'}-${userSettings.doNotTrack ? 'dnt' : 'nodnt'}-${userSettings.forceDarkWeb ? 'dark' : 'light'}-${userSettings.forceZoom ? 'zoom' : 'nozoom'}`, [activeTab?.id, activeTab?.isDesktopMode, isGhostMode, userSettings.doNotTrack, userSettings.forceDarkWeb, userSettings.forceZoom]);
 
   // ── Modal/overlay state ──
   const [menuVisible, setMenuVisible] = useState(false);
@@ -294,12 +294,20 @@ export default function BrowserScreen() {
   useEffect(() => {
     if (Platform.OS === 'android') {
       const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        // In Kids Mode: block hardware back from exiting - must use PIN
+        if (kidsModeIsActive) {
+          if (activeTab?.canGoBack) {
+            webViewRef.current?.goBack();
+          }
+          // Always return true in Kids Mode to prevent app exit
+          return true;
+        }
         if (activeTab?.canGoBack) { webViewRef.current?.goBack(); return true; }
         return false;
       });
       return () => backHandler.remove();
     }
-  }, [activeTab?.canGoBack]);
+  }, [activeTab?.canGoBack, kidsModeIsActive]);
 
   useEffect(() => {
     if (userSettings.ambientAwarenessEnabled) {
@@ -453,17 +461,63 @@ export default function BrowserScreen() {
   }, []);
 
   const handleGhostSelfDestructComplete = useCallback(() => {
-    setGhostSelfDestructAnim(false);
-    ghostDeactivate();
-    // Clear WebView data
-    if (webViewRef.current) {
-      webViewRef.current.injectJavaScript(`
-        localStorage.clear(); sessionStorage.clear();
-        document.cookie.split(';').forEach(function(c) { document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/'); });
-        true;
-      `);
+    try {
+      setGhostSelfDestructAnim(false);
+
+      // 1. Clear WebView cookies, localStorage, sessionStorage, cache
+      if (webViewRef.current) {
+        webViewRef.current.injectJavaScript(`
+          (function() {
+            try {
+              localStorage.clear();
+              sessionStorage.clear();
+              // Clear all cookies
+              document.cookie.split(';').forEach(function(c) {
+                var eqPos = c.indexOf('=');
+                var name = eqPos > -1 ? c.substr(0, eqPos) : c;
+                document.cookie = name.trim() + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+              });
+              // Clear caches if available
+              if (window.caches) {
+                caches.keys().then(function(names) {
+                  names.forEach(function(name) { caches.delete(name); });
+                });
+              }
+              // Clear IndexedDB
+              if (window.indexedDB && window.indexedDB.databases) {
+                indexedDB.databases().then(function(dbs) {
+                  dbs.forEach(function(db) { indexedDB.deleteDatabase(db.name); });
+                });
+              }
+            } catch(e) { console.log('Ghost cleanup error:', e); }
+          })();
+          true;
+        `);
+      }
+
+      // 2. Close ALL ghost tabs through the store (destroys ghost tab array)
+      useBrowserStore.getState().setGhostMode(false);
+
+      // 3. Deactivate ghost mode state (timer, settings)
+      ghostDeactivate();
+
+      // 4. Return to normal home screen (new tab page)
+      // Force navigate to the first regular tab or new tab
+      const regularTabs = useBrowserStore.getState().tabs;
+      if (regularTabs.length > 0) {
+        const firstTab = regularTabs[0];
+        useBrowserStore.getState().updateTab(firstTab.id, { isActive: true });
+      }
+
+      setGhostDestroyedMsg(true);
+      console.log('[GhostMode] Self-destruct complete: all data destroyed');
+    } catch (error) {
+      console.error('[GhostMode] Self-destruct error:', error);
+      // Ensure ghost mode is deactivated even on error
+      ghostDeactivate();
+      setGhostSelfDestructAnim(false);
+      setGhostDestroyedMsg(true);
     }
-    setGhostDestroyedMsg(true);
   }, [ghostDeactivate]);
 
   const handleGhostExitComplete = useCallback(() => {

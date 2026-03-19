@@ -90,16 +90,20 @@ export function useBackgroundMedia({
   // Inject YouTube background play script when on YouTube
   useEffect(() => {
     const isYouTube = currentUrl.includes('youtube.com') || currentUrl.includes('youtu.be');
+    let timer: ReturnType<typeof setTimeout> | null = null;
     
     if (isYouTube && lastUrlRef.current !== currentUrl && isBackgroundPlayEnabled) {
       // Inject YouTube background play script with a small delay
-      setTimeout(() => {
+      timer = setTimeout(() => {
         webViewRef.current?.injectJavaScript(youtubeBackgroundPlayScript);
         console.log('[BackgroundMedia] YouTube background play script injected');
       }, 1500);
     }
     
     lastUrlRef.current = currentUrl;
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [currentUrl, isBackgroundPlayEnabled, webViewRef]);
 
   // Show/hide video toolbar based on video state

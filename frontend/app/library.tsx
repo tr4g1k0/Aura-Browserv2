@@ -401,6 +401,9 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
             data={filteredBookmarks}
             keyExtractor={(item) => item.url}
             renderItem={renderBookmarkItem}
+            getItemLayout={(_data, index) => ({
+              length: 72, offset: 72 * index, index,
+            })}
             contentContainerStyle={[
               styles.listContent,
               filteredBookmarks.length === 0 && styles.emptyListContent,
@@ -413,6 +416,9 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
             data={filteredHistory}
             keyExtractor={(item) => `${item.url}-${item.timestamp}`}
             renderItem={renderHistoryItem}
+            getItemLayout={(_data, index) => ({
+              length: 72, offset: 72 * index, index,
+            })}
             contentContainerStyle={[
               styles.listContent,
               filteredHistory.length === 0 && styles.emptyListContent,

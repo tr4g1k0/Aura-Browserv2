@@ -680,6 +680,9 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = ({ visible, onClose
             ListHeaderComponent={renderListHeader}
             ListEmptyComponent={<EmptyState hasFilter={hasFilter} />}
             renderItem={renderItem}
+            getItemLayout={(_data, index) => ({
+              length: 80, offset: 80 * index, index,
+            })}
             contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
             showsVerticalScrollIndicator={false}
             refreshing={isRefreshing}
