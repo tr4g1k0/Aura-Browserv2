@@ -457,7 +457,7 @@ const PrivacyMetricsDashboard: React.FC = () => {
   const metrics = {
     trackersBlocked: '1,492',
     adsStopped: '384',
-    connectionStatus: 'Encrypted',
+    connectionStatus: 'Secure',  // Changed from 'Encrypted' for brevity
   };
 
   return (
@@ -474,17 +474,21 @@ const PrivacyMetricsDashboard: React.FC = () => {
         <Text style={styles.statusText}>AURA SHIELD ACTIVE</Text>
       </View>
 
-      {/* Metrics Grid */}
+      {/* Metrics Grid - Each column takes exactly 33.3% */}
       <View style={styles.metricsGrid}>
         {/* Column 1: Trackers Blocked */}
         <View style={styles.metricColumn}>
-          <Text style={styles.metricValue}>{metrics.trackersBlocked}</Text>
+          <Text style={styles.metricValue}>
+            {metrics.trackersBlocked}
+          </Text>
           <Text style={styles.metricLabel}>Trackers Blocked</Text>
         </View>
 
         {/* Column 2: Ads Stopped */}
         <View style={styles.metricColumn}>
-          <Text style={styles.metricValue}>{metrics.adsStopped}</Text>
+          <Text style={styles.metricValue}>
+            {metrics.adsStopped}
+          </Text>
           <Text style={styles.metricLabel}>Ads Stopped</Text>
         </View>
 
@@ -1244,9 +1248,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, on
         {/* PRIVACY METRICS DASHBOARD - Glassmorphic Monolith */}
         <PrivacyMetricsDashboard />
 
-        {/* Spacer to push dock to bottom */}
-        <View style={styles.flexSpacer} />
-
         {/* FLOATING ISLAND DOCK - Bottom Section */}
         <FloatingIslandDock 
           onSearch={onSearch}
@@ -1328,12 +1329,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 24,
+    justifyContent: 'space-evenly',
   },
 
   // ============== BRANDING ==============
   brandingContainer: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 0,
   },
   logoContainer: {
     width: 100,
@@ -1579,7 +1581,8 @@ const styles = StyleSheet.create({
   metricsDashboard: {
     alignSelf: 'center',
     width: '90%',
-    marginTop: 30,
+    marginTop: 24,
+    marginBottom: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: 24,
     borderWidth: 1,
@@ -1637,17 +1640,21 @@ const styles = StyleSheet.create({
   metricsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    width: '100%',
     marginTop: 20,
   },
   metricColumn: {
-    alignItems: 'center',
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
   metricValue: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 6,
+    textAlign: 'center',
     ...Platform.select({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'Roboto' },
