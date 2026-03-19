@@ -33,6 +33,7 @@ import { AccessibilityModal } from '../src/components/AccessibilityModal';
 import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
 import { CaptionPill } from '../src/components/CaptionPill';
 import { QuickConverseView } from '../src/components/QuickConverseView';
+import { DownloadsModal, addDownloadToList } from '../src/components/DownloadsModal';
 import { useAmbientAwareness } from '../src/hooks/useAmbientAwareness';
 import { usePrivacy } from '../src/context/PrivacyContext';
 import { downloadManager } from '../src/services/FileDownloadManager';

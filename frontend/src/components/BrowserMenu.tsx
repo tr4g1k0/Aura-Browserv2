@@ -43,6 +43,7 @@ interface BrowserMenuProps {
   onToggleBookmark?: () => void;
   onToggleDesktopMode?: () => void;
   onToggleReaderMode?: () => void;
+  onOpenDownloads?: () => void;
   onFindInPage?: () => void;
   onBurnSite?: () => void;
   onAISummarize?: () => void;
@@ -68,6 +69,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onToggleBookmark,
   onToggleDesktopMode,
   onToggleReaderMode,
+  onOpenDownloads,
   onFindInPage,
   onBurnSite,
   onAISummarize,
@@ -186,8 +188,8 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     // GOLDEN RULE: Close menu first
     onClose();
     
-    // TODO: Navigate to downloads screen
-    Alert.alert('Downloads', 'Coming soon! Your downloaded files will appear here.');
+    // Open Downloads Modal via callback
+    onOpenDownloads?.();
   };
 
   const handleSettings = () => {
