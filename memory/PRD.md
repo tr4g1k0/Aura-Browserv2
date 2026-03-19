@@ -84,10 +84,19 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - FlashcardModal: dark overlay with large centered text, spring scale animation, tap-anywhere dismiss
 - Unified injected JS: contextmenu handles images only, selectionchange handles text
 
-### Settings
-- Premium glossy glassmorphic design
-- Sections: Shield & Privacy, AI & Accessibility, System
-- All settings persist via AsyncStorage
+### Settings Screen ✅ (Feb 2026)
+- **Dark Theme Redesign**: Deep dark (#0a0a0f) background, glassmorphic cards (rgba(255,255,255,0.05) + blur), cyan section headers, cyan active toggles, red glowing burn button
+- **ThemeProvider Integration**: AuraDarkTheme applied globally via @react-navigation/native ThemeProvider in _layout.tsx
+- **All Settings Functional**:
+  - Default Search Engine: Modal with Google, DuckDuckGo, Brave, Bing — AsyncStorage persisted
+  - Local AI Assistant: Toggle (strictLocalAI)
+  - Ad & Tracker Shield: Toggle (aggressiveAdBlocking) — consumed in WebView network interception
+  - Strict Do Not Track: Toggle (doNotTrack) — injected via DNT header
+  - Burn Browsing Data: Confirmation dialog → clears AsyncStorage + history + cache
+  - App Theme: Modal (Dark/Light/System)
+  - Force Dark Web: Toggle → CSS invert(1) hue-rotate(180deg) injection via WebView
+  - Force Enable Zoom: Toggle → WebView scalesPageToFit override
+- Brave search engine added to URL parser
 
 ### Other
 - YouTube Shorts optimization
