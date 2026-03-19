@@ -39,8 +39,10 @@ interface BrowserMenuProps {
   currentTitle: string;
   isBookmarked?: boolean;
   isDesktopMode?: boolean;
+  isReaderMode?: boolean;
   onToggleBookmark?: () => void;
   onToggleDesktopMode?: () => void;
+  onToggleReaderMode?: () => void;
   onFindInPage?: () => void;
   onBurnSite?: () => void;
   onAISummarize?: () => void;
@@ -62,8 +64,10 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   currentTitle,
   isBookmarked = false,
   isDesktopMode = false,
+  isReaderMode = false,
   onToggleBookmark,
   onToggleDesktopMode,
+  onToggleReaderMode,
   onFindInPage,
   onBurnSite,
   onAISummarize,
@@ -149,8 +153,8 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     // GOLDEN RULE: Close menu first
     onClose();
     
-    // TODO: Implement reader mode
-    Alert.alert('Reader Mode', 'Coming soon! This will strip away clutter for distraction-free reading.');
+    // Toggle Reader Mode via callback
+    onToggleReaderMode?.();
   };
 
   const handleBurnSite = () => {
@@ -387,6 +391,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               icon=""
               label="Reader Mode"
               onPress={handleReaderMode}
+              isActive={isReaderMode}
             />
             <MenuRow
               emoji="🔥"
