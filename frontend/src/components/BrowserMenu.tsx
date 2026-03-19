@@ -49,6 +49,7 @@ interface BrowserMenuProps {
   onBurnSite?: () => void;
   onAISummarize?: () => void;
   onKidsMode?: () => void;
+  onGhostMode?: () => void;
 }
 
 /**
@@ -77,6 +78,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onBurnSite,
   onAISummarize,
   onKidsMode,
+  onGhostMode,
 }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -219,6 +221,13 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     console.log('[Menu] Kids Mode pressed');
     onClose();
     onKidsMode?.();
+  };
+
+  const handleGhostMode = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    console.log('[Menu] Ghost Mode pressed');
+    onClose();
+    onGhostMode?.();
   };
 
   // ============================================================
@@ -462,6 +471,11 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               icon=""
               label="Kids Mode"
               onPress={handleKidsMode}
+            />
+            <MenuRow
+              icon="skull-outline"
+              label="Ghost Mode"
+              onPress={handleGhostMode}
             />
           </View>
         </LinearGradient>

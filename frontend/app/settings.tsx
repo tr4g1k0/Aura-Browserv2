@@ -19,6 +19,7 @@ import { useSettings } from '../src/context/SettingsContext';
 import { SearchEngine } from '../src/hooks/useBrowserSettings';
 import { useBrowserStore } from '../src/store/browserStore';
 import { useKidsModeStore } from '../src/store/useKidsModeStore';
+import { useGhostModeStore } from '../src/store/useGhostModeStore';
 
 const ELECTRIC_CYAN = '#00FFFF';
 const DANGER_RED = '#FF4466';
@@ -58,6 +59,10 @@ export default function SettingsScreen() {
   
   const kidsModeIsActive = useKidsModeStore(s => s.isActive);
   const kidsModeConfig = useKidsModeStore(s => s.config);
+
+  const ghostIsActive = useGhostModeStore(s => s.isActive);
+  const ghostSettings = useGhostModeStore(s => s.settings);
+  const ghostUpdateSettings = useGhostModeStore(s => s.updateSettings);
 
   // Force dark background on Expo Router wrappers (web only)
   React.useEffect(() => {
@@ -267,6 +272,45 @@ export default function SettingsScreen() {
           <SwitchRow label="Force Dark Web" settingKey="forceDarkWeb" subtitle="Force dark mode on all websites" />
           <View style={styles.divider} />
           <SwitchRow label="Force Enable Zoom" settingKey="forceZoom" subtitle="Override sites that block pinch-to-zoom" />
+        </GlassCard>
+
+        {/* GHOST MODE */}
+        <GlassCard title="GHOST MODE">
+          <View style={styles.row}>
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>Ghost Mode</Text>
+              <Text style={styles.rowSub}>{ghostIsActive ? 'Session active' : 'The only mode that truly disappears'}</Text>
+            </View>
+            <View style={[styles.kidsBadge, ghostIsActive && { backgroundColor: 'rgba(0,255,136,0.15)' }]} data-testid="ghost-mode-settings-status">
+              <Ionicons name="skull-outline" size={16} color={ghostIsActive ? '#00FF88' : TEXT_MUTED} />
+              <Text style={[styles.kidsBadgeText, ghostIsActive && { color: '#00FF88' }]}>
+                {ghostIsActive ? 'ON' : 'OFF'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}><View style={styles.rowText}><Text style={styles.rowLabel}>Require biometric</Text></View>
+            <Switch value={ghostSettings.requireBiometric} onValueChange={() => ghostUpdateSettings({ requireBiometric: !ghostSettings.requireBiometric })} trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,136,0.5)' }} thumbColor={ghostSettings.requireBiometric ? '#00FF88' : '#AAA'} /></View>
+          <View style={styles.divider} />
+          <View style={styles.row}><View style={styles.rowText}><Text style={styles.rowLabel}>Entry animation</Text></View>
+            <Switch value={ghostSettings.showEntryAnimation} onValueChange={() => ghostUpdateSettings({ showEntryAnimation: !ghostSettings.showEntryAnimation })} trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,136,0.5)' }} thumbColor={ghostSettings.showEntryAnimation ? '#00FF88' : '#AAA'} /></View>
+          <View style={styles.divider} />
+          <View style={styles.row}><View style={styles.rowText}><Text style={styles.rowLabel}>Decoy Mode</Text></View>
+            <Switch value={ghostSettings.decoyModeEnabled} onValueChange={() => ghostUpdateSettings({ decoyModeEnabled: !ghostSettings.decoyModeEnabled })} trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(255,149,0,0.5)' }} thumbColor={ghostSettings.decoyModeEnabled ? '#FF9500' : '#AAA'} /></View>
+          {ghostSettings.decoyModeEnabled && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4, paddingLeft: 4 }}>
+              <View style={{ backgroundColor: 'rgba(255,165,0,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                <Text style={{ color: '#FF9500', fontSize: 10, fontWeight: '700' }}>DECOY</Text>
+              </View>
+              <Text style={{ color: TEXT_MUTED, fontSize: 11 }}>Fake history protects your privacy</Text>
+            </View>
+          )}
+          <View style={styles.divider} />
+          <View style={styles.row}><View style={styles.rowText}><Text style={styles.rowLabel}>Block WebRTC leaks</Text></View>
+            <Switch value={ghostSettings.blockWebRTC} onValueChange={() => ghostUpdateSettings({ blockWebRTC: !ghostSettings.blockWebRTC })} trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,136,0.5)' }} thumbColor={ghostSettings.blockWebRTC ? '#00FF88' : '#AAA'} /></View>
+          <View style={styles.divider} />
+          <View style={styles.row}><View style={styles.rowText}><Text style={styles.rowLabel}>Rotate User Agent</Text></View>
+            <Switch value={ghostSettings.rotateUserAgent} onValueChange={() => ghostUpdateSettings({ rotateUserAgent: !ghostSettings.rotateUserAgent })} trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,136,0.5)' }} thumbColor={ghostSettings.rotateUserAgent ? '#00FF88' : '#AAA'} /></View>
         </GlassCard>
 
         {/* KIDS MODE */}

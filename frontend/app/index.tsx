@@ -64,6 +64,14 @@ import { KidsModeParentDashboard } from '../src/components/KidsModeParentDashboa
 import { KidsModeSetupModal } from '../src/components/KidsModeSetupModal';
 import { useKidsModeStore } from '../src/store/useKidsModeStore';
 import { kidsContentFilter } from '../src/services/KidsContentFilter';
+import { useGhostModeStore } from '../src/store/useGhostModeStore';
+import { ghostPrivacyEngine } from '../src/services/GhostModePrivacyEngine';
+import { GhostModeEntryAnimation } from '../src/components/GhostModeEntryAnimation';
+import { GhostModeBiometricLock } from '../src/components/GhostModeBiometricLock';
+import { GhostModeTimerSheet } from '../src/components/GhostModeTimerSheet';
+import { GhostModeToolbar } from '../src/components/GhostModeToolbar';
+import { GhostModeLocationSheet } from '../src/components/GhostModeLocationSheet';
+import { GhostModeSelfDestruct, GhostModeDestroyedMessage } from '../src/components/GhostModeSelfDestruct';
 import { ttsService, contentExtractionScript } from '../src/services/TextToSpeechService';
 import { predictiveCacheService } from '../src/services/PredictiveCacheService';
 import { semanticHistoryService, PageContext } from '../src/services/SemanticHistoryService';
@@ -140,6 +148,20 @@ export default function BrowserScreen() {
   const kidsModeLogBlocked = useKidsModeStore(s => s.logBlockedAttempt);
   const kidsModeTodayUsage = useKidsModeStore(s => s.todayUsageMinutes);
   const kidsModeSessionStart = useKidsModeStore(s => s.sessionStartTime);
+
+  // ── Ghost Mode state ──
+  const [ghostBioLockVisible, setGhostBioLockVisible] = useState(false);
+  const [ghostTimerSheetVisible, setGhostTimerSheetVisible] = useState(false);
+  const [ghostLocationSheetVisible, setGhostLocationSheetVisible] = useState(false);
+  const [ghostEntryAnim, setGhostEntryAnim] = useState<'enter' | 'exit' | null>(null);
+  const [ghostSelfDestructAnim, setGhostSelfDestructAnim] = useState(false);
+  const [ghostDestroyedMsg, setGhostDestroyedMsg] = useState(false);
+  const ghostIsActive = useGhostModeStore(s => s.isActive);
+  const ghostSettings = useGhostModeStore(s => s.settings);
+  const ghostSpoofedLocation = useGhostModeStore(s => s.spoofedLocation);
+  const ghostInit = useGhostModeStore(s => s.initialize);
+  const ghostActivate = useGhostModeStore(s => s.activateGhostMode);
+  const ghostDeactivate = useGhostModeStore(s => s.deactivateGhostMode);
 
   // ── Extracted hooks ──
   const { barTranslateY, showBar, hideBar, handleScrollDirection } = useAutoHideBar();
@@ -222,6 +244,9 @@ export default function BrowserScreen() {
     
     // Initialize Kids Mode store
     kidsModeInitialize();
+    
+    // Initialize Ghost Mode store
+    ghostInit();
     
     return () => {
       tabVirtualizationService.stop();
@@ -361,6 +386,51 @@ export default function BrowserScreen() {
     }, 30000); // Check every 30 seconds
     return () => clearInterval(checkInterval);
   }, [kidsModeIsActive, kidsModeConfig.timeLimit, kidsModeTodayUsage, kidsModeSessionStart]);
+
+  // ── Ghost Mode handlers ──
+  const handleGhostModeMenuPress = useCallback(() => {
+    if (ghostSettings.requireBiometric) {
+      setGhostBioLockVisible(true);
+    } else {
+      setGhostTimerSheetVisible(true);
+    }
+  }, [ghostSettings.requireBiometric]);
+
+  const handleGhostBioAuthenticated = useCallback(() => {
+    setGhostBioLockVisible(false);
+    setGhostTimerSheetVisible(true);
+  }, []);
+
+  const handleGhostTimerSelected = useCallback((minutes: number) => {
+    setGhostTimerSheetVisible(false);
+    ghostActivate(minutes);
+    ghostPrivacyEngine.rotateUserAgent();
+    if (ghostSettings.showEntryAnimation) {
+      setGhostEntryAnim('enter');
+    }
+  }, [ghostActivate, ghostSettings.showEntryAnimation]);
+
+  const handleGhostSelfDestruct = useCallback(() => {
+    setGhostSelfDestructAnim(true);
+  }, []);
+
+  const handleGhostSelfDestructComplete = useCallback(() => {
+    setGhostSelfDestructAnim(false);
+    ghostDeactivate();
+    // Clear WebView data
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`
+        localStorage.clear(); sessionStorage.clear();
+        document.cookie.split(';').forEach(function(c) { document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/'); });
+        true;
+      `);
+    }
+    setGhostDestroyedMsg(true);
+  }, [ghostDeactivate]);
+
+  const handleGhostExitComplete = useCallback(() => {
+    setGhostEntryAnim(null);
+  }, []);
 
   // ── WebView message handler (dispatcher) ──
   const handleMessage = useCallback((event: any) => {
@@ -525,6 +595,7 @@ export default function BrowserScreen() {
           onOpenDownloads={() => setDownloadsModalVisible(true)}
           onDownloadAllLinks={handleDownloadAllLinks}
           onKidsMode={handleKidsModeMenuPress}
+          onGhostMode={handleGhostModeMenuPress}
         />
 
         {/* AI Summarizer Drawer */}
@@ -745,6 +816,48 @@ export default function BrowserScreen() {
           visible={kidsModeParentVisible}
           onClose={() => setKidsModeParentVisible(false)}
         />
+
+        {/* ══════ GHOST MODE COMPONENTS ══════ */}
+        <GhostModeBiometricLock
+          visible={ghostBioLockVisible}
+          onClose={() => setGhostBioLockVisible(false)}
+          onAuthenticated={handleGhostBioAuthenticated}
+        />
+        <GhostModeTimerSheet
+          visible={ghostTimerSheetVisible}
+          onClose={() => setGhostTimerSheetVisible(false)}
+          onSelect={handleGhostTimerSelected}
+        />
+        <GhostModeLocationSheet
+          visible={ghostLocationSheetVisible}
+          onClose={() => setGhostLocationSheetVisible(false)}
+        />
+
+        {/* Ghost Mode Floating Toolbar */}
+        {ghostIsActive && (
+          <GhostModeToolbar
+            onLocationPress={() => setGhostLocationSheetVisible(true)}
+            onSelfDestruct={handleGhostSelfDestruct}
+          />
+        )}
+
+        {/* Ghost Mode Entry/Exit Animation */}
+        {ghostEntryAnim && (
+          <GhostModeEntryAnimation
+            mode={ghostEntryAnim}
+            onComplete={handleGhostExitComplete}
+          />
+        )}
+
+        {/* Ghost Mode Self-Destruct Animation */}
+        {ghostSelfDestructAnim && (
+          <GhostModeSelfDestruct onComplete={handleGhostSelfDestructComplete} />
+        )}
+
+        {/* Ghost Mode Destroyed Message */}
+        {ghostDestroyedMsg && (
+          <GhostModeDestroyedMessage onComplete={() => setGhostDestroyedMsg(false)} />
+        )}
       </View>
     </KeyboardAvoidingView>
   );

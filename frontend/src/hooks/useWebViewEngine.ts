@@ -22,6 +22,8 @@ import {
 } from '../services/BackgroundMediaService';
 import { useKidsModeStore } from '../store/useKidsModeStore';
 import { kidsContentFilter } from '../services/KidsContentFilter';
+import { useGhostModeStore } from '../store/useGhostModeStore';
+import { ghostPrivacyEngine } from '../services/GhostModePrivacyEngine';
 
 interface WebViewEngineDeps {
   userSettings: {
@@ -153,6 +155,16 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
       `;
     }
 
+    // Ghost Mode privacy injection
+    const ghostState = useGhostModeStore.getState();
+    if (ghostState.isActive) {
+      scripts += ghostPrivacyEngine.getPrivacyInjectionScript({
+        blockWebRTC: ghostState.settings.blockWebRTC,
+        rotateUA: ghostState.settings.rotateUserAgent,
+        spoofLocation: ghostState.spoofedLocation,
+      });
+    }
+
     // Unified context menu + selection interceptor
     scripts += `
       (function() {
@@ -253,6 +265,15 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
       
       // Log page visit for activity tracking
       kidsModeState.logPageVisit(url, '');
+    }
+    
+    // Ghost Mode: strip tracking params from URLs
+    const ghostModeState = useGhostModeStore.getState();
+    if (ghostModeState.isActive) {
+      const cleanUrl = ghostPrivacyEngine.stripTrackingParams(url);
+      if (cleanUrl !== url) {
+        console.log('[Ghost] UTM params stripped:', url, '->', cleanUrl);
+      }
     }
     
     if (userSettings.aggressiveAdBlocking && isAdOrTracker(url)) {
