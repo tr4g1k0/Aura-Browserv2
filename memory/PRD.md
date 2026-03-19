@@ -34,12 +34,19 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - Ghost Mode
 - Privacy Shredder (data burn)
 - Burn This Site
+- Bot detection / reCAPTCHA fix (mobile User-Agent, DuckDuckGo default)
 
 ### Accessibility
 - Live Captions overlay
 - Text-to-Speech (Read Aloud) with control bar
 - Ambient Awareness alerts
 - Accessibility modal
+
+### AURA Shield Panel ✅ (Feb 2026)
+- **Layout Fix**: Tabular-nums font variant for consistent column alignment across iOS/Android/Web
+- **Counter Mechanism**: Dual counting — network-level blocking in `onShouldStartLoadWithRequest` + DOM-level via injected MutationObserver in adblock.ts
+- **Secure Status**: Green (#00FF88) connection indicator
+- **Persistence**: Counts stored/loaded via AsyncStorage through PrivacyContext
 
 ### Downloads Manager (Feb 2026) ✅
 **Core (v1):**
@@ -87,11 +94,26 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - FastAPI, MongoDB (motor), emergentintegrations (GPT-4o)
 
 ## Key Files
-- `/app/frontend/app/index.tsx` - Main browser (2500+ lines)
+- `/app/frontend/app/index.tsx` - Main browser (2800+ lines)
 - `/app/frontend/app/settings.tsx` - Settings screen
 - `/app/frontend/src/components/BrowserMenu.tsx` - 3-dot menu
+- `/app/frontend/src/components/NewTabPage.tsx` - Home/New tab page with AURA Shield
 - `/app/frontend/src/components/DownloadsModal.tsx` - Downloads manager (enhanced)
 - `/app/frontend/src/components/DownloadNotificationBanner.tsx` - Background download banner
+- `/app/frontend/src/components/AuraActionPill.tsx` - Text selection floating pill
+- `/app/frontend/src/components/ImageContextMenu.tsx` - Image long-press menu
 - `/app/frontend/src/store/useDownloadsStore.ts` - Active downloads Zustand store
 - `/app/frontend/src/services/FileDownloadManager.ts` - Download service
+- `/app/frontend/src/context/PrivacyContext.tsx` - Ad/tracker count management
+- `/app/frontend/src/utils/adblock.ts` - Ad blocking + counting logic
 - `/app/backend/server.py` - All API routes
+
+## Upcoming Tasks
+- **(P1) Wire AI Actions**: Implement Explain/Summarize in AuraActionPill + Aura Vision in ImageContextMenu using GPT-4o
+- **(P2) Add Define Button**: Dictionary lookups in AuraActionPill
+- **(P2) Add Translate Button**: Translation in text/image menus
+- **(P3) Downloads Storage Insights**: Visual chart of storage by category
+- **(P3) Cloud Sync**: Backup/sync for bookmarks and download history
+
+## Refactoring Needs
+- `index.tsx` is 2800+ lines — should extract WebView message handling, modal states, and hooks into separate files
