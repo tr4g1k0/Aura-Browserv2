@@ -8,6 +8,7 @@
     "scheme": "aura-browser",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "jsEngine": "hermes",
     "splash": {
       "image": "./assets/images/splash-image.png",
       "resizeMode": "contain",

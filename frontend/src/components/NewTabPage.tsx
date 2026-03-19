@@ -1085,9 +1085,9 @@ const AddLinkModal: React.FC<{
 };
 
 // ============================================================
-// MAIN NEW TAB PAGE COMPONENT
+// MAIN NEW TAB PAGE COMPONENT (Memoized for performance)
 // ============================================================
-export const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, onOpenMenu, onAISummarize, onAccessibility }) => {
+const NewTabPageComponent: React.FC<NewTabPageProps> = ({ onNavigate, onSearch, onOpenMenu, onAISummarize, onAccessibility }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { settings } = useSettings();
@@ -2090,5 +2090,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
+
+// Export memoized component to prevent unnecessary re-renders
+export const NewTabPage = React.memo(NewTabPageComponent);
 
 export default NewTabPage;

@@ -58,6 +58,8 @@ import { predictiveCacheService } from '../src/services/PredictiveCacheService';
 import { semanticHistoryService, PageContext } from '../src/services/SemanticHistoryService';
 import { ambientAwarenessService } from '../src/services/AmbientAwarenessService';
 import { prefetchQuickAccessDNS } from '../src/services/DNSPrefetchService';
+import { startupOptimizer } from '../src/services/StartupOptimizer';
+import { tabVirtualizationService } from '../src/services/TabVirtualizationService';
 import * as Haptics from 'expo-haptics';
 
 // Conditionally import WebView only on native platforms
@@ -138,10 +140,6 @@ export default function BrowserScreen() {
     }
   }, [isDanger, settings.ambientAwarenessEnabled]);
 
-  // ── Derived values ──
-  const isNewTabPage = !activeTab?.url || activeTab.url === 'about:blank' || activeTab.url === 'about:newtab' || activeTab.url === '';
-  const webViewKey = `webview-${activeTab?.id || 'none'}-${activeTab?.isDesktopMode ? 'desktop' : 'mobile'}-${isGhostMode ? 'ghost' : 'normal'}-${userSettings.doNotTrack ? 'dnt' : 'nodnt'}`;
-
   // ── Transition animation ──
   const transitionAnim = useRef(new Animated.Value(isNewTabPage ? 0 : 1)).current;
   useEffect(() => {
@@ -172,8 +170,17 @@ export default function BrowserScreen() {
 
   // ── Init effects ──
   useEffect(() => {
+    // Run all startup optimizations in parallel (WebView pre-warm, DNS prefetch, batch storage load)
+    startupOptimizer.runStartupOptimizations();
     loadPersistedState();
     webViewEngine.initVisionAISelectors();
+    
+    // Start tab virtualization service
+    tabVirtualizationService.start();
+    
+    return () => {
+      tabVirtualizationService.stop();
+    };
   }, []);
 
   useEffect(() => {
@@ -385,7 +392,12 @@ export default function BrowserScreen() {
         {/* WebView Container - fills the FULL screen */}
         <View style={styles.webviewContainer}>
           {Platform.OS === 'web' || isNewTabPage ? (
-            <Animated.View style={{ flex: 1, opacity: homeHubOpacity, transform: [{ translateY: homeHubTranslateY }] }}>
+            <Animated.View 
+              style={{ flex: 1, opacity: homeHubOpacity, transform: [{ translateY: homeHubTranslateY }] }}
+              // Performance: Rasterize animated layer on iOS for smoother animations
+              shouldRasterizeIOS={true}
+              renderToHardwareTextureAndroid={true}
+            >
               <NewTabPage
                 onNavigate={navigation.handleNavigate}
                 onSearch={navigation.handleNavigate}
@@ -439,10 +451,19 @@ export default function BrowserScreen() {
                 showsHorizontalScrollIndicator={false}
                 bounces={true}
                 decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.998}
+                // === PERFORMANCE OPTIMIZATIONS ===
+                // Hardware acceleration for GPU rendering (smoother scrolling, faster compositing)
                 androidHardwareAccelerationDisabled={false}
-                setSupportMultipleWindows={false}
+                androidLayerType="hardware"
+                renderToHardwareTextureAndroid={true}
+                // Cache optimization: Load from cache first, then network (instant loads for visited pages)
+                cacheMode={isGhostMode ? "LOAD_NO_CACHE" : "LOAD_CACHE_ELSE_NETWORK"}
+                // Avoid request blocking delays with mixed content
                 mixedContentMode="always"
-                cacheMode="LOAD_DEFAULT"
+                // Disable multi-window popups (saves memory)
+                setSupportMultipleWindows={false}
+                // Enable smooth scrolling
+                shouldRasterizeIOS={true}
               />
             </SwipeNavigationWrapper>
           ) : null}
@@ -474,10 +495,15 @@ export default function BrowserScreen() {
 
           {/* Bottom Navigation Bar - absolutely positioned, overlays webview */}
           {!isNewTabPage && (
-            <Animated.View style={[
-              styles.bottomBarWrapper,
-              { paddingBottom: insets.bottom, transform: [{ translateY: barTranslateY }] },
-            ]}>
+            <Animated.View 
+              style={[
+                styles.bottomBarWrapper,
+                { paddingBottom: insets.bottom, transform: [{ translateY: barTranslateY }] },
+              ]}
+              // Performance: Rasterize for smoother auto-hide animations
+              shouldRasterizeIOS={true}
+              renderToHardwareTextureAndroid={true}
+            >
               <UnifiedTopBar
                 onNavigate={navigation.handleNavigate}
                 onHomePress={navigation.handleGoHome}

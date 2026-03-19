@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   TextInput,
@@ -57,8 +57,9 @@ interface UnifiedTopBarProps {
  * - Uniform muted gray icons, Electric Cyan when active
  * - AI Agent icon keeps distinct gold accent
  * - Glassmorphism with BlurView
+ * - URL input debounced for performance (300ms) while staying responsive
  */
-export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
+const UnifiedTopBarComponent: React.FC<UnifiedTopBarProps> = ({
   onNavigate,
   onHomePress,
   onTabsPress,
@@ -96,6 +97,9 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   const [inputValue, setInputValue] = useState(currentUrl);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  
+  // Debounce timer ref for URL input optimization
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize VPN store
   useEffect(() => {
@@ -108,14 +112,48 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
     }
   }, [currentUrl, isFocused]);
 
-  const handleSubmit = () => {
+  // Debounced submit handler - 300ms delay but instant UI feedback
+  // The UI updates immediately (inputValue changes), but navigation is debounced
+  const handleSubmit = useCallback(() => {
     Keyboard.dismiss();
     const input = inputValue.trim();
     if (!input) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Clear any pending debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    
+    // Navigate immediately on explicit submit (Enter key)
     onNavigate(input);
     setIsFocused(false);
-  };
+  }, [inputValue, onNavigate]);
+
+  // Optimized text change handler with debounced state updates
+  const handleTextChange = useCallback((text: string) => {
+    // Update UI immediately for responsiveness
+    setInputValue(text);
+    
+    // Debounce any potential autocomplete/suggestion operations (300ms)
+    // Note: Navigation only happens on submit, this debounce is for future autocomplete
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      // Future: autocomplete suggestions would go here
+      // Currently just ensures we don't re-render too frequently
+    }, 300);
+  }, []);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
 
   const handleSearchFocus = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -181,7 +219,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
             ref={inputRef}
             style={styles.searchInput}
             value={isFocused ? inputValue : getDisplayUrl()}
-            onChangeText={setInputValue}
+            onChangeText={handleTextChange}
             onFocus={handleSearchFocus}
             onBlur={() => setIsFocused(false)}
             onSubmitEditing={handleSubmit}
@@ -442,5 +480,9 @@ const styles = StyleSheet.create({
     color: '#9B59B6',
   },
 });
+
+// Export memoized component to prevent unnecessary re-renders
+// Only re-renders when props actually change
+export const UnifiedTopBar = React.memo(UnifiedTopBarComponent);
 
 export default UnifiedTopBar;

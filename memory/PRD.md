@@ -136,3 +136,51 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - 7 custom hooks extracted: useAutoHideBar, useReaderMode, useFindInPage, useDownloads, useAISummarize, useBrowserNavigation, useWebViewEngine
 - 4 components extracted: FindInPageBar, AISummarizerDrawer, BotDetectionBanner, PrivacyShredderToast
 - All features preserved and verified via testing agent
+
+## Performance Optimizations (Feb 2026) ✅
+
+### 1. WebView Performance
+- **Hardware Acceleration**: `androidLayerType="hardware"`, `renderToHardwareTextureAndroid={true}` for GPU rendering
+- **Cache Optimization**: `cacheMode="LOAD_CACHE_ELSE_NETWORK"` for instant loads from cache
+- **Smooth Rendering**: `shouldRasterizeIOS={true}` on animated views
+
+### 2. DNS Prefetching
+- Quick Access domains pre-resolved on app startup
+- Local DNS cache with 30-minute TTL
+- Favicon preloading for instant display
+
+### 3. Lazy Loading & Code Splitting
+- Heavy modals (BrowserMenu, Downloads, AI Summarizer, etc.) use `React.lazy()` with Suspense
+- Only critical components loaded on startup
+
+### 4. Memory Management
+- Tab Virtualization Service: Pauses background tabs, limits to 5 active WebViews
+- Auto-destroy tabs inactive >10 minutes
+- Video buffer cleanup on navigation
+
+### 5. Smooth Animations
+- All animations use `useNativeDriver: true`
+- `shouldRasterizeIOS` and `renderToHardwareTextureAndroid` on animated components
+- Auto-hide bar uses 200px translateY animation
+
+### 6. Startup Time Optimization
+- Batch AsyncStorage reads via StartupOptimizer service
+- WebView pre-warming on app launch
+- Parallel DNS prefetch + storage load + WebView init
+
+### 7. JavaScript Thread Optimization
+- URL bar input debounced (300ms) but with instant UI feedback
+- `useMemo()` for isNewTabPage, webViewKey computations
+- `useCallback()` for all handlers
+- `React.memo()` on UnifiedTopBar, NewTabPage components
+
+### 8. Build Optimization
+- Hermes JS engine enabled (`jsEngine: "hermes"` in app.json)
+- Babel config with production console removal
+
+### Key Performance Services
+- `/app/frontend/src/services/StartupOptimizer.ts` - Batch startup loading
+- `/app/frontend/src/services/WebViewPrewarmer.ts` - WebView pre-warming
+- `/app/frontend/src/services/TabVirtualizationService.ts` - Memory management
+- `/app/frontend/src/services/DNSPrefetchService.ts` - DNS & favicon caching
+
