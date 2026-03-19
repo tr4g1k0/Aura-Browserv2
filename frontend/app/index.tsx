@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   TouchableOpacity,
   Alert,
+  InteractionManager,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,33 +30,34 @@ import { useAISummarize } from '../src/hooks/useAISummarize';
 import { useBrowserNavigation } from '../src/hooks/useBrowserNavigation';
 import { useWebViewEngine } from '../src/hooks/useWebViewEngine';
 
-// Extracted components
+// Performance: Lazy-load heavy overlay components (not visible on initial render)
+const BrowserMenu = React.lazy(() => import('../src/components/BrowserMenu').then(m => ({ default: m.BrowserMenu })));
+const AISummarizerDrawer = React.lazy(() => import('../src/components/AISummarizerDrawer').then(m => ({ default: m.AISummarizerDrawer })));
+const AccessibilityModal = React.lazy(() => import('../src/components/AccessibilityModal').then(m => ({ default: m.AccessibilityModal })));
+const DownloadsModal = React.lazy(() => import('../src/components/DownloadsModal').then(m => ({ default: m.DownloadsModal })));
+const LiveCaptionsOverlay = React.lazy(() => import('../src/components/LiveCaptionsOverlay').then(m => ({ default: m.LiveCaptionsOverlay })));
+const QuickConverseView = React.lazy(() => import('../src/components/QuickConverseView').then(m => ({ default: m.QuickConverseView })));
+const ImageContextMenu = React.lazy(() => import('../src/components/ImageContextMenu').then(m => ({ default: m.ImageContextMenu })));
+
+// Direct imports for always-visible components
 import { FindInPageBar } from '../src/components/FindInPageBar';
-import { AISummarizerDrawer } from '../src/components/AISummarizerDrawer';
 import { BotDetectionBanner } from '../src/components/BotDetectionBanner';
 import { PrivacyShredderToast } from '../src/components/PrivacyShredderToast';
-
-// Existing components
 import { UnifiedTopBar } from '../src/components/UnifiedTopBar';
 import { NewTabPage } from '../src/components/NewTabPage';
 import { SwipeNavigationWrapper } from '../src/components/SwipeNavigationWrapper';
 import { DownloadToast } from '../src/components/DownloadToast';
-import { BrowserMenu } from '../src/components/BrowserMenu';
 import { LibraryScreen } from './library';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
-import { AccessibilityModal } from '../src/components/AccessibilityModal';
-import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
 import { CaptionPill } from '../src/components/CaptionPill';
-import { QuickConverseView } from '../src/components/QuickConverseView';
-import { DownloadsModal } from '../src/components/DownloadsModal';
 import { DownloadNotificationBanner } from '../src/components/DownloadNotificationBanner';
-import { ImageContextMenu } from '../src/components/ImageContextMenu';
 import { AuraActionPill } from '../src/components/AuraActionPill';
 import { TTSControlBar } from '../src/components/TTSControlBar';
 import { ttsService, contentExtractionScript } from '../src/services/TextToSpeechService';
 import { predictiveCacheService } from '../src/services/PredictiveCacheService';
 import { semanticHistoryService, PageContext } from '../src/services/SemanticHistoryService';
 import { ambientAwarenessService } from '../src/services/AmbientAwarenessService';
+import { prefetchQuickAccessDNS } from '../src/services/DNSPrefetchService';
 import * as Haptics from 'expo-haptics';
 
 // Conditionally import WebView only on native platforms
@@ -84,6 +86,10 @@ export default function BrowserScreen() {
 
   const currentTabs = isGhostMode ? ghostTabs : tabs;
   const activeTab = currentTabs.find((t) => t.isActive) || currentTabs[0];
+
+  // ── Memoized computations ──
+  const isNewTabPage = useMemo(() => !activeTab?.url || activeTab.url === 'about:blank' || activeTab.url === 'about:newtab' || activeTab.url === '', [activeTab?.url]);
+  const webViewKey = useMemo(() => `webview-${activeTab?.id || 'none'}-${activeTab?.isDesktopMode ? 'desktop' : 'mobile'}-${isGhostMode ? 'ghost' : 'normal'}-${userSettings.doNotTrack ? 'dnt' : 'nodnt'}`, [activeTab?.id, activeTab?.isDesktopMode, isGhostMode, userSettings.doNotTrack]);
 
   // ── Modal/overlay state ──
   const [menuVisible, setMenuVisible] = useState(false);

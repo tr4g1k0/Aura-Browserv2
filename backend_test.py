@@ -10,7 +10,7 @@ import json
 from typing import Dict, Any
 
 # Get the backend URL from environment
-BACKEND_URL = "https://browser-preview-2.preview.emergentagent.com"
+BACKEND_URL = "https://privacy-browser-opt.preview.emergentagent.com"
 
 def test_health_endpoint() -> Dict[str, Any]:
     """Test the health endpoint as specified in review request."""
