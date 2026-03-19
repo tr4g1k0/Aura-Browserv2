@@ -1,6 +1,5 @@
 import { useState, useCallback, RefObject } from 'react';
 import { Platform } from 'react-native';
-import { Platform } from 'react-native';
 import {
   isAdOrTracker,
   adBusterScript,
