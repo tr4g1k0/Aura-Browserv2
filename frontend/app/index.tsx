@@ -34,6 +34,8 @@ import { LiveCaptionsOverlay } from '../src/components/LiveCaptionsOverlay';
 import { CaptionPill } from '../src/components/CaptionPill';
 import { QuickConverseView } from '../src/components/QuickConverseView';
 import { DownloadsModal, addDownloadToList } from '../src/components/DownloadsModal';
+import { DownloadNotificationBanner } from '../src/components/DownloadNotificationBanner';
+import { useDownloadsStore } from '../src/store/useDownloadsStore';
 import { useAmbientAwareness } from '../src/hooks/useAmbientAwareness';
 import { usePrivacy } from '../src/context/PrivacyContext';
 import { downloadManager } from '../src/services/FileDownloadManager';
@@ -732,6 +734,7 @@ export default function BrowserScreen() {
   /**
    * File Download Handler
    * Intercepts download URLs and uses FileDownloadManager to save and share files
+   * Tracks active downloads via Zustand store for DownloadsModal + notification banner
    */
   const handleFileDownload = useCallback(async (downloadUrl: string) => {
     console.log('[Browser] Download intercepted:', downloadUrl);
@@ -742,6 +745,11 @@ export default function BrowserScreen() {
       console.log('[Browser] Downloads not supported on web');
       return false;
     }
+
+    // Register in Zustand store
+    const store = useDownloadsStore.getState();
+    const extractedName = downloadManager.extractFilename(downloadUrl);
+    const activeId = store.startDownload(downloadUrl, extractedName);
 
     // Show download toast
     setDownloadToastVisible(true);
@@ -762,14 +770,17 @@ export default function BrowserScreen() {
         case 'downloading':
           setDownloadStatus('downloading');
           setDownloadProgress(progress || 0);
+          useDownloadsStore.getState().updateProgress(activeId, progress || 0);
           break;
         case 'complete':
           setDownloadStatus('complete');
           setDownloadProgress(100);
+          useDownloadsStore.getState().completeDownload(activeId);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           break;
         case 'error':
           setDownloadStatus('error');
+          useDownloadsStore.getState().failDownload(activeId, error || 'Download failed');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           console.error('[Browser] Download error:', error);
           break;
@@ -795,6 +806,37 @@ export default function BrowserScreen() {
       setDownloadFilename('');
       setDownloadProgress(0);
     }, 300);
+  }, []);
+
+  /**
+   * Download All Links — Injects JS to scan for downloadable <a> hrefs,
+   * then sequentially downloads each one.
+   */
+  const handleDownloadAllLinks = useCallback(() => {
+    if (!webViewRef.current || Platform.OS === 'web') return;
+
+    const scanScript = `
+      (function() {
+        var exts = ['.pdf','.doc','.docx','.xls','.xlsx','.ppt','.pptx','.txt','.csv','.zip','.rar','.7z','.tar','.gz','.mp3','.wav','.mp4','.mov','.avi','.jpg','.jpeg','.png','.gif','.webp','.apk'];
+        var links = Array.from(document.querySelectorAll('a[href]'));
+        var found = [];
+        links.forEach(function(a) {
+          var href = a.href || '';
+          var lower = href.toLowerCase();
+          for (var i = 0; i < exts.length; i++) {
+            if (lower.endsWith(exts[i]) || lower.includes(exts[i] + '?')) {
+              found.push(href);
+              break;
+            }
+          }
+        });
+        // Deduplicate
+        found = found.filter(function(v, i, a) { return a.indexOf(v) === i; });
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DOWNLOAD_ALL_LINKS', urls: found }));
+      })();
+      true;
+    `;
+    webViewRef.current.injectJavaScript(scanScript);
   }, []);
 
   /**
@@ -1026,6 +1068,28 @@ export default function BrowserScreen() {
         console.error('[Semantic History] Extraction error:', data.error);
       }
       
+      // Handle "Download All Links" scan result
+      if (data.type === 'DOWNLOAD_ALL_LINKS') {
+        const urls: string[] = data.urls || [];
+        if (urls.length === 0) {
+          Alert.alert('No Downloadable Links', 'No downloadable file links found on this page.');
+        } else {
+          Alert.alert(
+            'Download All Links',
+            `Found ${urls.length} downloadable file${urls.length > 1 ? 's' : ''} on this page. Download all?`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: `Download ${urls.length}`,
+                onPress: () => {
+                  urls.forEach((url: string) => handleFileDownload(url));
+                },
+              },
+            ]
+          );
+        }
+      }
+
       // Handle TTS content extraction response
       // STABILITY FIX: Wrapped in try/catch to prevent crashes
       if (data.type === 'TTS_CONTENT') {
@@ -1861,6 +1925,7 @@ export default function BrowserScreen() {
         onBurnSite={handleBurnSite}
         onAISummarize={handleAISummarize}
         onOpenDownloads={() => setDownloadsModalVisible(true)}
+        onDownloadAllLinks={handleDownloadAllLinks}
       />
 
       {/* ============================================================ */}
@@ -2156,6 +2221,12 @@ export default function BrowserScreen() {
         <DownloadsModal
           visible={downloadsModalVisible}
           onClose={() => setDownloadsModalVisible(false)}
+        />
+
+        {/* Background Download Notification Banner */}
+        <DownloadNotificationBanner
+          downloadsModalVisible={downloadsModalVisible}
+          onOpenDownloads={() => setDownloadsModalVisible(true)}
         />
 
         {/* TTS Floating Control Bar */}

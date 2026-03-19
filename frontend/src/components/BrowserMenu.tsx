@@ -44,6 +44,7 @@ interface BrowserMenuProps {
   onToggleDesktopMode?: () => void;
   onToggleReaderMode?: () => void;
   onOpenDownloads?: () => void;
+  onDownloadAllLinks?: () => void;
   onFindInPage?: () => void;
   onBurnSite?: () => void;
   onAISummarize?: () => void;
@@ -70,6 +71,7 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onToggleDesktopMode,
   onToggleReaderMode,
   onOpenDownloads,
+  onDownloadAllLinks,
   onFindInPage,
   onBurnSite,
   onAISummarize,
@@ -190,6 +192,13 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
     
     // Open Downloads Modal via callback
     onOpenDownloads?.();
+  };
+
+  const handleDownloadAllLinks = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log('[Menu] Download All Links pressed');
+    onClose();
+    onDownloadAllLinks?.();
   };
 
   const handleSettings = () => {
@@ -428,6 +437,11 @@ export const BrowserMenu: React.FC<BrowserMenuProps> = ({
               icon="download-outline"
               label="Downloads"
               onPress={handleDownloads}
+            />
+            <MenuRow
+              icon="cloud-download-outline"
+              label="Download All Links"
+              onPress={handleDownloadAllLinks}
             />
             <MenuRow
               icon="settings-outline"
