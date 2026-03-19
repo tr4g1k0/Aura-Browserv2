@@ -11,7 +11,7 @@ import time
 from typing import Dict, Any, Optional
 
 # Configuration from environment
-BACKEND_URL = "https://fork-handoff-summary.preview.emergentagent.com/api"
+BACKEND_URL = "https://price-history-hub-1.preview.emergentagent.com/api"
 
 class GhostModeBackendTester:
     def __init__(self):
