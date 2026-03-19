@@ -1,6 +1,8 @@
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
+import { downloadNotificationService } from './DownloadNotificationService';
+import { resumableDownloadService, DownloadRecord } from './ResumableDownloadService';
 
 // Common downloadable file extensions
 const DOWNLOADABLE_EXTENSIONS = [
@@ -105,6 +107,30 @@ export type DownloadStatusCallback = (
 class FileDownloadManager {
   private activeDownloads: Map<string, FileSystem.DownloadResumable> = new Map();
   private directoriesReady = false;
+  private isInitialized = false;
+
+  /**
+   * Initialize the download manager and related services
+   */
+  async initialize(): Promise<void> {
+    if (this.isInitialized || Platform.OS === 'web') return;
+
+    try {
+      // Initialize notification service
+      await downloadNotificationService.initialize();
+      
+      // Initialize resumable download service
+      await resumableDownloadService.initialize();
+      
+      // Ensure category directories exist
+      await this.ensureCategoryDirectories();
+      
+      this.isInitialized = true;
+      console.log('[DownloadManager] Initialized with notifications and resumable downloads');
+    } catch (error) {
+      console.error('[DownloadManager] Failed to initialize:', error);
+    }
+  }
 
   /**
    * Ensure category subdirectories exist under documentDirectory.
@@ -362,6 +388,109 @@ class FileDownloadManager {
     } catch {
       return [];
     }
+  }
+
+  // ============================================================
+  // RESUMABLE DOWNLOAD METHODS
+  // ============================================================
+
+  /**
+   * Start a resumable download with notification support
+   */
+  async startResumableDownload(
+    url: string,
+    filename?: string,
+    onStatusChange?: DownloadStatusCallback
+  ): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      console.warn('[DownloadManager] Resumable downloads not supported on web');
+      return null;
+    }
+
+    await this.initialize();
+
+    const finalFilename = filename || this.extractFilename(url);
+    
+    try {
+      const downloadId = await resumableDownloadService.startDownload(
+        url,
+        finalFilename,
+        this.getMimeType(finalFilename),
+        (progress) => {
+          // Map progress to status callback
+          onStatusChange?.('downloading', progress.progress, progress.filename);
+        }
+      );
+
+      onStatusChange?.('starting', 0, finalFilename);
+      return downloadId;
+    } catch (error: any) {
+      onStatusChange?.('error', 0, finalFilename, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Pause a resumable download
+   */
+  async pauseResumableDownload(downloadId: string): Promise<void> {
+    await resumableDownloadService.pauseDownload(downloadId);
+  }
+
+  /**
+   * Resume a paused download
+   */
+  async resumeResumableDownload(downloadId: string): Promise<void> {
+    await resumableDownloadService.resumeDownload(downloadId);
+  }
+
+  /**
+   * Cancel a resumable download
+   */
+  async cancelResumableDownload(downloadId: string): Promise<void> {
+    await resumableDownloadService.cancelDownload(downloadId);
+  }
+
+  /**
+   * Retry a failed download
+   */
+  async retryDownload(downloadId: string): Promise<void> {
+    await resumableDownloadService.retryDownload(downloadId);
+  }
+
+  /**
+   * Get all download records from resumable service
+   */
+  getAllDownloadRecords(): DownloadRecord[] {
+    return resumableDownloadService.getAllRecords();
+  }
+
+  /**
+   * Get active downloads
+   */
+  getActiveDownloadRecords(): DownloadRecord[] {
+    return resumableDownloadService.getActiveDownloads();
+  }
+
+  /**
+   * Get completed downloads
+   */
+  getCompletedDownloadRecords(): DownloadRecord[] {
+    return resumableDownloadService.getCompletedDownloads();
+  }
+
+  /**
+   * Check if a download can be resumed
+   */
+  canResumeDownload(downloadId: string): boolean {
+    return resumableDownloadService.isResumable(downloadId);
+  }
+
+  /**
+   * Set global progress callback for all downloads
+   */
+  setGlobalProgressCallback(callback: (progress: { downloadId: string; progress: number; speed: number; filename: string }) => void): void {
+    resumableDownloadService.setProgressCallback(callback);
   }
 }
 

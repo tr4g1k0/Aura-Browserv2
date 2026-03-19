@@ -334,3 +334,59 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - `/app/frontend/src/components/TabCleanupSuggestions.tsx` - Cleanup UI
 - `/app/frontend/app/tabs-manager.tsx` - Tab switcher screen
 
+## Download Notifications & Resumable Downloads (Feb 2026) ✅
+
+### Notification Bar Download Progress
+1. **expo-notifications Integration**
+   - Android notification channel "downloads" configured
+   - iOS background audio mode for download notifications
+   - POST_NOTIFICATIONS permission added
+
+2. **Notification Features**
+   - Persistent notification during active downloads
+   - Real-time progress bar with percentage
+   - Download speed display (MB/s)
+   - Complete notification with tap-to-open action
+   - Failed notification with tap-to-retry action
+   - Paused notification with resume hint
+   - "Connection restored - resuming X downloads" notification
+
+3. **Permission Handling**
+   - Request permission on first download
+   - Store permission state in AsyncStorage
+   - Fallback to in-app UI if denied
+
+### Resumable Downloads (HTTP Range Support)
+1. **Resume Interrupted Downloads**
+   - Check for partial files (.partial extension)
+   - Send `Range: bytes=CURRENT_SIZE-` header
+   - Append new data to existing partial file
+   - Survives app crashes/restarts
+
+2. **Download State Persistence**
+   - AsyncStorage-based persistence every 5 seconds
+   - Tracks: url, filename, filepath, total_bytes, downloaded_bytes, status, timestamp
+   - Status values: pending, downloading, paused, completed, failed
+   - Auto-check for interrupted downloads on app startup
+
+3. **Network Reconnection**
+   - NetInfo monitors WiFi/mobile connection
+   - Auto-resume paused downloads when network restored
+   - Auto-pause downloads when connection lost
+
+4. **Pause/Resume Controls**
+   - `pauseResumableDownload(id)` - Pause active download
+   - `resumeResumableDownload(id)` - Resume paused download
+   - `cancelResumableDownload(id)` - Cancel and delete partial
+   - `retryDownload(id)` - Retry failed download from scratch
+
+5. **File Integrity**
+   - Verify downloaded_bytes matches total_bytes
+   - Move .partial to final path on success
+   - Auto-delete corrupted partial files
+
+### Key Files
+- `/app/frontend/src/services/DownloadNotificationService.ts` - Notification management
+- `/app/frontend/src/services/ResumableDownloadService.ts` - HTTP Range & persistence
+- `/app/frontend/src/services/FileDownloadManager.ts` - Enhanced with resume support
+
