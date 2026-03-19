@@ -436,6 +436,28 @@ Complete premium redesign of NewTabPage to look more premium than Chrome, Brave,
 
 **Key File:** `/app/frontend/src/components/NewTabPage.tsx`
 
+### Ghost Mode (Mar 2026)
+The most advanced private browsing mode on any mobile browser.
+
+**Features:**
+1. **Biometric Lock** - expo-local-authentication for fingerprint/face unlock, 3-attempt lockout (30s), fallback to device PIN
+2. **Self-Destruct Timer** - 0/5/15/30/60 min + custom, countdown in floating toolbar, dramatic "SELF DESTRUCTING" animation + screen flash, auto-clears all cookies/cache/history/localStorage
+3. **Decoy Mode** - Generates 8-14 fake history entries (CNN, Wikipedia, Weather, ESPN, recipes, YouTube) with realistic timestamps throughout the day
+4. **GPS Spoofing** - 6 preset locations (NYC, London, Tokyo, Paris, Sydney, Toronto) + random + custom, injects navigator.geolocation override
+5. **Enhanced Privacy Engine** - WebRTC leak blocking, canvas fingerprint noise, audio context fingerprint blocking, font fingerprint blocking, User-Agent rotation, DNT+GPC headers, third-party cookie blocking, UTM param stripping, hardware info masking
+6. **Dramatic Animations** - Entry: dark ripple + skull icon + "You are now invisible", Exit: dissolve particles + "Ghost Mode destroyed", Self-destruct: red screen flash + progress bar
+7. **Floating Toolbar** - Ghost icon, location spoof indicator, timer countdown, self-destruct button, auto-hides after 4s
+8. **Settings** - 6 toggles: biometric lock, entry animation, decoy mode, WebRTC blocking, UA rotation; DECOY badge when active
+9. **Menu Integration** - Skull icon "Ghost Mode" in browser menu
+10. **Marketing** - "Chrome has Incognito. Aura has Ghost Mode." tagline in biometric lock screen
+
+**Key Files:**
+- `/app/frontend/src/store/useGhostModeStore.ts`
+- `/app/frontend/src/services/GhostModePrivacyEngine.ts`
+- `/app/frontend/src/services/DecoyHistoryService.ts`
+- `/app/frontend/src/components/GhostMode*.tsx` (6 component files)
+
+
 
 ## Upcoming Tasks
 - (P1) Wire AI Actions: Implement Explain/Summarize in AuraActionPill + Aura Vision in ImageContextMenu using GPT-4o
