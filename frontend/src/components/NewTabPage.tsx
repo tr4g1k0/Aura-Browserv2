@@ -1641,16 +1641,13 @@ const styles = StyleSheet.create({
   },
   metricsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
     width: '100%',
     marginTop: 20,
   },
   metricColumn: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    minWidth: 0,
+    justifyContent: 'flex-start',
   },
   metricValue: {
     fontSize: 22,
@@ -1659,13 +1656,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     textAlign: 'center',
     ...Platform.select({
-      ios: { fontFamily: 'System' },
+      ios: { fontFamily: 'System', fontVariant: ['tabular-nums'] as any },
       android: { fontFamily: 'Roboto' },
-      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+      web: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', fontVariantNumeric: 'tabular-nums' } as any,
     }),
   },
   metricValueCyan: {
     color: '#00FF88',
+    fontSize: 22,
   },
   metricLabel: {
     fontSize: 11,

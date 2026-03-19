@@ -363,11 +363,22 @@ export const createAdBusterScript = (additionalSelectors: string[] = []): string
 (function(){
   'use strict';
   
-  /* Smart Shield Ad Buster v1.0 */
-  /* Layer 2: DOM-based ad element hiding */
-  /* VISION AI HOOK: Additional selectors can be injected via additionalSelectors parameter */
+  /* Smart Shield Ad Buster v2.0 */
+  /* Layer 2: DOM-based ad element hiding + counting */
   
   var css='${cssRules}';
+  var _shieldAds = 0;
+  var _shieldTrackers = 0;
+  
+  function reportCounts(){
+    try {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'AD_BLOCK_COUNT',
+        adsBlocked: _shieldAds,
+        trackersBlocked: _shieldTrackers
+      }));
+    } catch(e) {}
+  }
   
   function injectStyles(){
     var existing=document.getElementById('smart-shield-styles');
@@ -380,18 +391,41 @@ export const createAdBusterScript = (additionalSelectors: string[] = []): string
   }
   
   function removeAdFrames(){
-    var iframes=document.querySelectorAll('iframe[src*="ad"],iframe[src*="doubleclick"],iframe[src*="googlesyndication"],iframe[id*="google_ads"]');
-    iframes.forEach(function(f){f.remove();});
+    var iframes=document.querySelectorAll('iframe[src*="ad"],iframe[src*="doubleclick"],iframe[src*="googlesyndication"],iframe[id*="google_ads"],iframe[src*="facebook.com/tr"],iframe[src*="taboola"],iframe[src*="outbrain"]');
+    var count = 0;
+    iframes.forEach(function(f){ f.remove(); count++; });
+    if (count > 0) { _shieldAds += count; reportCounts(); }
   }
   
   function hideAdElements(){
     var selectors='${allSelectors.slice(0, 30).join(',')}';
     try{
       var ads=document.querySelectorAll(selectors);
+      var hidden = 0;
       ads.forEach(function(el){
-        el.style.setProperty('display','none','important');
+        if (el.offsetParent !== null || el.style.display !== 'none') {
+          el.style.setProperty('display','none','important');
+          hidden++;
+        }
       });
+      if (hidden > 0) { _shieldAds += hidden; reportCounts(); }
     }catch(e){}
+  }
+  
+  function countTrackerScripts(){
+    var trackerDomains = ['google-analytics.com','googletagmanager.com','facebook.net','hotjar.com','clarity.ms','segment.com','mixpanel.com','amplitude.com','heapanalytics.com','fullstory.com','newrelic.com','chartbeat.com','scorecardresearch.com','quantserve.com','doubleclick.net','googlesyndication.com','adservice.google.com'];
+    var scripts = document.querySelectorAll('script[src]');
+    var counted = 0;
+    scripts.forEach(function(s){
+      var src = (s.getAttribute('src') || '').toLowerCase();
+      for (var i = 0; i < trackerDomains.length; i++) {
+        if (src.indexOf(trackerDomains[i]) !== -1) {
+          counted++;
+          break;
+        }
+      }
+    });
+    if (counted > 0) { _shieldTrackers += counted; reportCounts(); }
   }
   
   injectStyles();
@@ -400,10 +434,12 @@ export const createAdBusterScript = (additionalSelectors: string[] = []): string
     document.addEventListener('DOMContentLoaded',function(){
       removeAdFrames();
       hideAdElements();
+      countTrackerScripts();
     });
   }else{
     removeAdFrames();
     hideAdElements();
+    countTrackerScripts();
   }
   
   var observer=new MutationObserver(function(mutations){
@@ -421,7 +457,7 @@ export const createAdBusterScript = (additionalSelectors: string[] = []): string
     subtree:true
   });
   
-  console.log('[Smart Shield] Ad blocking active');
+  console.log('[Smart Shield] Ad blocking active - counting enabled');
 })();
 true;`;
   

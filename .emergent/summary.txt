@@ -1,91 +1,95 @@
-**original_problem_statement**: The user wants to build a full-stack mobile browser application named AURA Browser with a strong focus on privacy, accessibility, and a premium, glassmorphic UI aesthetic.
+**original_problem_statement:**
+The user's core objective is to build a sophisticated, privacy-focused mobile web browser named Aura Browser with a unique, AI-ready user interface.
 
-The user has provided feature requests incrementally, including:
-- A Quick Converse split-screen accessibility feature for real-time, face-to-face communication using Speech-to-Text and Text-to-Speech.
-- A global rebrand from the initial name ACCESS to AURA Browser.
-- A Minimalist Monolith home screen design, which was later reverted.
-- A Privacy Metrics Dashboard on the home screen.
-- A Reader Mode to reformat webpages for clean reading.
-- A functional Downloads Manager.
-
-PRODUCT REQUIREMENTS:
-- **UI/UX**: Must follow a Glassmorphic Monolith aesthetic with a deep indigo/black background, Aura Blue accents, and premium animations.
-- **Privacy Core**: Implement real-time ad/tracker blocking and display live metrics. VPN functionality is a future goal.
-- **Accessibility**: Features like Quick Converse and Reader Mode are key requirements.
-- **Functionality**: Must work as a standard mobile browser with tabs, history, bookmarks, and a downloadable file manager.
+Over the session, the user guided the agent to build and fix the following:
+**PRODUCT REQUIREMENTS:**
+1.  **Downloads Manager:** A full-featured manager to intercept, save, and manage file downloads from the WebView, with a custom UI for listing, opening, and deleting files. This was later enhanced with:
+    *   Live progress indicators for active downloads.
+    *   Search and filtering capabilities.
+    *   Batch download support (Download All Links).
+    *   A persistent notification banner for background downloads.
+    *   Auto-categorization of downloads into folders (Documents, Images, Media, etc.).
+2.  **Custom Context Menus:**
+    *   **Image Menu:** A custom long-press context menu for images to replace the default system menu, offering Download, Copy URL, Share, and a placeholder Aura Vision (OCR) option.
+    *   **Text Selection Menu:** A custom UI to replace the native text selection pop-up, initially a bottom sheet, then refactored into a floating Aura Action Pill. It provides Copy, Secure Search, and placeholder AI actions (Insight, Flashcard).
+3.  **Bug Fixes:**
+    *   **AURA Shield UI:** Fix uneven layout of the privacy stats panel and change the Secure status color to green.
+    *   **Ad/Tracker Counters:** Fix the Trackers Blocked and Ads Stopped counters, which were stuck at 0.
+    *   **Home Button:** Fix the non-functional home button in the bottom navigation bar.
+    *   **Bottom Nav Bar UI/UX:** Reduce the size of the bottom navigation bar and implement an auto-hide-on-scroll feature.
+    *   **reCAPTCHA/Bot Detection:** Implement a multi-point fix to prevent sites from flagging the browser as a bot, including setting a mobile User-Agent and defaulting to DuckDuckGo search.
+    *   **Crashes:** Resolve two separate crashes related to module resolution () and undefined props in the  screen.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The project is a functional Expo-based mobile application named AURA Browser with a FastAPI backend.
-- **Frontend**: The UI reflects the AURA brand, featuring a home screen () with a horizontally scrolling Quick Access section and a Privacy Metrics Dashboard. The dashboard is fully wired to a new , which persists ad/tracker block counts to  and updates in real-time.
-- **Key Features Implemented**:
-  - **Quick Converse**: A split-screen UI () with live Speech-to-Text (using ) and Text-to-Speech output.
-  - **Reader Mode**: A JavaScript injector () that reformats webpages into a clean, dark-mode reading layout, toggleable from the main menu.
-  - **Ad/Tracker Blocking**: A network-level blocker in 's  that now reports metrics to the .
-- **State Management**: Uses Zustand () for primary browser state and React Context () for privacy metrics.
-- **Downloads (In-Progress)**: The  and  packages are installed. A skeleton  has been created, and the main menu () is wired to open it. A  service with core download/management functions already exists.
+The project is a full-stack application consisting of a React Native (Expo) frontend and a FastAPI backend, functioning as a mobile web browser called Aura Browser.
+
+Key implemented features include:
+- A comprehensive Downloads Manager with features like categorization, search, and progress tracking, using a Zustand store () for state management.
+- Custom, non-native context menus for both image long-press () and text selection () that are triggered by intercepting WebView events.
+- A central New Tab Page () that displays a privacy dashboard (AURA Shield).
+- A compact bottom navigation bar () that automatically hides when the user scrolls down the page.
+- A functional ad and tracker blocking system where counts are now reported from the WebView back to the UI.
+- The backend is minimal, primarily serving health check endpoints.
 
 **Last working item**:
-- Last item agent was working: The agent began implementing the Downloads Manager feature. The initial setup is complete: a new  file was created,  was updated to trigger its visibility, and the necessary state and imports were added to . The agent was about to start building the UI and logic for the modal itself.
-- Status: IN PROGRESS
-- Agent Testing Done: N
-- Which testing method agent to use? Frontend testing agent
-- User Testing Done: N
+The agent was working on fixing two issues within the AURA Shield stats panel located on the home screen ().
+
+-   Last item agent was working: The agent addressed two user-reported issues simultaneously:
+    1.  **Uneven Layout:** The three stats columns (Trackers, Ads, Connection) were not visually aligned due to varying character widths of the numbers and text. The agent applied a  style to the metric values to enforce monospaced (tabular) numbering for consistent alignment.
+    2.  **Non-Functional Counters:** The Trackers Blocked and Ads Stopped counters were always zero. The agent identified that the DOM-level ad blocker was only hiding elements via CSS and not communicating the block count back to the React Native application. The fix involved modifying the injected  to use a , count the number of blocked elements, and send this count back via . A corresponding message handler was added in  to update the counts in the .
+-   Status: **USER VERIFICATION PENDING**
+-   Agent Testing Done: N (The agent only took a screenshot of the home page, which verifies the layout but not the counter functionality, which requires web navigation.)
+-   Which testing method agent to use? **both**
+    -  To test the layout fix, the **screenshot tool** can be used on the home page.
+    -  To test the counter fix, the **frontend testing agent** should be used to perform a multi-step test: 1. Load the home page and record the initial counts. 2. Navigate to a third-party website with known ads (e.g., forbes.com). 3. Navigate back to the home page and verify that the Ads Stopped and/or Trackers Blocked counters have incremented.
+-   User Testing Done: N
 
 **All Pending/In progress Issue list**:
-- **Issue 1: Complete the Downloads Manager Implementation (P0)**
-  - **Description**: The Downloads Manager feature is only partially set up. The modal is an empty shell, and the state management for the download list is missing.
-  - **Status**: IN PROGRESS
-
-**Issues Detail**:
-- **Issue 1**: Complete the Downloads Manager Implementation
-  - **Attempted fixes**: No attempts have failed yet. The agent successfully created the initial files and state hooks.
-  - **Next debug checklist**:
-    1.  **Build Modal UI**: Implement the UI inside  using  to render the list of downloads. Each item should display the filename, date, and a file-type icon.
-    2.  **Implement State Management**: Create a new context () to manage the  array. This context should handle loading from and saving to  to ensure persistence.
-    3.  **Wire Interactions**:
-        - In , implement the tap to open functionality using .
-        - Implement a swipe to delete action that calls  via the  service and updates the state.
-    4.  **Connect to Downloader**: In , update the  function to use the  service and call a function from the new  to add the completed download to the global list.
-  - **Why fix this issue and what will be achieved with the fix?**: This will complete a core feature request, replacing a mocked Coming soon button with a fully functional file download manager, enhancing the browser's utility.
-  - **Status**: IN PROGRESS
-  - **Is recurring issue?** N
-  - **Should Test frontend/backend/both after fix?** Frontend
-  - **Blocked on other issue**: None
+-   **Issue 1: Verify AURA Shield Panel Fixes (P0)**
+    -   **Description:** The agent has implemented fixes for both the uneven layout and the non-functional ad/tracker counters in the AURA Shield panel. These fixes need to be thoroughly tested to confirm they work as expected.
+    -   **Status:** USER VERIFICATION PENDING
+    -   **Next debug checklist:**
+        1.  Run the **frontend testing agent** to execute the test flow described in the Last working item section.
+        2.  Inspect  and confirm the  style is present on .
+        3.  Inspect  to ensure the  function sends an  message.
+        4.  Inspect  to confirm the  function correctly handles the  message and calls .
+    -   **Why fix this issue and what will be achieved with the fix?** This will fix a core feature of the privacy-focused browser, providing users with real-time feedback on blocking activity and improving the UI's professional appearance.
 
 **In progress Task List**:
-- **Task 1: Build out the DownloadsModal.tsx component (P0)**
-  - **Where to resume**: .
-  - **What will be achieved with this?**: A functional UI for listing, opening, and deleting downloaded files, adhering to the Aura design aesthetic.
-  - **Status**: IN PROGRESS
-  - **Should Test frontend/backend/both after fix?** Frontend
-  - **Blocked on something**: Task 2 (State Management for the download list).
+None.
 
 **Upcoming and Future Tasks**
-- **Upcoming Tasks**:
-  - **P1: VPN Integration**: The current VPN toggle is a mock. The next step is to replace it with a real native module implementation in .
 
-- **Future Tasks**:
-  - **P2: Live Captioning**: The UI is a placeholder. This task involves wiring it to an actual audio transcription service that captures audio from the WebView.
-  - **P2: Ambient Awareness**: The current service returns mock data. This task involves integrating a real sound detection library to make the feature functional.
-  - **P2: Vision AI Scanner**: This service is a placeholder. It needs to be implemented to perform visual element detection on webpages.
-  - **P2: AI API Key Configuration**: Currently, the AI API key is an empty string. A secure method for users to configure and use their API key needs to be implemented.
+-   **Upcoming Tasks:**
+    -   **(P1) Wire AI Actions:** Implement the backend logic and frontend integration for the placeholder AI buttons.
+        -   Wire Explain and Summarize buttons in  to a GPT-4o service.
+        -   Wire Aura Vision button in  to a GPT-4o Vision API for image-to-text extraction.
+
+-   **Future Tasks:**
+    -   **(P2) Add Define Button:** Implement a Define action in  for single-word dictionary lookups.
+    -   **(P2) Add Translate Button:** Add translation capabilities to the text and image context menus.
+    -   **(P3) Downloads Storage Insights:** Enhance the Downloads Manager with a visual chart showing storage usage by category.
+    -   **(P3) Cloud Sync:** Implement a cloud backup/sync feature for bookmarks and download history.
 
 **Completed work in this session**
-- **Quick Converse Feature**: Implemented the full feature, including UI () and the live Speech-to-Text listener.
-- **AURA Browser Rebranding**: Performed a global search-and-replace to rebrand the app, update color schemes, and modify backend AI prompts.
-- **UI Revert**: Successfully reverted an unpopular Minimalist Monolith UI change using M	frontend/app/index.tsx
-M	frontend/src/components/BrowserMenu.tsx.
-- **Routing and Layout Fixes**: Corrected the new tab/home button logic to show the home screen instead of performing a Google search. Fixed layout issues with the bottom dock.
-- **Quick Access Scrolling**: Upgraded the home screen's Quick Access section to use a horizontal .
-- **Privacy Dashboard Implementation**: Built the glassmorphic UI for the dashboard on the home screen ().
-- **Wired Privacy Dashboard**: Connected the dashboard to the ad-blocker engine via a new , providing live, persisted metrics.
-- **Reader Mode Implementation**: Replaced a mocked menu item with a functional Reader Mode that injects CSS/JS into the WebView to reformat pages.
-- **Downloads Manager Initial Setup**: Created the  component and wired the menu to open it.
+-   **Downloads Manager (Features):**
+    -   Implemented a complete Downloads Manager with a custom UI (), file handling logic (), and state management ().
+    -   Added advanced features: live progress, search, batch downloads, background notifications, and auto-categorization.
+-   **Custom UI Components (Features):**
+    -   Created a custom long-press context menu for images ().
+    -   Created a floating Aura Action Pill for text selection ().
+-   **Bug Fixes & Refinements:**
+    -   Fixed multiple UI layout issues in the AURA Shield panel ().
+    -   Fixed a non-functional home button by creating a dedicated  handler (, ).
+    -   Resolved two critical app crashes related to module resolution and undefined props in .
+    -   Fixed bot-detection issues by setting a proper User-Agent and changing the default search engine to DuckDuckGo.
+    -   Made the bottom navigation bar more compact and implemented an auto-hide-on-scroll animation.
+    -   Implemented the counting mechanism for the ad and tracker blocker.
 
 **Earlier issues found/mentioned but not fixed**
-None. The agent has addressed all issues raised by the user so far.
+None. The agent has addressed all issues raised by the user during this session.
 
 **Known issue recurrence from previous fork**
 None.
@@ -94,81 +98,77 @@ None.
 
 
 **Key Technical Concepts**
-- **Frontend**: React Native, Expo, Expo Router, Zustand, React Context, 
-- **Backend**: FastAPI
-- **Database**: MongoDB (via backend)
-- **Native Features**: , , , .
-- **Styling**: StyleSheet, Glassmorphism,  for animations.
+-   **Frameworks:** React Native (Expo) for the frontend, FastAPI for the backend.
+-   **WebView-Native Bridge:** The core mechanism for custom browser features. It relies on injecting JavaScript into the  to capture events (e.g., , , ) and using  to send data back to the React Native host app.
+-   **State Management:** A hybrid approach using React Context for localized state () and Zustand for more complex, global state (, ).
+-   **File System:**  and  are used for the Downloads Manager.
+-   **Animation:** The React Native  API is used for UI animations like the auto-hiding navigation bar.
 
 **key DB schema**
-- **AsyncStorage (Client-Side Persistence)**:
-  - : 
-  - : Persisted state from Zustand store, including , , , , and .
-- No direct database schema changes were made in this session.
+No database schemas were modified or created. Data persistence for ad/tracker counts is handled via  on the device.
 
 **changes in tech stack**
-- Added  for speech-to-text functionality.
-
-**All files of reference**
-- : **(New)** Created to house the UI for the download manager.
-- : **(New)** Created to manage and persist privacy-related metrics (, ).
-- : **(Updated)** Heavily modified to integrate multiple features including the Privacy Context, Reader Mode state and logic, and the Downloads Modal state.
-- : **(Updated)** Heavily modified to add the Privacy Dashboard, wire it to the new context, and implement horizontal scrolling for Quick Access links. Also reverted from a previous git commit.
-- : **(Updated)** Logic updated to replace Coming Soon alerts with functional toggles for Reader Mode and the new Downloads Modal.
-- : **(Updated)** Wrapped the application in the new .
-- : **(Updated)** Default URL for new tabs changed to  to fix a routing bug.
-- : **(Updated)** AI system prompts and API info updated during the AURA rebranding.
-
-**Areas that need refactoring**
-- The main browser screen file, , has grown to over 2500 lines. It manages a large amount of state, contains complex logic (like ad-blocking), and renders many conditional components. This file should be refactored by extracting logic into custom hooks (e.g., , ) and breaking down the JSX into smaller, more focused components.
-
-**key api endpoints**
-- : (Backend) Categorizes browser tabs.
-- : (Backend) Generates a summary of a webpage.
-- : (Backend) Executes an AI agent command on a webpage.
-
-**Critical Info for New Agent**
-- **Use Existing Services**: A  service already exists with functions for downloading, deleting, and listing files. Leverage this service when building the  to avoid reimplementing logic.
-- **WebView Features on Native Only**: Features that rely on deep WebView integration (Ad-blocking, Reader Mode, STT, Downloads) will only work on native devices via the Expo Go app. The web preview is primarily for layout verification.
-- **Refactoring Opportunity**: Be aware that  is very large. While not an immediate task, look for opportunities to break it down into smaller, more manageable pieces as you add new features.
-
-**documents and test reports created in this job**
 None.
 
-**Last 10 User Messages and any pending HUMAN messages**
-1. **User**: Implement the 'Reader Mode' feature. (Completed)
-2. **User**: Implement the 'Downloads Manager'. (In Progress)
-3. **User**: What's missing in the browser? (Completed)
-4. **User**: Wire the Privacy Dashboard to the Ad-Blocker. (Completed)
-5. **User**: Fix the dashboard overlap and vertical spacing. (Completed)
-6. **User**: Implement the 'Privacy Metrics Dashboard'. (Completed)
-7. **User**: Upgrade 'Quick Access' to support horizontal scrolling. (Completed)
-8. **User**: Fix the Home button and new tab routing logic. (Completed)
-9. **User**: Stop and revert the 'Minimalist Monolith' UI changes. (Completed)
-10. **User**: Implement the 'Minimalist Monolith' design. (Completed & Reverted)
+**All files of reference**
+-   : The main application screen. It hosts the  and contains the message handling logic that connects the web content to the native UI features. It was heavily modified to integrate almost every new feature.
+-   : The home screen component. It was updated to fix the layout of the AURA Shield stats.
+-   : Contains the ad/tracker blocking logic. It was updated to add counting and report back to the main app.
+-   : The React Context responsible for managing and persisting the ad and tracker block counts.
+-   : The bottom navigation bar. It was refactored to be more compact, to auto-hide on scroll, and to fix the home button.
+-   : The bookmarks/history screen. It was fixed to prevent a crash when opened as a route.
+-   : A newly created component for the floating text selection menu.
+-   : A newly created component for the custom image long-press menu.
+-   : Newly created service to handle all file download logic.
+-   : Newly created Zustand store to manage the state of all downloads.
+-   : The agent-managed Product Requirements document.
 
-**Pending Request**: The current and primary pending task is to complete the implementation of the **Downloads Manager**, as detailed in the  and  sections.
+**Areas that need refactoring**:
+-   The main application file, , has grown to over 2,800 lines. It manages a significant amount of state, side effects, and complex JSX. It should be broken down into smaller, more manageable custom hooks and components to improve readability and maintainability. For example, the WebView message handling logic and the various modal visibility states could be extracted.
+
+**key api endpoints**
+-   
+-   
+
+**Critical Info for New Agent**
+-   The application's most complex features (custom menus, ad counting, scroll behavior) are built on the **WebView-to-Native communication bridge**. When debugging these features, you must examine both the injected JavaScript (in  within  and ) and the  function in .
+-   The project uses a mix of state management tools. Be sure to identify whether the relevant state is managed by **Zustand**, **React Context**, or local .
+-   The file  is the application's core. Be cautious when making changes here, as they can have far-reaching impacts.
+-   Some components like  are designed to function as both modal components (receiving props) and standalone routes (receiving no props), which has been a source of bugs. Always check for a default export, which indicates an Expo Router route.
+
+**documents and test reports created in this job**
+-   /app/memory/PRD.md
+-   /app/test_result.md (updated throughout the job)
+
+**Last 10 User Messages and any pending HUMAN messages**
+1.  **Request (Pending Verification):** Fix the uneven layout and non-working ad/tracker counters in the AURA Shield panel.
+2.  **Summary:** Agent confirms fix for  crash.
+3.  **Request:** Fix a crash in  where  is undefined.
+4.  **Summary:** Agent confirms fix for the bottom navigation bar UI/UX.
+5.  **Request:** Make the bottom navigation bar smaller and auto-hide on scroll.
+6.  **Summary:** Agent confirms fix for the non-working home button.
+7.  **Request:** Fix the home button.
+8.  **Summary:** Agent confirms fix for reCAPTCHA/bot detection issues.
+9.  **Request:** Fix reCAPTCHA/bot detection issues with a 5-point plan.
+10. **Summary:** Agent confirms fix for an earlier crash in .
 
 **Project Health Check:**
-- **Broken**: None. The application is in a stable, working state.
-- **Mocked**:
-  - **VPN Service**:  contains placeholder logic.
-  - **Live Captioning & Ambient Awareness**: UI and services exist but use placeholder/mock data.
+-   **Broken:** None confirmed, but the fix for the ad/tracker counters is pending verification.
+-   **Mocked:** The AI-powered actions are placeholders.
+    -   Explain & Summarize buttons in the .
+    -   Aura Vision button in the .
 
 **3rd Party Integrations**
-- : For Speech-to-Text in the Quick Converse feature.
-- : For managing local file downloads.
-- : For opening downloaded files with the native OS.
-- **LLM Integration**: The system prompt indicates the backend uses  with an  for AI features, but the agent did not directly interact with this setup.
+-   None added in this session. The project uses standard React Native / Expo libraries.
 
 **Testing status**
-- **Testing agent used after significant changes**: NO
-- **Troubleshoot agent used after agent stuck in loop**: NO
-- **Test files created**:  (created and deleted during development).
-- **Known regressions**: None.
+-   Testing agent used after significant changes: YES. The agent used  regularly, which appears to perform static code analysis and health checks.
+-   Troubleshoot agent used after agent stuck in loop: NO.
+-   Test files created: None.
+-   Known regressions: None.
 
 **Credentials to test flow:**
 N/A
 
 **What agent forgot to execute**
-The agent has followed all user instructions diligently. A potential oversight is not proactively suggesting a refactor of the increasingly complex  file, which is becoming a source of technical debt.
+-   The agent did not perform a functional test of the ad/tracker counter fix after implementing it. It only took a screenshot of the home page, which could not verify if the counters increment after browsing an ad-heavy website. The next agent must perform this verification step.

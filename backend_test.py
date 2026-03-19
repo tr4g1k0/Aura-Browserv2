@@ -10,7 +10,7 @@ import sys
 from typing import Dict, Any
 
 # Backend URL from environment
-BACKEND_URL = "https://aura-downloads.preview.emergentagent.com/api"
+BACKEND_URL = "https://browser-preview-2.preview.emergentagent.com/api"
 
 def test_health_endpoint() -> Dict[str, Any]:
     """Test the backend health endpoint"""

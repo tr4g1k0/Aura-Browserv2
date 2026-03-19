@@ -1112,6 +1112,15 @@ export default function BrowserScreen() {
         console.log('[Zero-Load] Prefetching links:', data.links);
         predictiveCacheService.prefetchMultiple(data.links);
       }
+
+      // Handle ad/tracker blocking counts from injected script
+      if (data.type === 'AD_BLOCK_COUNT') {
+        const ads = data.adsBlocked || 0;
+        const trackers = data.trackersBlocked || 0;
+        if (ads > 0) incrementAds(ads);
+        if (trackers > 0) incrementTrackers(trackers);
+      }
+
       
       /**
        * SEMANTIC TIME-MACHINE: Handle Page Context Extraction
