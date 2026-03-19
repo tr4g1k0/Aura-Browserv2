@@ -420,6 +420,23 @@ A comprehensive child-safe browsing mode for parents.
 - `/app/frontend/src/components/KidsModeParentDashboard.tsx` - Parent controls (3 tabs)
 - `/app/frontend/src/components/KidsModeTimeUp.tsx` - Time limit reached screen
 
+### Home Screen Redesign (Mar 2026)
+Complete premium redesign of NewTabPage to look more premium than Chrome, Brave, and Firefox.
+
+**Design Elements:**
+1. Living Aurora Background – animated teal/blue glow orbs + 8 floating particles
+2. Hero Shield – 64px icon with multi-layer glow, breathing animation, 3 radar ripples
+3. AURA Title – 36px bold, letter-spacing 14px, subtle text glow
+4. Status Bar Pill – frosted glass, pulsing green dot, "Aura Active | Shielding your data"
+5. Quick Access – 78x92px frosted glass cards, spring press, staggered entrance
+6. AURA Shield Panel – glassmorphic card, green accent line, animated number counting, "Secure" glow
+7. Search Bar – 52px frosted pill, cycling placeholders (3s), teal focus glow, mic + QR icons
+8. Bottom Nav – 5 icons with active teal indicator bar/dot, spring bounce press
+9. Staggered entrance animations (100ms-1000ms)
+
+**Key File:** `/app/frontend/src/components/NewTabPage.tsx`
+
+
 ## Upcoming Tasks
 - (P1) Wire AI Actions: Implement Explain/Summarize in AuraActionPill + Aura Vision in ImageContextMenu using GPT-4o
 - (P2) Add Define Button: Dictionary lookups in AuraActionPill
