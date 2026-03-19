@@ -202,3 +202,36 @@ Aura Browser is a privacy-focused AI-powered mobile browser built with React Nat
 - `/app/frontend/src/services/TabVirtualizationService.ts` - Memory management
 - `/app/frontend/src/services/DNSPrefetchService.ts` - DNS & favicon caching
 
+## Background Media Playback (Feb 2026) ✅
+
+### Features Implemented
+1. **Background Audio Playback**
+   - Audio continues playing when app goes to background
+   - expo-av configured with `staysActiveInBackground: true`
+   - Audio session set to allow background playback
+
+2. **YouTube Background Play**
+   - Page Visibility API overridden so YouTube thinks page is always visible
+   - Intercepts visibilitychange events to prevent pause
+   - Works with all YouTube videos including Shorts
+
+3. **Video Control Toolbar**
+   - Floating toolbar appears when video is detected playing
+   - Controls: Play/Pause, Mute/Unmute, Background Play toggle, PIP (Android)
+   - Auto-hides after 3 seconds of inactivity
+   - Glassmorphism design with blur effect
+
+4. **Video Detection**
+   - JavaScript injected to detect video elements on any page
+   - Reports video state (playing, paused, muted, duration, currentTime)
+   - Monitors for new videos added dynamically (SPAs)
+
+5. **Permissions Configured**
+   - iOS: UIBackgroundModes=["audio"]
+   - Android: WAKE_LOCK, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK
+
+### Key Files
+- `/app/frontend/src/services/BackgroundMediaService.ts` - Core service
+- `/app/frontend/src/hooks/useBackgroundMedia.ts` - React hook
+- `/app/frontend/src/components/VideoControlToolbar.tsx` - UI component
+

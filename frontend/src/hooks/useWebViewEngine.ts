@@ -16,6 +16,10 @@ import {
 import {
   pageContextExtractionScript,
 } from '../services/SemanticHistoryService';
+import {
+  videoDetectionScript,
+  youtubeBackgroundPlayScript,
+} from '../services/BackgroundMediaService';
 
 interface WebViewEngineDeps {
   userSettings: {
@@ -309,6 +313,21 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
       if (lastProcessedUrl !== currentUrl) {
         (globalThis as any).__lastProcessedUrl = currentUrl;
         webViewRef.current?.injectJavaScript(linkExtractionScript);
+      }
+    }
+
+    // Video detection for background playback
+    if (activeTab?.url) {
+      // Inject video detector on all pages
+      webViewRef.current?.injectJavaScript(videoDetectionScript);
+      
+      // Inject YouTube-specific background play script on YouTube
+      const isYouTube = activeTab.url.includes('youtube.com') || activeTab.url.includes('youtu.be');
+      if (isYouTube) {
+        setTimeout(() => {
+          webViewRef.current?.injectJavaScript(youtubeBackgroundPlayScript);
+          console.log('[BackgroundMedia] YouTube background play script injected');
+        }, 1000);
       }
     }
 

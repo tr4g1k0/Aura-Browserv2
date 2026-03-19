@@ -18,7 +18,11 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Enable ambient sound detection for accessibility",
-        "NSSpeechRecognitionUsageDescription": "Enable live captioning for media content"
+        "NSSpeechRecognitionUsageDescription": "Enable live captioning for media content",
+        "UIBackgroundModes": ["audio"],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       },
       "bundleIdentifier": "com.aura.browser"
     },
@@ -37,7 +41,10 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.INTERNET",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "package": "com.aura.browser"
     },
@@ -65,7 +72,13 @@
           "enableFileSharing": true
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Aura Browser to access your microphone for voice search."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

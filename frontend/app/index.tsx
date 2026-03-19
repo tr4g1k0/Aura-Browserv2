@@ -29,6 +29,7 @@ import { useDownloads } from '../src/hooks/useDownloads';
 import { useAISummarize } from '../src/hooks/useAISummarize';
 import { useBrowserNavigation } from '../src/hooks/useBrowserNavigation';
 import { useWebViewEngine } from '../src/hooks/useWebViewEngine';
+import { useBackgroundMedia } from '../src/hooks/useBackgroundMedia';
 
 // Performance: Lazy-load heavy overlay components (not visible on initial render)
 const BrowserMenu = React.lazy(() => import('../src/components/BrowserMenu').then(m => ({ default: m.BrowserMenu })));
@@ -48,6 +49,7 @@ import { NewTabPage } from '../src/components/NewTabPage';
 import { SwipeNavigationWrapper } from '../src/components/SwipeNavigationWrapper';
 import { DownloadToast } from '../src/components/DownloadToast';
 import { LibraryScreen } from './library';
+import { VideoControlToolbar } from '../src/components/VideoControlToolbar';
 import { AmbientAlerts } from '../src/components/AmbientAlerts';
 import { CaptionPill } from '../src/components/CaptionPill';
 import { DownloadNotificationBanner } from '../src/components/DownloadNotificationBanner';
@@ -125,6 +127,13 @@ export default function BrowserScreen() {
     setIsCacheHit: navigation.setIsCacheHit,
     incrementAds, incrementTrackers,
     checkForDownload, handleFileDownload, setLoading, webViewRef,
+  });
+
+  // ── Background media (video/audio playback) ──
+  const backgroundMedia = useBackgroundMedia({
+    webViewRef,
+    currentUrl: activeTab?.url || '',
+    isGhostMode,
   });
 
   // ── Ambient awareness ──
@@ -294,6 +303,10 @@ export default function BrowserScreen() {
       if (data.type === 'AD_BLOCK_COUNT') {
         if (data.adsBlocked > 0) incrementAds(data.adsBlocked);
         if (data.trackersBlocked > 0) incrementTrackers(data.trackersBlocked);
+      }
+      // Background media: Handle video state updates
+      if (data.type === 'VIDEO_STATE') {
+        backgroundMedia.handleVideoMessage(data);
       }
       if (data.type === 'PAGE_CONTEXT' && !isGhostMode) {
         const pageContext: PageContext = {
@@ -515,6 +528,20 @@ export default function BrowserScreen() {
             </TouchableOpacity>
           )}
           <PrivacyShredderToast />
+
+          {/* Video Control Toolbar - appears when video is playing */}
+          {!isNewTabPage && backgroundMedia.isVideoToolbarVisible && (
+            <VideoControlToolbar
+              videoInfo={backgroundMedia.videoState}
+              onPIP={backgroundMedia.enterPIP}
+              onBackgroundPlay={backgroundMedia.toggleBackgroundPlay}
+              onToggleMute={backgroundMedia.toggleMute}
+              onPlay={backgroundMedia.play}
+              onPause={backgroundMedia.pause}
+              isBackgroundPlayEnabled={backgroundMedia.isBackgroundPlayEnabled}
+              bottomOffset={80 + insets.bottom}
+            />
+          )}
 
           {/* Bottom Navigation Bar - absolutely positioned, overlays webview */}
           {!isNewTabPage && (
