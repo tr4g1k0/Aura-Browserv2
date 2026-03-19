@@ -101,7 +101,7 @@ export const DEFAULT_BROWSER_SETTINGS: BrowserSettings = {
   doNotTrack: true,
   
   // General Browsing
-  defaultSearchEngine: 'google',
+  defaultSearchEngine: 'duckduckgo',
   requestDesktopSite: false,
   predictiveCaching: true,
   

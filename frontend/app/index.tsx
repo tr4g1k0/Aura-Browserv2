@@ -82,6 +82,9 @@ const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 // Desktop User Agent for requesting desktop sites
 const DESKTOP_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+// Mobile User Agent - realistic Chrome on Android to avoid bot detection
+const MOBILE_USER_AGENT = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+
 /**
  * Privacy Shredder Toast - Shows confirmation after data deletion
  * "Privacy Shredded. You are on a clean slate."
@@ -461,6 +464,9 @@ export default function BrowserScreen() {
   // Text Selection Menu state
   const [selectedText, setSelectedText] = useState('');
   const [isActionPillVisible, setIsActionPillVisible] = useState(false);
+
+  // Bot detection banner state
+  const [showBotBanner, setShowBotBanner] = useState(false);
   
   // Find in Page state
   const [isFindModeActive, setIsFindModeActive] = useState(false);
@@ -617,8 +623,20 @@ export default function BrowserScreen() {
    * Uses the user's preferred search engine from settings
    * Implements Zero-Load instant navigation from predictive cache
    */
+  // Navigation throttle — minimum 500ms between consecutive navigations
+  const lastNavigationTimeRef = useRef<number>(0);
+
   const handleNavigate = useCallback((input: string) => {
     if (!input.trim()) return;
+    
+    // Throttle: enforce minimum 500ms between navigations
+    const now = Date.now();
+    const elapsed = now - lastNavigationTimeRef.current;
+    if (elapsed < 500) {
+      console.log(`[Browser] Navigation throttled (${elapsed}ms < 500ms)`);
+      return;
+    }
+    lastNavigationTimeRef.current = now;
     
     // Parse the input using user's preferred search engine
     const parsedUrl = parseUrlInput(input, userSettings.defaultSearchEngine);
@@ -1099,6 +1117,14 @@ export default function BrowserScreen() {
         setIsActionPillVisible(false);
         setSelectedText('');
       }
+
+      // Handle bot detection / reCAPTCHA page
+      if (data.type === 'BOT_DETECTED') {
+        console.log('[Browser] Bot detection page detected');
+        setShowBotBanner(true);
+        setTimeout(() => setShowBotBanner(false), 8000);
+      }
+
       
       // Handle "Download All Links" scan result
       if (data.type === 'DOWNLOAD_ALL_LINKS') {
@@ -1891,6 +1917,29 @@ export default function BrowserScreen() {
         }
       })();
     `;
+
+    // ============================================================================
+    // BOT DETECTION / reCAPTCHA DETECTOR
+    // Checks if the loaded page contains reCAPTCHA or "unusual traffic" indicators
+    // ============================================================================
+    scripts += `
+      (function() {
+        try {
+          setTimeout(function() {
+            var body = document.body ? document.body.innerText || '' : '';
+            var url = window.location.href || '';
+            var isBot = false;
+            if (url.indexOf('/sorry/') !== -1 || url.indexOf('recaptcha') !== -1) isBot = true;
+            if (body.indexOf('unusual traffic') !== -1) isBot = true;
+            if (body.indexOf('reCAPTCHA') !== -1 && body.indexOf('robot') !== -1) isBot = true;
+            if (body.indexOf('blocked') !== -1 && body.indexOf('automated') !== -1) isBot = true;
+            if (isBot) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'BOT_DETECTED' }));
+            }
+          }, 1500);
+        } catch(e) {}
+      })();
+    `;
     
     return scripts || 'true;';
   }, [userSettings.aggressiveAdBlocking, userSettings.doNotTrack, userSettings.forceZoom, visionAISelectors, vpnScript]);
@@ -2220,7 +2269,7 @@ export default function BrowserScreen() {
               // YouTube's video player can break in strict incognito mode
               incognito={isGhostMode && !activeTab?.url?.includes('youtube.com')}
               // Desktop Mode: Use desktop user agent if enabled (per-tab or global default)
-              userAgent={activeTab?.isDesktopMode || userSettings.requestDesktopSite ? DESKTOP_USER_AGENT : undefined}
+              userAgent={activeTab?.isDesktopMode || userSettings.requestDesktopSite ? DESKTOP_USER_AGENT : MOBILE_USER_AGENT}
               // ============================================================
               // NATIVE SCROLL PHYSICS - No JS bridge overhead
               // WebView handles all scrolling and refresh natively
@@ -2294,6 +2343,27 @@ export default function BrowserScreen() {
           onClose={() => setLiveCaptionsVisible(false)}
         />
         <AmbientAlerts />
+
+        {/* Bot Detection / reCAPTCHA Warning Banner */}
+        {showBotBanner && (
+          <View style={{
+            position: 'absolute', top: 80, left: 16, right: 16, zIndex: 1000,
+            backgroundColor: 'rgba(239, 68, 68, 0.95)', borderRadius: 14,
+            paddingVertical: 12, paddingHorizontal: 16,
+            flexDirection: 'row', alignItems: 'center',
+          }} data-testid="bot-detection-banner">
+            <Ionicons name="shield-outline" size={20} color="#FFF" style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>Site Blocked Request</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, marginTop: 2 }}>
+                Try switching networks or disabling VPN.
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowBotBanner(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Download Toast Notification */}
         <DownloadToast

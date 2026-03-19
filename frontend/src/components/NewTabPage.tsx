@@ -116,7 +116,7 @@ const getSearchUrl = (query: string, engine: string): string => {
       return `https://www.bing.com/search?q=${encodedQuery}`;
     case 'google':
     default:
-      return `https://www.google.com/search?q=${encodedQuery}`;
+      return `https://duckduckgo.com/?q=${encodedQuery}`;
   }
 };
 

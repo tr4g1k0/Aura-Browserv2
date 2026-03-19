@@ -77,8 +77,9 @@ export const parseUrlInput = (
   }
 
   // Rule 7: Search Query Fallback - treat as search query
+  // Default to DuckDuckGo to avoid Google bot detection
   const encodedInput = encodeURIComponent(trimmedInput);
-  const searchUrl = SEARCH_ENGINE_URLS[searchEngine] || SEARCH_ENGINE_URLS.google;
+  const searchUrl = SEARCH_ENGINE_URLS[searchEngine] || SEARCH_ENGINE_URLS.duckduckgo;
   
   return `${searchUrl}${encodedInput}`;
 };
