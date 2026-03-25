@@ -387,6 +387,8 @@ export function useWebViewEngine(deps: WebViewEngineDeps) {
       // Import dynamically to avoid circular deps
       import('../services/MediaDownloadService').then(({ mediaDetectionScript }) => {
         webViewRef.current?.injectJavaScript(mediaDetectionScript);
+      }).catch((error) => {
+        console.error('[WebViewEngine] Failed to load MediaDownloadService:', error);
       });
     }
 

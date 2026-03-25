@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -14,12 +15,22 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ.get('MONGO_URL')
+if not mongo_url:
+    raise RuntimeError("MONGO_URL environment variable is not set. Please configure it in the .env file.")
+db_name = os.environ.get('DB_NAME')
+if not db_name:
+    raise RuntimeError("DB_NAME environment variable is not set. Please configure it in the .env file.")
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[db_name]
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    client.close()
 
 # Create the main app without a prefix
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -176,7 +187,8 @@ Do not include any other text."""
             # Clean response (remove markdown if present)
             cleaned = llm_response.strip()
             if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[1]
+                parts = cleaned.split("\n", 1)
+                cleaned = parts[1] if len(parts) > 1 else ""
             if cleaned.endswith("```"):
                 cleaned = cleaned.rsplit("```", 1)[0]
             cleaned = cleaned.strip()
@@ -362,6 +374,3 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
