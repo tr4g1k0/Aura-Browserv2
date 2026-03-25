@@ -1,12 +1,15 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import re
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional
 import uuid
 from datetime import datetime
@@ -28,6 +31,17 @@ db = client[db_name]
 async def lifespan(app: FastAPI):
     yield
     client.close()
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers to every response."""
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        return response
 
 # Create the main app without a prefix
 app = FastAPI(lifespan=lifespan)
@@ -52,12 +66,27 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
+# ---- Input validation helpers ----
+
+_DOMAIN_RE = re.compile(
+    r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+)
+
+def is_valid_domain(domain: str) -> bool:
+    return bool(_DOMAIN_RE.match(domain)) and len(domain) <= 253
+
 # Tab Models
 class TabInfo(BaseModel):
-    id: str
-    title: str
-    url: str
-    metaDescription: Optional[str] = None
+    id: str = Field(..., max_length=128)
+    title: str = Field(..., max_length=500)
+    url: str = Field(..., max_length=2000)
+    metaDescription: Optional[str] = Field(None, max_length=1000)
+
+    @validator('url')
+    def url_must_be_http(cls, v: str) -> str:
+        if not v.startswith(('http://', 'https://')):
+            raise ValueError('URL must start with http:// or https://')
+        return v
 
 class CategorizeTabsRequest(BaseModel):
     tabs: List[TabInfo]
@@ -342,7 +371,9 @@ async def compare_prices(request: PriceCompareRequest):
 async def search_coupons(request: CouponSearchRequest):
     """Search for coupon codes for a given store domain"""
     try:
-        domain = request.domain.replace('www.', '')
+        domain = request.domain.replace('www.', '').strip().lower()
+        if not is_valid_domain(domain):
+            raise HTTPException(status_code=400, detail="Invalid domain format")
         store_name = domain.split('.')[0].upper()
         
         # Generate common coupon patterns (in production, would scrape real coupon sites)
@@ -366,11 +397,17 @@ async def search_coupons(request: CouponSearchRequest):
 # Include the router in the main app
 app.include_router(api_router)
 
+# Security headers on every response
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS: allow_credentials must be False when allow_origins=["*"].
+# Combining allow_credentials=True with a wildcard origin is rejected by
+# browsers and is a misconfiguration (OWASP A01 - Broken Access Control).
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 

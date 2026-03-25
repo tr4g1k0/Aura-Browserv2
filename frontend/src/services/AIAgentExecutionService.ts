@@ -83,15 +83,19 @@ export interface PageSitemap {
 /**
  * Generate JavaScript for clicking an element
  */
-const getClickScript = (selector: string): string => `
+const getClickScript = (selector: string): string => {
+  // JSON.stringify safely encodes the selector as a JS string literal,
+  // preventing injection via backticks, quotes, or ${} expressions.
+  const safeSelector = JSON.stringify(selector);
+  return `
 (function() {
   try {
-    const el = document.querySelector('${selector.replace(/'/g, "\\'")}');
+    const el = document.querySelector(${safeSelector});
     if (!el) {
       window.ReactNativeWebView.postMessage(JSON.stringify({
         type: 'AGENT_ACTION_RESULT',
         success: false,
-        message: 'Element not found: ${selector.replace(/'/g, "\\'")}'
+        message: 'Element not found: ' + ${safeSelector}
       }));
       return;
     }
@@ -126,42 +130,46 @@ const getClickScript = (selector: string): string => `
 })();
 true;
 `;
+};
 
 /**
  * Generate JavaScript for inputting text
  */
-const getInputScript = (selector: string, value: string): string => `
+const getInputScript = (selector: string, value: string): string => {
+  const safeSelector = JSON.stringify(selector);
+  const safeValue = JSON.stringify(value);
+  return `
 (function() {
   try {
-    const el = document.querySelector('${selector.replace(/'/g, "\\'")}');
+    const el = document.querySelector(${safeSelector});
     if (!el) {
       window.ReactNativeWebView.postMessage(JSON.stringify({
         type: 'AGENT_ACTION_RESULT',
         success: false,
-        message: 'Input element not found: ${selector.replace(/'/g, "\\'")}'
+        message: 'Input element not found: ' + ${safeSelector}
       }));
       return;
     }
-    
+
     // Focus and scroll into view
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.focus();
-    
+
     // Highlight element
     const originalOutline = el.style.outline;
     el.style.outline = '2px solid #00FF88';
-    
+
     setTimeout(() => {
       // Set value
-      el.value = '${value.replace(/'/g, "\\'")}';
-      
+      el.value = ${safeValue};
+
       // Dispatch events to trigger React/Vue/Angular listeners
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
       el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-      
+
       el.style.outline = originalOutline;
-      
+
       window.ReactNativeWebView.postMessage(JSON.stringify({
         type: 'AGENT_ACTION_RESULT',
         success: true,
@@ -178,6 +186,7 @@ const getInputScript = (selector: string, value: string): string => `
 })();
 true;
 `;
+};
 
 /**
  * Generate JavaScript for scrolling
@@ -388,23 +397,26 @@ true;
 /**
  * Generate JavaScript for select dropdown
  */
-const getSelectScript = (selector: string, value: string): string => `
+const getSelectScript = (selector: string, value: string): string => {
+  const safeSelector = JSON.stringify(selector);
+  const safeValue = JSON.stringify(value);
+  return `
 (function() {
   try {
-    const el = document.querySelector('${selector.replace(/'/g, "\\'")}');
+    const el = document.querySelector(${safeSelector});
     if (!el || el.tagName !== 'SELECT') {
       window.ReactNativeWebView.postMessage(JSON.stringify({
         type: 'AGENT_ACTION_RESULT',
         success: false,
-        message: 'Select element not found: ${selector.replace(/'/g, "\\'")}'
+        message: 'Select element not found: ' + ${safeSelector}
       }));
       return;
     }
-    
+
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.value = '${value.replace(/'/g, "\\'")}';
+    el.value = ${safeValue};
     el.dispatchEvent(new Event('change', { bubbles: true }));
-    
+
     window.ReactNativeWebView.postMessage(JSON.stringify({
       type: 'AGENT_ACTION_RESULT',
       success: true,
@@ -420,6 +432,7 @@ const getSelectScript = (selector: string, value: string): string => `
 })();
 true;
 `;
+};
 
 // ============================================================================
 // COMMAND PARSING

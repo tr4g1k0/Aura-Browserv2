@@ -178,13 +178,35 @@ export function getDealScoreInjectionScript(score: number, label: string, isNew:
   } else {
     bgColor = '#D50000'; textColor = '#FFFFFF'; borderColor = '#FF1744';
   }
+
+  // Safely encode dynamic text values as JSON strings for use in injected JS.
+  // This prevents XSS by ensuring no HTML or JS can break out of the string context.
+  const safeScoreText = JSON.stringify(isNew ? 'NEW' : String(score));
+  const safeLabelText = JSON.stringify(isNew ? 'Tracking' : (score >= 9 ? '🔥 BEST' : label));
+
   return `
     (function() {
       if (document.getElementById('aura-deal-score')) document.getElementById('aura-deal-score').remove();
       var badge = document.createElement('div');
       badge.id = 'aura-deal-score';
       badge.style.cssText = 'position:fixed;top:16px;right:16px;z-index:999999;width:64px;height:64px;border-radius:50%;background:${bgColor};border:2px solid ${borderColor};display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.4);transition:transform 0.2s;touch-action:none;';
-      badge.innerHTML = '<div style="font-size:10px;font-weight:700;color:${textColor};opacity:0.8;letter-spacing:1px;">AURA</div><div style="font-size:${isNew ? '10' : '22'}px;font-weight:900;color:${textColor};line-height:1;">${isNew ? 'NEW' : score}</div><div style="font-size:8px;color:${textColor};opacity:0.9;">${isNew ? 'Tracking' : (score >= 9 ? '🔥 BEST' : label)}</div>';
+
+      // Build badge content with safe DOM APIs instead of innerHTML to prevent XSS.
+      var topDiv = document.createElement('div');
+      topDiv.style.cssText = 'font-size:10px;font-weight:700;color:${textColor};opacity:0.8;letter-spacing:1px;';
+      topDiv.textContent = 'AURA';
+
+      var midDiv = document.createElement('div');
+      midDiv.style.cssText = 'font-size:${isNew ? '10' : '22'}px;font-weight:900;color:${textColor};line-height:1;';
+      midDiv.textContent = ${safeScoreText};
+
+      var botDiv = document.createElement('div');
+      botDiv.style.cssText = 'font-size:8px;color:${textColor};opacity:0.9;';
+      botDiv.textContent = ${safeLabelText};
+
+      badge.appendChild(topDiv);
+      badge.appendChild(midDiv);
+      badge.appendChild(botDiv);
       
       // Make draggable
       var isDragging = false, startX, startY, origX, origY;

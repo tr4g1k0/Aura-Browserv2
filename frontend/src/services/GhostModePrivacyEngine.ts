@@ -96,17 +96,25 @@ class GhostModePrivacyEngine {
 
     // 6. Geolocation spoofing
     if (options.spoofLocation) {
-      const { lat, lng } = options.spoofLocation;
-      script += `
-        navigator.geolocation.getCurrentPosition=function(success){
-          success({coords:{latitude:${lat},longitude:${lng},accuracy:10,altitude:null,altitudeAccuracy:null,heading:null,speed:null},timestamp:Date.now()});
-        };
-        navigator.geolocation.watchPosition=function(success){
-          success({coords:{latitude:${lat},longitude:${lng},accuracy:10,altitude:null,altitudeAccuracy:null,heading:null,speed:null},timestamp:Date.now()});
-          return 0;
-        };
-        console.log('[Ghost] Location spoofed to ${options.spoofLocation.name}');
-      `;
+      // Validate and clamp coordinates to prevent JS injection via crafted values.
+      // Parsing as Number rejects non-numeric strings; clamping enforces valid ranges.
+      const rawLat = Number(options.spoofLocation.lat);
+      const rawLng = Number(options.spoofLocation.lng);
+      if (!isNaN(rawLat) && !isNaN(rawLng)) {
+        const lat = Math.max(-90, Math.min(90, rawLat));
+        const lng = Math.max(-180, Math.min(180, rawLng));
+        const safeName = JSON.stringify(options.spoofLocation.name);
+        script += `
+          navigator.geolocation.getCurrentPosition=function(success){
+            success({coords:{latitude:${lat},longitude:${lng},accuracy:10,altitude:null,altitudeAccuracy:null,heading:null,speed:null},timestamp:Date.now()});
+          };
+          navigator.geolocation.watchPosition=function(success){
+            success({coords:{latitude:${lat},longitude:${lng},accuracy:10,altitude:null,altitudeAccuracy:null,heading:null,speed:null},timestamp:Date.now()});
+            return 0;
+          };
+          console.log('[Ghost] Location spoofed to ' + ${safeName});
+        `;
+      }
     }
 
     // 7. DNT + GPC headers

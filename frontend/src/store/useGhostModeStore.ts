@@ -89,7 +89,18 @@ const USER_AGENTS = [
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 ];
 
-export const getRandomUserAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+export const getRandomUserAgent = (): string => {
+  // Use a cryptographically secure RNG so User-Agent rotation cannot be predicted
+  // by fingerprinting scripts that model Math.random() output.
+  try {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return USER_AGENTS[buf[0] % USER_AGENTS.length];
+  } catch {
+    // Fallback for environments where crypto is unavailable
+    return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+  }
+};
 
 export const useGhostModeStore = create<GhostModeState>((set, get) => ({
   isActive: false,
@@ -179,7 +190,13 @@ export const useGhostModeStore = create<GhostModeState>((set, get) => ({
   recordBioFailure: () => {
     const attempts = get().failedBioAttempts + 1;
     if (attempts >= 3) {
-      set({ failedBioAttempts: attempts, bioLockoutUntil: Date.now() + 30000 });
+      // Exponential backoff: 5 min → 15 min → 60 min for repeated failures.
+      // A fixed 30-second lockout is trivially bypassed by waiting.
+      const lockoutMs =
+        attempts === 3 ? 5 * 60 * 1000 :
+        attempts === 4 ? 15 * 60 * 1000 :
+        60 * 60 * 1000;
+      set({ failedBioAttempts: attempts, bioLockoutUntil: Date.now() + lockoutMs });
     } else {
       set({ failedBioAttempts: attempts });
     }
